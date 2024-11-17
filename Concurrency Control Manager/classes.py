@@ -74,7 +74,7 @@ class Lock:
 class ConcurrencyControlManager:
     def __init__(self, algorithm: str):
         self.algorithm = algorithm
-        self.locks = [] # List of Lock
+        self.activeLocks = {} # transaction_id: Lock[]
     
     def __str__(self):
         return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"
@@ -93,7 +93,54 @@ class ConcurrencyControlManager:
     
     def validate_object(self, object: Row, transaction_id: int, action: Action) -> Response:
         # decide wether the object is allowed to do a particular action or not
-        pass
+        action = action.lower()
+        if(action != "read" and action != "write"):
+            raise ValueError(f"Invalid action type: {action}. Allowed actions are \"read\" or \"write\".")
+        lockType = 'S' if action == "read" else 'X'
+        
+        for trans_id, lock_list in self.activeLocks.items():
+            for idx,activeLock in enumerate(lock_list):
+                # Row nya udah ada yg nge-lock?
+                if(object == activeLock.row):
+                    # Row di lock di transaksi yang berbeda?
+                    if(transaction_id != trans_id):
+                        if(lockType != activeLock.type):
+                            print("Lock not granted S != X")
+                            return Response(False, transaction_id)
+                        else:
+                            if(lockType == 'X'):
+                                print("Lock not granted X == X")
+                                return Response(False, transaction_id)
+                            else:
+                                break
+                else:
+                    continue
+                              
+        # Row tidak di-lock transaksi lain
+        
+        if(transaction_id in self.activeLocks):
+            isAlrExist = False
+            # Transaksi saat ini udah pernah ambil lock?
+            for idx, lock in enumerate(self.activeLocks[transaction_id]):
+                if(object == lock.row):
+                    isAlrExist = True
+                    
+                    # Upgrade lock?
+                    if(lockType == 'X' and lock.type == 'S'):
+                        self.activeLocks[transaction_id][idx].type = 'X'
+                        print("Lock Upgraded")
+                    else:
+                        print(f"Lock {lock.type} already granted")
+                            
+            if not isAlrExist:
+                newLock = Lock(lockType, transaction_id, object)
+                self.activeLocks[transaction_id].append(newLock)
+                print(f"Lock {lockType} Acquired")
+        else:
+            newLock = Lock(lockType, transaction_id, object)
+            self.activeLocks[transaction_id] = [newLock]
+            print(f"Lock {lockType} Acquired")
+        return Response(True, transaction_id)
     
     def end_transaction(self, transaction_id: int):
         # Flush objects of a particular transaction after it has successfully committed/aborted
@@ -128,3 +175,26 @@ class ConcurrencyControlManager:
 
 # lock = Lock('S',2,row)
 # print(lock)
+
+# row_tes_1 = Row('table', 1, {'col1': 1, 'col2': 'SBD'})
+# tid1 = ccm.begin_transaction()
+# tid2 = ccm.begin_transaction()
+
+# print(ccm.validate_object(row_tes_1, tid1,'ReAd'))  # T
+# print(ccm.validate_object(row_tes_1, tid2,'reAd'))  # T
+# print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # F
+
+# print(ccm.validate_object(row_tes_1, tid1,'ReAd'))  # T
+# print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # T
+# print(ccm.validate_object(row_tes_1, tid2,'reAd'))  # F
+
+# print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # T
+# print(ccm.validate_object(row_tes_1, tid1,'ReAd'))  # T
+# print(ccm.validate_object(row_tes_1, tid2,'reAd'))  # F
+
+# print(ccm.validate_object(row_tes_1, tid1,'rEAd'))  # T
+# print(ccm.validate_object(row_tes_1, tid2,'ReAd'))  # T
+# print(ccm.validate_object(row_tes_1, tid1,'reAd'))  # T
+
+# print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # T
+# print(ccm.validate_object(row_tes_1, tid2,'wriTe')) # F
