@@ -1,6 +1,6 @@
 # import class Row
 from datetime import datetime
-import random
+import time
 
 class PrimaryKey:
     def __init__(self, *keys):
@@ -80,7 +80,8 @@ class ConcurrencyControlManager:
         return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"
     
     def __generate_id(self) -> int:
-        return int(f"{datetime.now().strftime("%Y%m%d%H%M%S%f")}{random.randint(10000, 99999)}")
+        # return int(f"{datetime.now().strftime("%Y%m%d%H%M%S%f")}{random.randint(10000, 99999)}")
+        return int((str(time.perf_counter()*1000000000)).replace('.', ''))
     
     def begin_transaction(self) -> int:
         # will return transaction_id: int
@@ -148,6 +149,8 @@ class ConcurrencyControlManager:
         pass
     
 # ccm = ConcurrencyControlManager(algorithm="Test")
+# print(ccm.begin_transaction())
+# print(ccm.begin_transaction())
 # print(ccm.begin_transaction())
 
 # pkey = PrimaryKey("lala", 1)
