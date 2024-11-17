@@ -42,7 +42,7 @@ class Row:
         return not self.__eq__(other)
     
     def __str__(self):
-        return f"=== Row ===\ntable: {self.table}\npkey:\n{self.pkey}map:\n{self.map}\n===========\n"
+        return f"=============== Row ===============\ntable: {self.table}\nmap:\n{self.map}\npkey:\n{self.pkey}===================================\n"
 
 class Action:
     def __init__(self, action):
@@ -59,9 +59,22 @@ class Response:
     def __str__(self):
         return f"==== Response ====\nallowed: {self.allowed}\ntransaction_id: {self.transaction_id}\n==================\n"
 
+class Lock:
+    def __init__(self, type: str, transaction_id: int, row: Row):
+        # type is either 'S' or 'X'
+        self.type = type.upper()
+        if(self.type != 'S' and self.type != 'X'):
+            raise ValueError(f"Invalid lock type: {type}. Allowed values are 'S' or 'X'.")
+        self.transaction_id = transaction_id
+        self.row = row
+        
+    def __str__(self):
+        return f"=============== Lock ===============\ntype: {self.type}\ntransaction_id: {self.transaction_id}\nrow:\n{self.row}====================================\n"
+
 class ConcurrencyControlManager:
     def __init__(self, algorithm: str):
         self.algorithm = algorithm
+        self.locks = [] # List of Lock
     
     def __str__(self):
         return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"
@@ -71,7 +84,6 @@ class ConcurrencyControlManager:
     
     def begin_transaction(self) -> int:
         # will return transaction_id: int
-        
         return self.__generate_id()
     
     def log_object(self, object: Row, transaction_id: int):
@@ -113,4 +125,6 @@ class ConcurrencyControlManager:
 
 # print(row3['att1'])
 # print(row3['att2'])
-    
+
+# lock = Lock('S',2,row)
+# print(lock)
