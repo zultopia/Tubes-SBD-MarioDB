@@ -1,9 +1,46 @@
 # import class Row
 from datetime import datetime
 
+class PrimaryKey:
+    def __init__(self, *keys):
+        # keys nya langsung value si primary key nya aja
+        self.isComposite = len(keys) > 1
+        self.keys = keys
+
+    def __eq__(self, other):
+        if not isinstance(other, PrimaryKey):
+            return NotImplemented
+        if(self.isComposite != other.isComposite):
+            return False
+        return self.keys == other.keys
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __str__(self):
+        keys_list = ", ".join(map(str, self.keys))
+        return (
+            # f"PrimaryKey(keys=[{keys_list}], isComposite={self.isComposite})"
+            f"{self.keys}"
+        )
+
 class Row:
-    def __init__(self):
-        pass
+    def __init__(self, table: str, pkey: PrimaryKey, map: dict):
+        self.table = table
+        self.pkey = pkey
+        self.map = map
+        
+    def __getitem__(self, key):
+        # use case: Row['key1'], then it will return the value of that 'key1' key in the map
+        if key in self.map:
+            return self.map[key]
+        raise KeyError(f"Key '{key}' not found")
+    
+    def __eq__(self, other):
+        return (self.pkey == other.pkey) and (self.table == other.table)
+    
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
 class Action:
     def __init__(self, action):
@@ -51,4 +88,25 @@ class ConcurrencyControlManager:
     
 ccm = ConcurrencyControlManager(algorithm="Test")
 print(ccm.begin_transaction())
+
+pkey = PrimaryKey("lala", 1)
+pkey1 = PrimaryKey("lala", 1)
+pkey2 = PrimaryKey("lala")
+print(pkey != pkey1)
+print(pkey == pkey2)
+
+row = Row(table="table", pkey=pkey, map={'att1': 15})
+row1 = Row(table="table", pkey=pkey, map={'att1': 15})
+row2 = Row(table="table", pkey=pkey2, map={'att1': 15})
+row3 = Row(table="table1", pkey=pkey, map={'att1': 15, 'att2': "Lela"})
+print("=== tes Row comparison ===")
+print(row == row1)
+print(row == row2)
+print(row == row3)
+print(row != row1)
+print(row != row2)
+print(row != row3)
+
+print(row3['att1'])
+print(row3['att2'])
     
