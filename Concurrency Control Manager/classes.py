@@ -19,10 +19,8 @@ class PrimaryKey:
         return not self.__eq__(other)
 
     def __str__(self):
-        keys_list = ", ".join(map(str, self.keys))
         return (
-            # f"PrimaryKey(keys=[{keys_list}], isComposite={self.isComposite})"
-            f"{self.keys}"
+            f"===== PrimaryKey =====\nisComposite: {self.isComposite}\nkeys: {self.keys}\n======================\n"
         )
 
 class Row:
@@ -42,13 +40,16 @@ class Row:
     
     def __ne__(self, other):
         return not self.__eq__(other)
+    
+    def __str__(self):
+        return f"=== Row ===\ntable: {self.table}\npkey:\n{self.pkey}map:\n{self.map}\n===========\n"
 
 class Action:
     def __init__(self, action):
         self.action = action
         
     def __str__(self):
-        return f"=== Action ===\nAction: {self.action}\n==============\n"
+        return f"=== Action ===\naction: {self.action}\n==============\n"
         
 class Response:
     def __init__(self, allowed: bool, transaction_id: int):
@@ -92,11 +93,13 @@ class ConcurrencyControlManager:
 
 # pkey = PrimaryKey("lala", 1)
 # pkey1 = PrimaryKey("lala", 1)
+# print(pkey1)
 # pkey2 = PrimaryKey("lala")
 # print(pkey != pkey1)
 # print(pkey == pkey2)
 
 # row = Row(table="table", pkey=pkey, map={'att1': 15})
+# print(row)
 # row1 = Row(table="table", pkey=pkey, map={'att1': 15})
 # row2 = Row(table="table", pkey=pkey2, map={'att1': 15})
 # row3 = Row(table="table1", pkey=pkey, map={'att1': 15, 'att2': "16"})
