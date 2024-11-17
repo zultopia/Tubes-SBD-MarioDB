@@ -1,5 +1,6 @@
 # import class Row
 from datetime import datetime
+import random
 
 class PrimaryKey:
     def __init__(self, *keys):
@@ -65,7 +66,7 @@ class ConcurrencyControlManager:
         return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"
     
     def __generate_id(self) -> int:
-        return int(datetime.now().strftime("%Y%m%d%H%M%S%f"))
+        return int(f"{datetime.now().strftime("%Y%m%d%H%M%S%f")}{random.randint(10000, 99999)}")
     
     def begin_transaction(self) -> int:
         # will return transaction_id: int
@@ -86,27 +87,27 @@ class ConcurrencyControlManager:
         # Terminates the transaction
         pass
     
-ccm = ConcurrencyControlManager(algorithm="Test")
-print(ccm.begin_transaction())
+# ccm = ConcurrencyControlManager(algorithm="Test")
+# print(ccm.begin_transaction())
 
-pkey = PrimaryKey("lala", 1)
-pkey1 = PrimaryKey("lala", 1)
-pkey2 = PrimaryKey("lala")
-print(pkey != pkey1)
-print(pkey == pkey2)
+# pkey = PrimaryKey("lala", 1)
+# pkey1 = PrimaryKey("lala", 1)
+# pkey2 = PrimaryKey("lala")
+# print(pkey != pkey1)
+# print(pkey == pkey2)
 
-row = Row(table="table", pkey=pkey, map={'att1': 15})
-row1 = Row(table="table", pkey=pkey, map={'att1': 15})
-row2 = Row(table="table", pkey=pkey2, map={'att1': 15})
-row3 = Row(table="table1", pkey=pkey, map={'att1': 15, 'att2': "Lela"})
-print("=== tes Row comparison ===")
-print(row == row1)
-print(row == row2)
-print(row == row3)
-print(row != row1)
-print(row != row2)
-print(row != row3)
+# row = Row(table="table", pkey=pkey, map={'att1': 15})
+# row1 = Row(table="table", pkey=pkey, map={'att1': 15})
+# row2 = Row(table="table", pkey=pkey2, map={'att1': 15})
+# row3 = Row(table="table1", pkey=pkey, map={'att1': 15, 'att2': "16"})
+# print("=== tes Row comparison ===")
+# print(row == row1)
+# print(row == row2)
+# print(row == row3)
+# print(row != row1)
+# print(row != row2)
+# print(row != row3)
 
-print(row3['att1'])
-print(row3['att2'])
+# print(row3['att1'])
+# print(row3['att2'])
     
