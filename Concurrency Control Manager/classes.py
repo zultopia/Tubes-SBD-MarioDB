@@ -33,8 +33,7 @@ class ConcurrencyControlManager:
     def begin_transaction(self) -> int:
         # will return transaction_id: int
         
-        self.__generate_id
-        pass
+        return self.__generate_id()
     
     def log_object(self, object: Row, transaction_id: int):
         # implement lock on an object
@@ -49,4 +48,7 @@ class ConcurrencyControlManager:
         # Flush objects of a particular transaction after it has successfully committed/aborted
         # Terminates the transaction
         pass
+    
+ccm = ConcurrencyControlManager(algorithm="Test")
+print(ccm.begin_transaction())
     
