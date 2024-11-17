@@ -1,4 +1,9 @@
 # import class Row
+from datetime import datetime
+
+class Row:
+    def __init__(self):
+        pass
 
 class Action:
     def __init__(self, action):
@@ -22,8 +27,13 @@ class ConcurrencyControlManager:
     def __str__(self):
         return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"
     
+    def __generate_id(self) -> int:
+        return int(datetime.now().strftime("%Y%m%d%H%M%S%f"))
+    
     def begin_transaction(self) -> int:
         # will return transaction_id: int
+        
+        self.__generate_id
         pass
     
     def log_object(self, object: Row, transaction_id: int):
