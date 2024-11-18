@@ -33,5 +33,6 @@ class Token(Enum):
     DOT = '.'
     OPEN_PARANTHESIS = '('
     CLOSE_PARANTHESIS = ')'
+    QUOTE = '\''
 
     SEMICOLON = ';'
