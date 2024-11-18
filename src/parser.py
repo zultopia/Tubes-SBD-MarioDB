@@ -28,14 +28,30 @@ class ParsedQueryTree:
     
     query_plan: QueryPlan | None
     
-
+    def __init__(self, unoptimized_query):
+        self.parse(unoptimized_query)
+        
+    def parse(self, unoptimized_query: str):
+        # ini nyoba isi root dan childsnya, tapi queryplan belum.
+        pass
+    
+    def get_cost(self) -> float:
+        return optimize.calculate_cost(self)
+    
+    def optimize(self):
+        # ini nyoba susun ulang tree biar lebih optimal nya dan mengisi queryplannya.
+        optimize.optimize(self)
+        
+    
     
     
 class ParsedQuery:
     parsed_query_tree: ParsedQueryTree
     query: str # ini hasil query yang sudah dimodify sehingga sesuai dengan query tree yang sudah teroptimisasi
     
-    def get_cost(self) -> float:
-        return optimize.calculate_cost(self.query_tree)
+    def __init__(self, unoptimized_query: str):
+        self.parsed_query_tree = ParsedQueryTree(unoptimized_query)
     
+    def optimize(self):
+        self.optimize()
     
