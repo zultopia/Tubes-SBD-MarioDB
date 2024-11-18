@@ -14,9 +14,9 @@ class Token(Enum):
     LIMIT = 'limit'
 
     # Logical operators
-    AND = 'AND'
-    NOT = 'NOT'
-    OR = 'OR'
+    AND = 'and'
+    NOT = 'not'
+    OR = 'or'
 
     # Comparison operators
     GREATER = '>'
@@ -27,11 +27,11 @@ class Token(Enum):
 
 
     # Others
-    COMMA = ',' # buat nama tabel atau hasil aliasing table contoh 'SELECT ATTRIBUTE from TABLE1, TABLE2, TABLE3;'
-    TABLE = None # buat nama attribute contoh 'select ATTRIBUTE from TABLE;' atau 'select TABLE.ATTRIBUTE from TABLE;;
-    ATTRIBUTE = None
+    COMMA = ','
+    TABLE = None # buat nama tabel atau hasil aliasing table contoh 'SELECT ATTRIBUTE from TABLE1, TABLE2, TABLE3;' 
+    ATTRIBUTE = None # buat nama attribute contoh 'select ATTRIBUTE from TABLE;' atau 'select TABLE.ATTRIBUTE from TABLE;'
     DOT = '.'
+    OPEN_PARANTHESIS = '('
+    CLOSE_PARANTHESIS = ')'
 
     SEMICOLON = ';'
-
-    # begin transaction dan commit tidak perlu karena kita hanya melakukan parsing query
