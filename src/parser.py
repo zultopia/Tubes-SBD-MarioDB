@@ -1,4 +1,4 @@
-import cost
+import optimize
 
 from typing import List
 from lexer import Token
@@ -36,6 +36,6 @@ class ParsedQuery:
     query: str # ini hasil query yang sudah dimodify sehingga sesuai dengan query tree yang sudah teroptimisasi
     
     def get_cost(self) -> float:
-        return cost.calculate_cost(self.query_tree)
+        return optimize.calculate_cost(self.query_tree)
     
     
