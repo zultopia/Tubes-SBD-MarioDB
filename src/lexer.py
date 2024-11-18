@@ -1,8 +1,6 @@
 from enum import Enum
 
 class Token(Enum):
-    QUERY = None # Ini token_type dari rootnya parse trree  
-
     # Basic SQL keywords
     SELECT = 'select'
     UPDATE = 'update'
@@ -25,6 +23,9 @@ class Token(Enum):
     LESS_EQ = '<='
     EQ = '='
 
+    # Literals
+    NUMBER = None # Contoh: 3.14 atau 19
+    STRING = None # 'John' (btw ini termasuk single quotation marksnya ya)
 
     # Others
     COMMA = ','
@@ -33,6 +34,5 @@ class Token(Enum):
     DOT = '.'
     OPEN_PARANTHESIS = '('
     CLOSE_PARANTHESIS = ')'
-    QUOTE = '\''
 
     SEMICOLON = ';'
