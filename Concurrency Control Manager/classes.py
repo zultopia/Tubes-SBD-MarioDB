@@ -75,6 +75,7 @@ class ConcurrencyControlManager:
     def __init__(self, algorithm: str):
         self.algorithm = algorithm
         self.activeLocks = {} # transaction_id: Lock[]
+        
     
     def __str__(self):
         return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"
