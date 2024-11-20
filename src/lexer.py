@@ -14,19 +14,28 @@ class Token(Enum):
     LIMIT = 'limit'
     ON = 'on'
     NATURAL = 'natural'
+    ASC = 'ascending'
+    DESC = 'descending'
 
     # Logical operators
     AND = 'and'
     NOT = 'not'
     OR = 'or'
 
-    # Comparison operators
+    # operators
     GREATER = '>'
     GREATER_EQ = '>='
     LESS = '<'
     LESS_EQ = '<='
     EQ = '='
     NEQ = '<>'
+    ADD = '+'
+    SUBTRACT = '-'
+    DIVIDE = '/'
+    MODULO = '%'
+    BWAND = '&'
+    BWOR = '|'
+    BWXOR = '^'
 
     # Literals
     NUMBER = 1 # Contoh: 3.14 atau 19
@@ -40,8 +49,6 @@ class Token(Enum):
     DOT = '.'
     OPEN_PARANTHESIS = '('
     CLOSE_PARANTHESIS = ')'
-    ASC = 'ascending'
-    DES = 'descending'
     WS = None # tokens white spaces
 
     SEMICOLON = ';'
@@ -71,19 +78,29 @@ class Lexer:
     (Token.LIMIT, r"(?i)\blimit\b"),
     (Token.ON, r"(?i)\bon\b"),
     (Token.NATURAL, r"(?i)\bnatural\b"),
+    (Token.ASC, r"(?i)\b(ascending|asc)\b"),   
+    (Token.DESC, r"(?i)\b(descending|desc)\b"),
 
     # Logical operators
     (Token.AND, r"(?i)\band\b"),
     (Token.NOT, r"(?i)\bnot\b"),
     (Token.OR, r"(?i)\bor\b"),
 
-    # Comparison operators
+    # Operators
     (Token.GREATER, r">"),      
     (Token.GREATER_EQ, r">="),   
     (Token.LESS, r"<"),         
     (Token.LESS_EQ, r"<="),      
     (Token.EQ, r"="),           
-    (Token.NEQ, r"<>"),          
+    (Token.NEQ, r"<>"),
+    (Token.ADD,r'\+'),
+    (Token.SUBTRACT,r'-'),
+    (Token.DIVIDE,r'/'),
+    (Token.MODULO,r'%'),
+    (Token.BWAND,r'&'),
+    (Token.BWOR,r'\|'),
+    (Token.BWXOR,r'\^'),
+
 
     # Literals
     (Token.NUMBER, r"\b\d+(\.\d+)?\b"),  
@@ -96,9 +113,7 @@ class Lexer:
     (Token.ATTRIBUTE, r"[a-zA-Z_][a-zA-Z0-9_]*"),   
     (Token.DOT, r"\."),                  
     (Token.OPEN_PARANTHESIS, r"\("),     
-    (Token.CLOSE_PARANTHESIS, r"\)"),    
-    (Token.ASC, r"(?i)\bascending\b"),   
-    (Token.DES, r"(?i)\bdescending\b"),           
+    (Token.CLOSE_PARANTHESIS, r"\)"),               
 
     (Token.SEMICOLON, r";")              
 ]
@@ -140,3 +155,5 @@ class Lexer:
                 result[i-1] = tuple(result[i-1])
         self.state=0
         return result
+    
+print(Lexer("Select t1.f1, t2.f2 from t1 as s, t2 natUrAl join t1 where s.f1 = 2 and f9 * 2 * 2 * 2 > 4 and 2+ s.f1 <12 order by f1, t2.f2 ascending limit 4;").tokenize())
