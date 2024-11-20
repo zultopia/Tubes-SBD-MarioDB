@@ -111,32 +111,32 @@ class Lexer:
                 token, regex = tokenExpr
                 isMatch = re.match(regex,tempQuery)
                 if isMatch:
-                    tokenValue = token.value
                     actualValue = isMatch.group()
                     avLength = len(actualValue)
-                    if type(tokenValue) == int:
-                        if token == Token.NUMBER:
-                            result.append((token, float(actualValue)))
-                        elif token in {Token.ATTRIBUTE, Token.TABLE}:
-                            if self.state == 0:
-                                result.append((Token.ATTRIBUTE, actualValue))
-                            else:
-                                result.append((Token.TABLE, actualValue))
-                        else:
-                            result.append((token, actualValue))
+                    if token in {Token.ATTRIBUTE, Token.TABLE}:
+                        if self.state == 0: 
+                            result.append((Token.ATTRIBUTE, actualValue))
+                        elif self.state == 1: 
+                            result.append((Token.TABLE, actualValue))
+                    elif token == Token.NUMBER :
+                        result.append((token,float(actualValue)))
                     else:
-                        if token == Token.SELECT or token == Token.DOT:
+                        if token in {Token.SELECT, Token.DOT,Token.WHERE, Token.ON}:
                             self.state = 0
-                        elif token == Token.FROM:
+                        elif token in {Token.FROM, Token.JOIN}:
                             self.state = 1
                         result.append((token,actualValue))
-                    tempQuery = tempQuery[avLength:].lstrip()
+                    tempQuery = tempQuery[avLength:].lstrip() # to delete all whitespaces
                     break # so that if match is found, y'don't have to loop through the entire thing
             if isMatch is None: #if no patterns match return None
                 return
-
-
+        
+        #maybe there are better ways
+        #this is for making sure its always TABLE,DOT,ATTRIBUTE
+        for i in range(len(result)):
+            if result[i][0] == Token.DOT and i>1:
+                result[i-1] = list(result[i-1])
+                result[i-1][0] = Token.TABLE
+                result[i-1] = tuple(result[i-1])
         self.state=0
         return result
-    
-print(Lexer("SELECT age1, prodi FROM user JOIN prodis ON user.prodiid = prodis.prodiid WHERE age1 > 20;").tokenize())
