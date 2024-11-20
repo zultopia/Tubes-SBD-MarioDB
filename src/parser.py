@@ -1,7 +1,6 @@
-import optimize
-
 from typing import List
-from lexer import Token
+from src.grammar import SQLGrammar
+from src.lexer import Token
 
 class Node:
     def __init__(self):
@@ -32,15 +31,23 @@ class ParsedQueryTree:
         self.parse(unoptimized_query)
         
     def parse(self, unoptimized_query: str):
-        # ini nyoba isi root dan childsnya, tapi queryplan belum.
-        pass
+        from tests.test_lexer import mock_tokenize as tokenize
+        tokens = tokenize(unoptimized_query)
+        print(tokens)
+
+        SQL_grammar = SQLGrammar(tokens)
+        SQL_grammar.Query()
+
+
+
     
     def get_cost(self) -> float:
-        return optimize.calculate_cost(self)
+        # Nyoman
+        pass
     
     def optimize(self):
-        # ini nyoba susun ulang tree biar lebih optimal nya dan mengisi queryplannya.
-        optimize.optimize(self)
+        # Nyoman
+        pass
         
     
     
@@ -53,5 +60,5 @@ class ParsedQuery:
         self.parsed_query_tree = ParsedQueryTree(unoptimized_query)
     
     def optimize(self):
-        self.optimize()
+        self.parsed_query_tree.optimize()
     
