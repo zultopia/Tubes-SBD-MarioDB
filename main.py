@@ -6,11 +6,11 @@ if __name__ == "__main__":
     
     # Contoh
     # Write
-    manager.write_block(DataWrite("Student", ["StudentID", "FullName", "GPA"], [3, "Charlie", 3.2]))
+    manager.write_block(DataWrite("Student", ["StudentID", "FullName", "GPA"], [1, "Charlie", 3.2]))
     print("Data After Write:", manager.data)
     
     # Read
-    results = manager.read_block(DataRetrieval("Student", ["FullName"], [Condition("GPA", ">", 3.0)]))
+    results = manager.read_block(DataRetrieval("Student", ["FullName", "GPA"], [Condition("GPA", ">", 3.0)]))
     print("Read Results:", results)
     
     # Delete
