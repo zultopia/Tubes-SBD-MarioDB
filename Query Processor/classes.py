@@ -1,7 +1,16 @@
 # Query Processor sangatlah mantap
+# Import komponen yang lain dulu
+import sys
+import os
+import importlib
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(project_root)
+
+from StorageManager.classes import StorageManager
+ParsedQuery = importlib.import_module('query-optimizer.src.parser').ParsedQuery
+
 
 # Kita buat class interface untuk objek-objek yang digunakan
-# Nanti coba tanya, kalau import librarynya untuk typing boleh nggak
 class Rows:
     def __init__(self, data, rows_count):
         self.data = data
@@ -15,12 +24,26 @@ class ExecutionResult:
         self.data = data
         self.query = query
 
-# Sekarang query processornya (sekarang masih belum ada apa apa)
+# Sekarang query processornya
 class QueryProcessor:
-    # Fungsi ini melakukan:
-    # 1. Mengirimkan query awal ke Query Optimization
-    # 2. Mengirimkan query transaction ke Concurrency Control Manager
-    # 3. Mengirimkan query plan ke Storage Manager
-    # 4. Menerima dan mengirimkan ExecutionResult ke user
-    def execute_query(query):
+    def __init__(self, query):
+        # Instansiasi semua komponen
+        # Instansiasi Query Processor
+        # Instansiasi Storage Manager
+        # Instansiasi Concurrency Control Manager
+        # self.execute_query(query)
         pass
+    
+    def execute_query(query):
+        # Mengirimkan query transaction ke Concurrency Control Manager
+        # Mengirimkan query awal ke Query Optimizer, menghasilkan Parsed Query
+        # Menerima Parseq Query akan di optimasi oleh Query Optimizer
+        # Menjalankan query plan ke Storage Manager
+        # Menerima dan mengirimkan ExecutionResult ke user
+        pass
+    
+    # Fungsi yang berhubungan dengan storage manager
+    # Fungsi yang dapat mengeksekusi SELECT, FROM, WHERE ke storage manager
+    def execute_read(data_retrieval):
+        pass
+        
