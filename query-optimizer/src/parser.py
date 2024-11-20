@@ -1,6 +1,7 @@
 from typing import List
-from src.grammar import SQLGrammar
+from src.sql_grammar import SQLGrammar
 from src.lexer import Token
+from src.optimizer import get_cost, optimize
 
 class Node:
     def __init__(self):
@@ -38,20 +39,16 @@ class ParsedQueryTree:
         SQL_grammar = SQLGrammar(tokens)
         SQL_grammar.Query()
 
-
-
     
     def get_cost(self) -> float:
         # Nyoman
-        pass
+        return get_cost(self)
     
     def optimize(self):
         # Nyoman
-        pass
+        return optimize(self)
+    
         
-    
-    
-    
 class ParsedQuery:
     parsed_query_tree: ParsedQueryTree
     query: str # ini hasil query yang sudah dimodify sehingga sesuai dengan query tree yang sudah teroptimisasi

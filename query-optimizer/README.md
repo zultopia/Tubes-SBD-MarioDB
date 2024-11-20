@@ -1,63 +1,59 @@
 # Tubes-SBD-MarioDB (Query Optimizer)
 
-## Setup Instructions
 
-Follow the steps below to set up the project and run tests.
 
----
+## Setting Up the Project
 
-### 1. Create a Virtual Environment
+Follow these steps to set up the project environment:
 
-#### On Linux/Mac:
-```python3 -m venv venv```
+### 1. Navigate to the project directory
+```bash
+cd query-optimizer
+```
+
+### 2. Set up a virtual environment
+
+#### On Linux/MacOS:
+```bash
+python3 -m venv venv
+```
 
 #### On Windows:
-```python -m venv venv```
+```cmd
+python -m venv venv
+```
 
-This will create a virtual environment named `venv` in your project directory.
+### 3. Activate the virtual environment
 
----
+#### On Linux/MacOS:
+```bash
+source venv/bin/activate
+```
 
-### 2. Activate the Virtual Environment
+#### On Windows:
+```cmd
+venv\Scripts\activate
+```
 
-#### On Linux/Mac:
-```source venv/bin/activate```
+### 4. Install dependencies
+```bash
+pip install -r requirements.txt
+```
 
-#### On Windows (Command Prompt):
-```venv\Scripts\activate```
-
-#### On Windows (PowerShell):
-```.\venv\Scripts\activate```
-
-Once activated, your terminal prompt should show the environment name (e.g., `(venv)`).
-
----
-
-### 3. Install Required Packages
-After activating the virtual environment, install the dependencies from `requirements.txt`:
-```pip install -r requirements.txt```
-
----
-
-### 4. Run Tests
-To run the tests, use the following command:
-```pytest```
-
-This will execute all the tests in the project.
+### 5. Install `pytest`
+```bash
+pip install pytest
+```
 
 ---
 
-### Notes
-- Ensure that `python` and `pip` point to the correct version of Python. Use `python --version` or `python3 --version` to verify.
-- If `pytest` is not recognized, ensure it is installed by running:
-  ```pip install pytest```
+## Running Tests
+
+Once the setup is complete, you can run tests using:
+```bash
+pytest
+```
 
 ---
 
-### Additional Commands
-- To deactivate the virtual environment:
-  ```deactivate```
-- To update dependencies:
-  ```pip freeze > requirements.txt```
-
----
+Feel free to extend this README with additional details about the project, usage, or contributors.
