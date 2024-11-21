@@ -1,5 +1,7 @@
 from enum import Enum
 from typing import Dict, List
+from utils import Prototype
+from abc import ABC, abstractmethod
 
 """
 Complete documentation of what this file is about
@@ -47,7 +49,7 @@ class JoinCondition:
         pass
 
 
-class QueryNode:
+class QueryNode(ABC):
     """
     Abstract base class for all nodes in the query plan tree.
     Provides the basic structure and interface for query plan operations.
@@ -62,6 +64,7 @@ class QueryNode:
     def __init__(self, node_type: NodeType):
         pass
     
+    @abstractmethod
     def estimate_cost(self, statistics: Dict) -> float:
         """
         Calculate total cost of this operation including its children.
@@ -74,6 +77,7 @@ class QueryNode:
         """
         pass
     
+    @abstractmethod
     def _calculate_operation_cost(self, statistics: Dict) -> float:
         """
         Calculate cost of just this operation (without children).
@@ -129,7 +133,7 @@ class JoinNode(QueryNode):
         """
         pass
 
-class QueryPlan:
+class QueryPlan(Prototype):
     """
     Represents the entire query execution plan tree.
     Provides methods for optimizing and executing the plan.
