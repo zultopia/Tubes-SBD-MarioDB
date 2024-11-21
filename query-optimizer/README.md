@@ -1,7 +1,5 @@
 # Tubes-SBD-MarioDB (Query Optimizer)
 
-
-
 ## Setting Up the Project
 
 Follow these steps to set up the project environment:
@@ -44,6 +42,18 @@ pip install -r requirements.txt
 ```bash
 pip install pytest
 ```
+
+---
+
+## Running the Application
+
+To run the application, use the following command:
+
+```bash
+python -m src.main
+```
+
+This will start the query optimizer.
 
 ---
 

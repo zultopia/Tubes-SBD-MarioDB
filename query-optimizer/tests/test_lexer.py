@@ -76,15 +76,3 @@ def test_complex_query():
         (Token.NUMBER, 30),
         (Token.SEMICOLON, ';')
     ]
-    
-
-# While waiting for the implementation of the tokenize function, other codes can call this instead.
-def mock_tokenize(query_string: str) -> List[Tuple[Token, Any]]:
-    if query_string == "select name from person;":
-        return [
-        (Token.SELECT, 'select'), (Token.ATTRIBUTE, 'name'), (Token.FROM, 'from'),
-        (Token.TABLE, 'person'), (Token.SEMICOLON, ';')
-        ]
-    else:
-        print("Query string not recognized in the mock function")
-

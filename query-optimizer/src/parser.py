@@ -1,6 +1,6 @@
 from typing import List
 from src.sql_grammar import SQLGrammar
-from src.lexer import Token
+from src.lexer import Token, Lexer
 from src.optimizer import get_cost, optimize
 
 class Node:
@@ -32,9 +32,7 @@ class ParsedQueryTree:
         self.parse(unoptimized_query)
         
     def parse(self, unoptimized_query: str):
-        from tests.test_lexer import mock_tokenize as tokenize
-        tokens = tokenize(unoptimized_query)
-        print(tokens)
+        tokens = Lexer(unoptimized_query).tokenize()
 
         SQL_grammar = SQLGrammar(tokens)
         SQL_grammar.Query()

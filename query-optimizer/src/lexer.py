@@ -155,5 +155,3 @@ class Lexer:
                 result[i-1] = tuple(result[i-1])
         self.state=0
         return result
-    
-print(Lexer("Select t1.f1, t2.f2 from t1 as s, t2 natUrAl join t1 where s.f1 = 2 and f9 * 2 * 2 * 2 > 4 and 2+ s.f1 <12 order by f1, t2.f2 ascending limit 4;").tokenize())
