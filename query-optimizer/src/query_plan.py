@@ -3,6 +3,8 @@ from typing import Dict, List, Union
 from utils import Prototype
 from abc import ABC, abstractmethod
 from utils import Pair
+from optimizer import BFOptimizer
+
 """
 Complete documentation of what this file is about
 
@@ -28,8 +30,8 @@ class NodeType(Enum):
     """
     PROJECT = "PROJECT"    
     JOIN = "JOIN"         
-    INDEX_SCAN = "INDEX_SCAN"  
     SORTING = "SORTING"
+    TABLE = "TABLE"
 
 class JoinAlgorithm(Enum):
     """
@@ -60,7 +62,7 @@ class QueryNode(ABC):
         estimated_rows: Estimated number of result rows
     """
     node_type: NodeType
-    children: Union[QueryNode, Pair[QueryNode, QueryNode]]
+    children: Union[QueryNode, Pair[QueryNode, QueryNode], None]
 
     def __init__(self, node_type: NodeType):
         self.node_type = node_type
@@ -146,6 +148,50 @@ class JoinNode(QueryNode):
     def set_children(self, children: Pair[QueryNode, QueryNode]):
         self.children = children
 
+class SortingNode(QueryNode):
+    """
+    Represents a sorting operation in the query plan.
+    Orders the result rows based on specified attributes.
+    
+    Attributes:
+        attributes: List of attributes to sort by
+    """
+    def __init__(self, attributes: List[str]):
+        pass
+    
+    def _calculate_operation_cost(self, statistics: Dict) -> float:
+        """
+        Calculate cost of sorting operation based on input size and attributes.
+            
+        Returns:
+            Estimated cost of sorting operation
+        """
+        pass
+
+    def set_children(self, children: QueryNode):
+        self.children = children
+
+class TableNode(QueryNode):
+    """
+    Represents a table access operation in the query plan.
+    Reads rows from a table or view.
+    """
+
+    def __init__(self, table_name: str):
+        pass
+    
+    def _calculate_operation_cost(self, statistics: Dict) -> float:
+        """
+        Calculate cost of table access operation based on table size and indexes.
+            
+        Returns:
+            Estimated cost of table access operation
+        """
+        pass
+
+    def set_children(self):
+        pass
+
 class QueryPlan(Prototype):
     """
     Represents the entire query execution plan tree.
@@ -159,10 +205,9 @@ class QueryPlan(Prototype):
         pass
     
     def optimize(self):
-        """
-        Optimize the query plan tree to reduce execution cost.
-        """
-        pass
+        optimizer = BFOptimizer()
+        optimized = optimizer.optimize(self)
+        self = optimized
     
     def execute(self):
         """
@@ -170,11 +215,5 @@ class QueryPlan(Prototype):
         
         Returns:
             Result of the query execution
-        """
-        pass
-
-    def print_query(self): 
-        """
-        Print the SQL query represented by this query plan.
         """
         pass
