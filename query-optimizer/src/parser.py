@@ -21,6 +21,7 @@ class QueryPlan:
     #   3. join: (indexed) nested-loop, block nested-loop, merge, hybrid merge, hash.
     # Apakah ada yang kurang?
     pass
+        
 
 class ParsedQueryTree:
     root: Node

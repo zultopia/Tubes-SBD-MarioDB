@@ -1,8 +1,13 @@
+from typing import List
 
-def get_cost(tree):
-    print("Getting the cost....")
-    pass
+class Node:
+    val: int
+    
 
-def optimize(tree):
-    print("Optimizing the tree...")
-    pass
+class Tree:
+    current: Node
+    child: List[Node]
+
+class QueryPlanOptimizer:
+    def __init__(self) -> None:
+        pass
