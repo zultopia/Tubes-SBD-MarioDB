@@ -1,59 +1,128 @@
-from typing import List
-from src.sql_grammar import SQLGrammar
+from typing import Any, List, Tuple
 from src.lexer import Token, Lexer
 from src.optimizer import get_cost, optimize
+from src.parse_tree import Node, ParseTree
 
-class Node:
-    def __init__(self):
-        pass
-        
-        
-    token_type: Token
-    value: str | None # value bernilai None kalau tidak ada maknanya, contohnya untuk token_type SELECT, UPDATE, dll.
-               # value bernilai sesuatu jika ada maknanya, contohnya untuk token_type TABLE, ATTRIBUTE.
-    
-    
-class QueryPlan:
-    # Ini terserah mau dibuat kayak gimana.
-    # Yang jelas minimal harus ada:
-    #   1. select: mengconsider index-index yang ada, operasi-operasi yang dilakukan
-    #   2. sorting: external sort-merge
-    #   3. join: (indexed) nested-loop, block nested-loop, merge, hybrid merge, hash.
-    # Apakah ada yang kurang?
-    pass
 
-class ParsedQueryTree:
-    root: Node
-    childs: List[Node] = []
-    
-    query_plan: QueryPlan | None
-    
-    def __init__(self, unoptimized_query):
-        self.parse(unoptimized_query)
-        
-    def parse(self, unoptimized_query: str):
-        tokens = Lexer(unoptimized_query).tokenize()
+class SQLGrammar:
+    def __init__(self, tokens):
+        self.tokens: List[Tuple[Token, Any]] = tokens
+        self.pos = 0
 
-        SQL_grammar = SQLGrammar(tokens)
-        SQL_grammar.Query()
+    def current_token(self):
+        return self.tokens[self.pos] if self.pos < len(self.tokens) else None
 
-    
-    def get_cost(self) -> float:
-        # Nyoman
-        return get_cost(self)
-    
-    def optimize(self):
-        # Nyoman
-        return optimize(self)
-    
+    def match(self, expected_token: Token):
+        if self.current_token()[0] == expected_token:
+            self.pos += 1
+        else:
+            raise SyntaxError(f"Expected {expected_token}, found {self.current_token()}")
+
+    def Query(self) -> ParseTree:
+        print("Query")
+        """Parse a Query -> SELECT SelectList FROM FromList SEMICOLON."""
+        tree = ParseTree()
+        tree.root = "Azmi"
+        self.match(Token.SELECT)
+        tree.add_child(Node(Token.SELECT))
+
+        tree.add_child(self.SelectList())
         
-class ParsedQuery:
-    parsed_query_tree: ParsedQueryTree
-    query: str # ini hasil query yang sudah dimodify sehingga sesuai dengan query tree yang sudah teroptimisasi
-    
-    def __init__(self, unoptimized_query: str):
-        self.parsed_query_tree = ParsedQueryTree(unoptimized_query)
-    
-    def optimize(self):
-        self.parsed_query_tree.optimize()
-    
+        self.match(Token.FROM)
+        tree.add_child(Node(Token.FROM))
+        tree.add_child(self.FromList())
+
+        self.match(Token.SEMICOLON)
+        tree.add_child(Node(Token.SEMICOLON))
+        return tree
+
+    def Field(self) -> ParseTree:
+        print("Field")
+        tree = ParseTree()
+
+        """Parse a Field -> ATTRIBUTE | TABLE DOT ATTRIBUTE."""
+        if self.current_token()[0] == Token.ATTRIBUTE:
+            self.match(Token.ATTRIBUTE)
+            tree.add_child(Node(Token.ATTRIBUTE))
+            return tree
+        elif self.current_token()[0] == Token.TABLE:
+            self.match(Token.TABLE)
+            tree.add_child(Node(Token.TABLE))
+            self.match(Token.DOT)
+            tree.add_child(Node(Token.DOT))
+            self.match(Token.ATTRIBUTE)
+            tree.add_child(Node(Token.ATTRIBUTE))
+            return tree
+        else:
+            raise SyntaxError(f"Expected ATTRIBUTE or TABLE DOT ATTRIBUTE, found {self.current_token()[0]}")
+
+
+    def SelectList(self) -> ParseTree:
+        print("SelectList")
+        """Parse a SelectList -> Field SelectList_."""
+        tree = ParseTree()
+
+        tree.add_child(self.Field())
+        tree.add_child(self.SelectList_())
+
+        return tree
+
+    def SelectList_(self) -> ParseTree | None:
+        print("SelectList_")
+        """Parse SelectList_ -> COMMA Field SelectList_ | e."""
+        if self.current_token() is None:
+            return None
+        
+        tree = ParseTree()
+        if self.current_token()[0] == Token.COMMA:
+            self.match(Token.COMMA)
+            tree.add_child(Node(Token.COMMA))
+            tree.add_child(self.Field())
+            tree.add_child(self.SelectList_())
+            return tree
+
+    def TableReference(self) -> ParseTree:
+        print("TableReference")
+        """Parse TableReference -> TABLE (AS TABLE)."""
+        tree = ParseTree()
+        self.match(Token.TABLE)
+        tree.add_child(Node(Token.TABLE))
+        if self.current_token() is None:
+            return tree
+        
+        if self.current_token()[0] == Token.AS:
+            self.match(Token.AS)
+            tree.add_child(Node(Token.AS))
+            self.match(Token.TABLE)
+            tree.add_child(Node(Token.TABLE))
+        
+        return tree
+
+    def FromList(self) -> ParseTree:
+        print("FromList")
+        """Parse FromList -> TableReference FromList_."""
+        tree = ParseTree()
+        tree.add_child(self.TableReference())
+        tree.add_child(self.FromList_())
+        return tree
+
+    def FromList_(self) -> ParseTree | None:
+        print("FromList_")
+        """Parse FromList_ -> COMMA TableReference FromList_ | e."""
+        if self.current_token() is None:
+            return
+        tree = ParseTree()
+
+        if self.current_token()[0] == Token.COMMA:
+            self.match(Token.COMMA)
+            tree.add_child(Node(Token.COMMA))
+            tree.add_child(self.TableReference())
+            tree.add_child(self.FromList_())
+            return tree
+
+def parse(query_string) -> ParseTree:
+    tokens = Lexer(query_string).tokenize()
+
+    SQL_grammar = SQLGrammar(tokens)
+    parse_tree = SQL_grammar.Query()
+    return parse_tree
