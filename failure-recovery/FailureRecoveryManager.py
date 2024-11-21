@@ -4,7 +4,7 @@ from RecoverCriteria import RecoverCriteria
 class FailureRecoveryManager:
     def __init__(self, log_file="log.log"):
         self.log_file = log_file
-        self.wh_logs = {"logs": [], "checkpoints": []}
+        self.wh_logs = []
                 
     def write_log(self, execution_result):
         pass
