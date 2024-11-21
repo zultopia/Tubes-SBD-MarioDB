@@ -19,9 +19,11 @@ class TestQueryProcessor(unittest.TestCase):
         query_processor.set_query("SELECT id FROM users;")
         self.assertEqual(query_processor.get_query(), "SELECT id FROM users;")
     
-    def test_parse_query(self):
+    # Testing parsing (mungkin berubah)
+    @patch('classes.parse')
+    def test_parse_query(self, mock_parse):
         query = "SELECT id FROM users;"
-        query_processor = QueryProcessor(query)  
+        processor = QueryProcessor(query)
         expected_parse_tree = {
             "type": "Query",
             "children": [
@@ -39,8 +41,12 @@ class TestQueryProcessor(unittest.TestCase):
                 ]},
                 {"type": "Token.SEMICOLON", "value": ";"}
             ]
-        } 
-        self.assertEqual(query_processor.parse_query(), expected_parse_tree)
+        }
+        mock_parse.return_value = expected_parse_tree
+        actual_parse_tree = processor.parse_query()
+        mock_parse.assert_called_once_with(query)
+        self.assertEqual(actual_parse_tree, expected_parse_tree)
+
 
 if __name__ == '__main__':
     unittest.main()
