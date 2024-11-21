@@ -148,7 +148,42 @@ class ConcurrencyControlManager:
         # Flush objects of a particular transaction after it has successfully committed/aborted
         # Terminates the transaction
         pass
+
+class WaitForGraph:
+    def __init__(self):
+        self.waitfor = {}   # tid_waiting: tid_waited; tid_waiting -> tid_waited; 1-to-1 or many-to-1
     
+    def addEdge(self, tid_waiting: int, tid_waited: int):
+        self.waitfor[tid_waiting] = tid_waited
+    
+    def deleteEdge(self, tid_waiting: int, tid_waited: int):
+        del self.waitfor[tid_waiting]
+        
+    def deleteNode(self, tid): 
+        deleted_node = []
+
+        for tid_waiting, tid_waited in self.waitfor.items():
+            if tid_waited == tid:
+                deleted_node.append(tid_waiting)
+
+        for key in deleted_node:
+            del self.waitfor[key]
+                
+    def isCyclic(self):
+        for tid_waiting, tid_waited in self.waitfor.items():
+            visited_node = []
+            current_node = tid_waiting
+            while(current_node in self.waitfor):
+                visited_node.append(current_node)
+                current_node = self.waitfor[current_node]
+                if(current_node == tid_waiting):
+                    return True
+        return False
+    
+    def __str__(self):
+        return f"{self.waitfor}"
+            
+        
 # ccm = ConcurrencyControlManager(algorithm="Test")
 # print(ccm.begin_transaction())
 # print(ccm.begin_transaction())
@@ -202,3 +237,25 @@ class ConcurrencyControlManager:
 
 # print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # T
 # print(ccm.validate_object(row_tes_1, tid2,'wriTe')) # F
+
+wfg = WaitForGraph()
+wfg.addEdge(1, 2)
+wfg.addEdge(4, 1)
+wfg.addEdge(2, 3)
+wfg.addEdge(3, 5)
+
+print(wfg.isCyclic())
+
+wfg.addEdge(5, 1)
+print(wfg.isCyclic())
+
+wfg.deleteEdge(5, 1)
+print(wfg)
+
+wfg.deleteEdge(4, 1)
+wfg.addEdge(4, 5)
+
+print(wfg)
+
+wfg.deleteNode(5)
+print(wfg)
