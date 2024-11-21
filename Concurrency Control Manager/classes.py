@@ -71,6 +71,14 @@ class Lock:
     def __str__(self):
         return f"=============== Lock ===============\ntype: {self.type}\ntransaction_id: {self.transaction_id}\nrow:\n{self.row}====================================\n"
 
+class Transaction: 
+    def __init__(self, tid: int, action: Action, level: int, data_item: str): 
+        self.id = tid 
+        self.action = action
+        self.level  = level
+        # TODO: update data_item
+        self.data_item = data_item
+
 class WaitForGraph:
     def __init__(self):
         self.waitfor = {}   # tid_waiting: set[tid_waited]
@@ -136,6 +144,7 @@ class ConcurrencyControlManager:
         self.lock_S = {} # Map Row -> List[transaction_id]
         self.lock_X = {} # Map Row -> transaction_id
         self.wait_for_graph = WaitForGraph()
+        self.waiting_list = [Transaction]
     
     def __str__(self):
         return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"
@@ -219,6 +228,27 @@ class ConcurrencyControlManager:
         # Flush objects of a particular transaction after it has successfully committed/aborted
         # Terminates the transaction
         pass
+
+    def process_waiting_list(self): 
+        need_check = True
+        while (need_check): 
+            need_check = False
+            for transaction in self.waiting_list: 
+                if self.wait_for_graph.waiting(transaction.id): 
+                    break
+                
+                # TODO: adjust lock type 
+                lock_type = ""
+                if (transaction.action.name == "WRITE"): 
+                    lock_type = "X"
+                else : 
+                    lock_type = "S"
+
+                self.lock(transaction.data_item, transaction.id, lock_type)
+                #TODO: determine when to commit. This line might be the time that 
+                # the transaction committed. Hence, the node in waitgraph might be removed    
+            
+                self.waiting_list.remove(transaction)
 
             
         
