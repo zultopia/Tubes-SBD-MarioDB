@@ -1,8 +1,8 @@
 from enum import Enum
-from typing import Dict, List
+from typing import Dict, List, Union
 from utils import Prototype
 from abc import ABC, abstractmethod
-
+from utils import Pair
 """
 Complete documentation of what this file is about
 
@@ -56,12 +56,14 @@ class QueryNode(ABC):
     
     Attributes:
         node_type: Type of operation this node represents
-        left: Left child node in the tree
-        right: Right child node in the tree
         estimated_cost: Estimated cost of this operation
         estimated_rows: Estimated number of result rows
     """
+    node_type: NodeType
+    children: Union[QueryNode, Pair[QueryNode, QueryNode]]
+
     def __init__(self, node_type: NodeType):
+        self.node_type = node_type
         pass
     
     @abstractmethod
@@ -91,6 +93,9 @@ class QueryNode(ABC):
         """
         pass
 
+    def __str__(self) -> str:
+        return self.node_type.value
+
 class ProjectNode(QueryNode):
     """
     Represents a selection operation in the query plan.
@@ -110,6 +115,11 @@ class ProjectNode(QueryNode):
             Estimated cost of selection operation
         """
         pass
+
+    def set_children(self, children: QueryNode):
+        self.children = children
+
+
 
 class JoinNode(QueryNode):
     """
@@ -133,6 +143,9 @@ class JoinNode(QueryNode):
         """
         pass
 
+    def set_children(self, children: Pair[QueryNode, QueryNode]):
+        self.children = children
+
 class QueryPlan(Prototype):
     """
     Represents the entire query execution plan tree.
@@ -142,8 +155,6 @@ class QueryPlan(Prototype):
         root: Root node of the query plan tree
         children: List of child nodes
     """
-    children: List[QueryNode]
-
     def __init__(self, root: QueryNode):
         pass
     
@@ -159,5 +170,11 @@ class QueryPlan(Prototype):
         
         Returns:
             Result of the query execution
+        """
+        pass
+
+    def print_query(self): 
+        """
+        Print the SQL query represented by this query plan.
         """
         pass
