@@ -1,5 +1,5 @@
 import unittest
-from classes import ConcurrencyControlManager, PrimaryKey, Row, Action, Response
+from classes import ConcurrencyControlManager, PrimaryKey, Row, Action, Response, WaitForGraph
 
 class TestConcurrencyControlManager(unittest.TestCase):
     def setUp(self):
@@ -114,6 +114,31 @@ class TestConcurrencyControlManager(unittest.TestCase):
     def test_ne_Row(self):
         # [Tes-Helper] compare not equal Row
         pass
+    
+    def test_deadlock_detection(self):
+        wfg = WaitForGraph()
+        wfg.addEdge(1, 2)
+        wfg.addEdge(4, 1)
+        wfg.addEdge(2, 3)
+        wfg.addEdge(3, 5)
+        
+        # Tes: No Deadlock
+        isDeadlock = wfg.isCyclic()
+        self.assertFalse(isDeadlock)
+        
+        wfg.addEdge(5, 1)
+        
+        # Tes: Deadlock
+        isDeadlock = wfg.isCyclic()
+        self.assertTrue(isDeadlock)
+        
+        # Tes: delete node 5, transaction id 5 sudah commit
+        wfg.deleteEdge(5, 1)
+        wfg.deleteEdge(4, 1)
+        wfg.addEdge(4, 5)
+        wfg.deleteNode(5)
+        lenWaitFor = len(wfg.waitfor)
+        self.assertEqual(lenWaitFor, 2)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
