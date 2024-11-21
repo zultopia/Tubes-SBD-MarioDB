@@ -229,7 +229,15 @@ class ConcurrencyControlManager:
         
         self.transaction_queue[transaction_id].append(row)
         
-        return Response(True, transaction_id)        
+        return Response(True, transaction_id)    
+
+    # IF: transaction_id can be granted lock with type lock_type to data_item  
+    # FS: transaction_id granted lock with type lock_type to  data_item
+    def lock(self, data_item, transaction_id: int, lock_type: str): 
+        if (lock_type == "X"): 
+            self.lock_X[data_item] = transaction_id 
+        else: # lock_type = "S"
+            self.lock_S[data_item] = transaction_id   
     
     def end_transaction(self, transaction_id: int):
         # Flush objects of a particular transaction after it has successfully committed/aborted
@@ -256,7 +264,7 @@ class ConcurrencyControlManager:
                 
                 # TODO: adjust lock type 
                 lock_type = ""
-                if (transaction.action.name == "WRITE"): 
+                if (transaction.action == "WRITE"): 
                     lock_type = "X"
                 else : 
                     lock_type = "S"
