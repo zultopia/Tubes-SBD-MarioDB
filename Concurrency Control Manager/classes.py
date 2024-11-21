@@ -141,9 +141,10 @@ class WaitForGraph:
 class ConcurrencyControlManager:
     def __init__(self, algorithm: str):
         self.algorithm = algorithm
-        self.lock_S = {} # Map Row -> List[transaction_id]
+        self.lock_S = {} # Map Row -> Set[transaction_id]
         self.lock_X = {} # Map Row -> transaction_id
         self.wait_for_graph = WaitForGraph()
+        self.transaction_queue = {} # Map transaction_id -> List[Row]
         self.waiting_list = [Transaction]
     
     def __str__(self):
@@ -155,7 +156,9 @@ class ConcurrencyControlManager:
     
     def begin_transaction(self) -> int:
         # will return transaction_id: int
-        return self.__generate_id()
+        transaction_id = self.__generate_id()
+        self.transaction_queue[transaction_id] = []
+        return transaction_id
 
     def log_object(self, object: Row, transaction_id: int):
         # implement lock on an object
@@ -214,6 +217,8 @@ class ConcurrencyControlManager:
             if row in self.lock_S and transaction_id in self.lock_S[row]:
                 print(f"{transaction_id} successfully upgrades from lock-S to lock-X")
                 self.lock_S[row].remove(transaction_id)
+                if self.lock_S[row] == []:
+                    del self.lock_S[row]
             else:
                 print(f"Lock-X is granted to {transaction_id}")
                 
@@ -222,13 +227,25 @@ class ConcurrencyControlManager:
             else:  
                 self.lock_X[row].append(transaction_id)
         
+        self.transaction_queue[transaction_id].append(row)
+        
         return Response(True, transaction_id)        
     
     def end_transaction(self, transaction_id: int):
         # Flush objects of a particular transaction after it has successfully committed/aborted
         # Terminates the transaction
-        pass
-
+        for row in self.transaction_queue[transaction_id]:
+            if row in self.lock_X and self.lock_X[row] == transaction_id:
+                del self.lock_X[row]
+            
+            if row in self.lock_S and transaction_id in self.lock_S[row]:
+                self.lock_S[row].remove(row)
+                if self.lock_S[row] == []:
+                    del self.lock_S[row]
+        
+        del self.transaction_queue[transaction_id]
+        self.wait_for_graph.deleteNode(transaction_id)
+        
     def process_waiting_list(self): 
         need_check = True
         while (need_check): 

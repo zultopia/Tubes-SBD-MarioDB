@@ -25,6 +25,8 @@ class TestConcurrencyControlManager(unittest.TestCase):
         # Tes: Lock S == S (T); Lock S != X (F)
         print("\nTest case 1:")
         ccm1 = ConcurrencyControlManager(algorithm="Tes")
+        tid1 = ccm1.begin_transaction()
+        tid2 = ccm1.begin_transaction()
         
         res1 = ccm1.validate_object(row_tes, tid1,'ReAd')  # T
         res2 = ccm1.validate_object(row_tes, tid2,'reAd')  # T
@@ -40,6 +42,8 @@ class TestConcurrencyControlManager(unittest.TestCase):
         # Tes: Upgrade Lock
         print("\nTest case 2:")
         ccm2 = ConcurrencyControlManager(algorithm="Tes")
+        tid1 = ccm2.begin_transaction()
+        tid2 = ccm2.begin_transaction()
         
         res1 = ccm2.validate_object(row_tes, tid1,'ReAd')  # T
         res2 = ccm2.validate_object(row_tes, tid1,'wriTe') # T
@@ -55,6 +59,8 @@ class TestConcurrencyControlManager(unittest.TestCase):
         # Tes: Lock X Already Granted
         print("\nTest case 3:")
         ccm3 = ConcurrencyControlManager(algorithm="Tes")
+        tid1 = ccm3.begin_transaction()
+        tid2 = ccm3.begin_transaction()
         
         res1 = ccm3.validate_object(row_tes, tid1,'wriTe') # T
         res2 = ccm3.validate_object(row_tes, tid1,'ReAd')  # T
@@ -70,6 +76,8 @@ class TestConcurrencyControlManager(unittest.TestCase):
         # Tes: Lock S Already Granted; Lock S == S (T)
         print("\nTest case 4:")
         ccm4 = ConcurrencyControlManager(algorithm="Tes")
+        tid1 = ccm4.begin_transaction()
+        tid2 = ccm4.begin_transaction()
         
         res1 = ccm4.validate_object(row_tes, tid1,'rEAd')  # T
         res2 = ccm4.validate_object(row_tes, tid2,'ReAd')  # T
@@ -85,6 +93,8 @@ class TestConcurrencyControlManager(unittest.TestCase):
         # Tes: Lock X == X (F)
         print("\nTest case 5:")
         ccm5 = ConcurrencyControlManager(algorithm="Tes")
+        tid1 = ccm5.begin_transaction()
+        tid2 = ccm5.begin_transaction()
     
         res1 = ccm5.validate_object(row_tes, tid1,'wriTe') # T
         res2 = ccm5.validate_object(row_tes, tid2,'wriTe') # F
@@ -100,6 +110,41 @@ class TestConcurrencyControlManager(unittest.TestCase):
     
     def test_end_transaction(self):
         # [Tes-MainMethod] end_transaction
+        row_tes = Row('table', PrimaryKey(1), {'col1': 1, 'col2': 'SBD'})
+        ccm5 = ConcurrencyControlManager(algorithm="Tes")
+        tid1 = ccm5.begin_transaction()
+        tid2 = ccm5.begin_transaction()
+        
+        res0 = ccm5.validate_object(row_tes, tid1,'read') # T
+        res1 = ccm5.validate_object(row_tes, tid1,'wriTe') # T
+        res2 = ccm5.validate_object(row_tes, tid2,'wriTe') # F
+        
+        self.assertTrue(res0.allowed)
+        self.assertEqual(res0.transaction_id, tid1)
+        self.assertTrue(res1.allowed)
+        self.assertEqual(res1.transaction_id, tid1)
+        self.assertFalse(res2.allowed)
+        self.assertEqual(res2.transaction_id, tid2)
+        
+        ccm5.end_transaction(tid1)
+        res2 = ccm5.validate_object(row_tes, tid2, 'wriTe') # T
+        self.assertTrue(res2.allowed)
+        
+        tid3 = ccm5.begin_transaction()
+        res3 = ccm5.validate_object(row_tes, tid3, 'wriTe') # F
+        res4 = ccm5.validate_object(row_tes, tid3, 'read') # F
+        
+        self.assertFalse(res3.allowed)
+        self.assertFalse(res4.allowed)
+        
+        ccm5.end_transaction(tid2)
+        
+        res3 = ccm5.validate_object(row_tes, tid3, 'wriTe') # T
+        res4 = ccm5.validate_object(row_tes, tid3, 'read') # T
+        
+        self.assertTrue(res3.allowed)
+        self.assertTrue(res4.allowed)
+        
         pass
     
     # Helper Methods
