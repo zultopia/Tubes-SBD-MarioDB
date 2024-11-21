@@ -2,13 +2,16 @@
 # Import komponen yang lain dulu
 import sys
 import os
-import importlib
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(project_root)
+sys.path.extend([
+    project_root,
+    os.path.join(project_root, 'query-optimizer')
+])
 
+# Storage Manager
 from StorageManager.classes import StorageManager
-ParsedQuery = importlib.import_module('query-optimizer.src.parser').ParsedQuery
-
+# Query Optimizer
+from parser import parse
 
 # Kita buat class interface untuk objek-objek yang digunakan
 class Rows:
@@ -31,16 +34,23 @@ class QueryProcessor:
         # Instansiasi Query Processor
         # Instansiasi Storage Manager
         # Instansiasi Concurrency Control Manager
-        # self.execute_query(query)
+        self.execute_query(query)
         pass
     
     def execute_query(query):
         # Mengirimkan query transaction ke Concurrency Control Manager
         # Mengirimkan query awal ke Query Optimizer, menghasilkan Parsed Query
-        # Menerima Parseq Query akan di optimasi oleh Query Optimizer
+        parse_tree = self.parse_query(query)
+        # Menerima Parse Query akan di optimasi oleh Query Optimizer
         # Menjalankan query plan ke Storage Manager
         # Menerima dan mengirimkan ExecutionResult ke user
         pass
+    
+    # Fungsi yang berhubungan dengan storage manager
+    # Fungsi yang melakukan parsing dengan memanggil Query Optimizer
+    def parse_query(query):
+        parse_tree = parse(query)
+        return parse_tree        
     
     # Fungsi yang berhubungan dengan storage manager
     # Fungsi yang dapat mengeksekusi SELECT, FROM, WHERE ke storage manager
