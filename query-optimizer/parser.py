@@ -1,7 +1,7 @@
 from typing import Any, List, Tuple
-from src.lexer import Token, Lexer
-from src.optimizer import get_cost, optimize
-from src.parse_tree import Node, ParseTree
+from lexer import Token, Lexer
+from optimizer import get_cost, optimize
+from parse_tree import Node, ParseTree
 
 
 class SQLGrammar:

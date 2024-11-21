@@ -1,5 +1,5 @@
 from typing import List
-from src.parse_tree import Node, ParseTree
+from parse_tree import Node, ParseTree
 
 class Plan:
     # Ini terserah mau dibuat kayak gimana.

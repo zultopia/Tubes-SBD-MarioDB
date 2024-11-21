@@ -1,5 +1,5 @@
 from typing import Any, List, Optional
-from src.lexer import Token
+from lexer import Token
 extra_references = []
 
 # class Node hanya untuk token
