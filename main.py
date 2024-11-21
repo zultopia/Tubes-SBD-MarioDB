@@ -10,7 +10,7 @@ if __name__ == "__main__":
     print("Data After Write:", manager.data)
     
     # Read
-    results = manager.read_block(DataRetrieval("Student", ["FullName", "GPA"], [Condition("GPA", ">", 3.0)]))
+    results = manager.read_block(DataRetrieval("Student", ["FullName", "GPA"], [Condition("GPA", ">", 3.0)], "sequential"))
     print("Read Results:", results)
     
     # Delete
