@@ -34,13 +34,22 @@ class QueryProcessor:
         # Instansiasi Query Processor
         # Instansiasi Storage Manager
         # Instansiasi Concurrency Control Manager
-        self.execute_query(query)
-        pass
+        # Instansiasi query
+        self.query = query
     
-    def execute_query(query):
+    # Setter getter
+    # Awalnya hanya dibuat untuk kepentingan testing
+    def set_query(self, query):
+        self.query = query
+        
+    def get_query(self):
+        return self.query
+    
+    # Intinya deh
+    def execute_query(self):
         # Mengirimkan query transaction ke Concurrency Control Manager
         # Mengirimkan query awal ke Query Optimizer, menghasilkan Parsed Query
-        parse_tree = self.parse_query(query)
+        parse_tree = self.parse_query()
         # Menerima Parse Query akan di optimasi oleh Query Optimizer
         # Menjalankan query plan ke Storage Manager
         # Menerima dan mengirimkan ExecutionResult ke user
@@ -48,12 +57,12 @@ class QueryProcessor:
     
     # Fungsi yang berhubungan dengan storage manager
     # Fungsi yang melakukan parsing dengan memanggil Query Optimizer
-    def parse_query(query):
-        parse_tree = parse(query)
+    def parse_query(self):
+        parse_tree = parse(self.query)
         return parse_tree        
     
     # Fungsi yang berhubungan dengan storage manager
     # Fungsi yang dapat mengeksekusi SELECT, FROM, WHERE ke storage manager
-    def execute_read(data_retrieval):
+    def execute_read(self, data_retrieval):
         pass
         
