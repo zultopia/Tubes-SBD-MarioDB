@@ -71,12 +71,71 @@ class Lock:
     def __str__(self):
         return f"=============== Lock ===============\ntype: {self.type}\ntransaction_id: {self.transaction_id}\nrow:\n{self.row}====================================\n"
 
+class WaitForGraph:
+    def __init__(self):
+        self.waitfor = {}   # tid_waiting: set[tid_waited]
+    
+    def addEdge(self, tid_waiting: int, tid_waited: int):
+        if tid_waiting not in self.waitfor: 
+            self.waitfor[tid_waiting] = set()
+        self.waitfor[tid_waiting].add(tid_waited)
+    
+    def deleteEdge(self, tid_waiting: int, tid_waited: int):
+        if tid_waiting in self.waitfor and tid_waited in self.waitfor[tid_waiting]:
+            self.waitfor[tid_waiting].remove(tid_waited)
+            if not self.waitfor[tid_waiting]: 
+                del self.waitfor[tid_waiting]
+        
+    def deleteNode(self, tid): 
+        # remove edges that pointing to tid node 
+        for tid_waiting in list(self.waitfor):
+            if tid in self.waitfor[tid_waiting]: 
+                self.waitfor[tid_waiting].remove(tid)
+
+                if not self.waitfor[tid_waiting]: 
+                    del self.waitfor[tid_waiting]
+
+        # remove the tid node
+        if tid in self.waitfor: 
+            del self.waitfor[tid]
+                
+    def isCyclic(self):
+        def dfs(node, visited, rec_stack): 
+            visited.add(node)
+            rec_stack.add(node)
+
+            for neighbor in self.waitfor.get(node, []): 
+                if neighbor not in visited: 
+                    if dfs(neighbor, visited, rec_stack): 
+                        return True
+                elif neighbor in rec_stack: 
+                    return True
+                
+            rec_stack.remove(node)
+            return False
+
+        visited = set()
+        rec_stack = set()
+
+        for node in self.waitfor: 
+            if node not in visited: 
+                if dfs(node, visited, rec_stack): 
+                    return True
+        
+        return False
+    
+    def waiting(self, tid: int): 
+        return tid in self.waitfor
+
+    def __str__(self):
+        return f"{self.waitfor}"
+
 class ConcurrencyControlManager:
     def __init__(self, algorithm: str):
         self.algorithm = algorithm
         self.lock_S = {} # Map Row -> List[transaction_id]
         self.lock_X = {} # Map Row -> transaction_id
-        
+        self.wait_for_graph = WaitForGraph()
     
     def __str__(self):
         return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"
@@ -161,39 +220,6 @@ class ConcurrencyControlManager:
         # Terminates the transaction
         pass
 
-class WaitForGraph:
-    def __init__(self):
-        self.waitfor = {}   # tid_waiting: tid_waited; tid_waiting -> tid_waited; 1-to-1 or many-to-1
-    
-    def addEdge(self, tid_waiting: int, tid_waited: int):
-        self.waitfor[tid_waiting] = tid_waited
-    
-    def deleteEdge(self, tid_waiting: int, tid_waited: int):
-        del self.waitfor[tid_waiting]
-        
-    def deleteNode(self, tid): 
-        deleted_node = []
-
-        for tid_waiting, tid_waited in self.waitfor.items():
-            if tid_waited == tid:
-                deleted_node.append(tid_waiting)
-
-        for key in deleted_node:
-            del self.waitfor[key]
-                
-    def isCyclic(self):
-        for tid_waiting, tid_waited in self.waitfor.items():
-            visited_node = []
-            current_node = tid_waiting
-            while(current_node in self.waitfor):
-                visited_node.append(current_node)
-                current_node = self.waitfor[current_node]
-                if(current_node == tid_waiting):
-                    return True
-        return False
-    
-    def __str__(self):
-        return f"{self.waitfor}"
             
         
 # ccm = ConcurrencyControlManager(algorithm="Test")
