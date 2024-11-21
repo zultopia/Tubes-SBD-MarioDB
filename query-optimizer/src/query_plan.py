@@ -1,9 +1,9 @@
 from enum import Enum
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Literal
 from utils import Prototype
 from abc import ABC, abstractmethod
 from utils import Pair
-from optimizer import BFOptimizer
+from lexer import Token
 
 """
 Complete documentation of what this file is about
@@ -18,10 +18,8 @@ Complete documentation of what this file is about
     -> If the node is a JOIN node, then it should have a JoinAlgorithm attribute which is an enumeration of available join algorithms.
 
 3. 3. SORTING
-
-
-
 """
+
 
 class NodeType(Enum):
     """
@@ -47,8 +45,15 @@ class JoinCondition:
     Represents a join condition between two relations.
     Contains the attributes to be joined and the comparison operator.
     """
-    def __init__(self, left_attr: str, right_attr: str, operator: str = "="):
-        pass
+    left_attr: str
+    right_attr: str
+    operator: Literal['>', '>=', '<', '<=', '=']
+
+    def __init__(self, left_attr: str, right_attr: str, 
+                 operator: Literal['>', '>=', '<', '<=', '=']):
+        self.left_attr = left_attr
+        self.right_attr = right_attr
+        self.operator = operator
 
 
 class QueryNode(ABC):
@@ -62,7 +67,7 @@ class QueryNode(ABC):
         estimated_rows: Estimated number of result rows
     """
     node_type: NodeType
-    children: Union[QueryNode, Pair[QueryNode, QueryNode], None]
+    children: Union['QueryNode', Pair['QueryNode', 'QueryNode'], None]
 
     def __init__(self, node_type: NodeType):
         self.node_type = node_type
@@ -106,8 +111,12 @@ class ProjectNode(QueryNode):
     Attributes:
         condition: Selection predicate to be applied
     """
-    def __init__(self, condition: str):
-        pass
+    condition: List[str]
+
+    def __init__(self, condition: List[str]):
+        super().__init__(NodeType.PROJECT)
+        self.condition = condition
+        self.child = None
     
     def _calculate_operation_cost(self, statistics: Dict) -> float:
         """
@@ -118,8 +127,11 @@ class ProjectNode(QueryNode):
         """
         pass
 
-    def set_children(self, children: QueryNode):
-        self.children = children
+    def estimate_cost(self, statistics: Dict) -> float:
+        pass
+
+    def set_child(self, childr: QueryNode):
+        self.child = childr
 
 
 
@@ -130,10 +142,13 @@ class JoinNode(QueryNode):
     
     Attributes:
         algorithm: Specific join algorithm to use
-        conditions: List of join conditions
     """
-    def __init__(self, algorithm: JoinAlgorithm, conditions: List[JoinCondition]):
-        pass
+    algorithm: JoinAlgorithm
+
+    def __init__(self, algorithm: JoinAlgorithm):
+        super().__init__(NodeType.JOIN)
+        self.algorithm = algorithm
+        self.children = None
     
     def _calculate_operation_cost(self, statistics: Dict) -> float:
         """
@@ -148,6 +163,72 @@ class JoinNode(QueryNode):
     def set_children(self, children: Pair[QueryNode, QueryNode]):
         self.children = children
 
+class ConditionalJoinNode(JoinNode):
+    """
+    Represents a join operation in the query plan.
+    Combines two relations based on specified conditions.
+    
+    Attributes:
+        algorithm: Specific join algorithm to use
+        conditions: List of join conditions
+    """
+    algorithm: JoinAlgorithm
+    conditions: List[JoinCondition]
+    children: None | Pair[QueryNode, QueryNode]
+
+    def __init__(self, algorithm: JoinAlgorithm, conditions: List[JoinCondition]):
+        super().__init__(NodeType.JOIN)
+        self.algorithm = algorithm
+        self.conditions = conditions
+        self.children = None
+    
+    def _calculate_operation_cost(self, statistics: Dict) -> float:
+        """
+        Calculate cost of join operation based on chosen algorithm and input sizes.
+    
+            
+        Returns:
+            Estimated cost of join operation
+        """
+        pass
+
+    def estimate_cost(self, statistics: Dict) -> float:
+        pass
+
+class NaturalJoinNode(JoinNode):
+    """
+    Represents a join operation in the query plan.
+    Combines two relations based on specified conditions.
+    
+    Attributes:
+        algorithm: Specific join algorithm to use
+    """
+    algorithm: JoinAlgorithm
+    children: None | Pair[QueryNode, QueryNode]
+
+    def __init__(self, algorithm: JoinAlgorithm):
+        super().__init__(NodeType.JOIN)
+        self.algorithm = algorithm
+        self.children = None
+    
+    def _calculate_operation_cost(self, statistics: Dict) -> float:
+        """
+        Calculate cost of join operation based on chosen algorithm and input sizes.
+    
+            
+        Returns:
+            Estimated cost of join operation
+        """
+        pass
+
+    def estimate_cost(self, statistics: Dict) -> float:
+        pass
+
+
+
+
+
+
 class SortingNode(QueryNode):
     """
     Represents a sorting operation in the query plan.
@@ -156,8 +237,13 @@ class SortingNode(QueryNode):
     Attributes:
         attributes: List of attributes to sort by
     """
+    attributes: List[str]
+    children: None | QueryNode
+
     def __init__(self, attributes: List[str]):
-        pass
+        super().__init__(NodeType.SORTING)
+        self.attributes = attributes
+        self.children = None
     
     def _calculate_operation_cost(self, statistics: Dict) -> float:
         """
@@ -168,6 +254,9 @@ class SortingNode(QueryNode):
         """
         pass
 
+    def estimate_cost(self, statistics: Dict) -> float:
+        pass
+
     def set_children(self, children: QueryNode):
         self.children = children
 
@@ -176,9 +265,13 @@ class TableNode(QueryNode):
     Represents a table access operation in the query plan.
     Reads rows from a table or view.
     """
+    table_name: str
+    children: None
 
     def __init__(self, table_name: str):
-        pass
+        super().__init__(NodeType.TABLE)
+        self.table_name = table_name
+        self.children = None
     
     def _calculate_operation_cost(self, statistics: Dict) -> float:
         """
@@ -189,8 +282,28 @@ class TableNode(QueryNode):
         """
         pass
 
-    def set_children(self):
+    def estimate_cost(self, statistics: Dict) -> float:
         pass
+
+
+class QueryPlanOptimizer(ABC):
+    """
+    An ABC for query plan optimization algorithms.
+    """
+    
+    @abstractmethod
+    def optimize(self, query: 'QueryPlan') -> 'QueryPlan':
+        """
+        Optimize the query plan tree to reduce execution cost.
+        
+        Args:
+            query: Parsed query tree to optimize
+        
+        Returns:
+            Optimized query plan tree
+        """
+        pass
+
 
 class QueryPlan(Prototype):
     """
@@ -201,12 +314,14 @@ class QueryPlan(Prototype):
         root: Root node of the query plan tree
         children: List of child nodes
     """
-    def __init__(self, root: QueryNode):
-        pass
+    root: QueryNode
+    optimizer: QueryPlanOptimizer
+
+    def __init__(self, root: QueryNode, optimizer: QueryPlanOptimizer):
+        self.root = root
     
     def optimize(self):
-        optimizer = BFOptimizer()
-        optimized = optimizer.optimize(self)
+        optimized = self.optimizer.optimize(self)
         self = optimized
     
     def execute(self):
@@ -217,3 +332,91 @@ class QueryPlan(Prototype):
             Result of the query execution
         """
         pass
+
+    def print(self):
+        """
+        Print the query plan tree in a human-readable format.
+        """
+        def print_node(node: QueryNode, level: int = 0):
+            indent = "    " * level
+            node_str = f"{indent}└─ {node}"
+            
+            if isinstance(node, ProjectNode):
+                node_str += f" ({', '.join(node.condition)})"
+                if node.child:
+                    print(node_str)
+                    print_node(node.child, level + 1)
+            
+            elif isinstance(node, (JoinNode, ConditionalJoinNode, NaturalJoinNode)):
+                node_str += f" [{node.algorithm.value}]"
+                if isinstance(node, ConditionalJoinNode):
+                    conditions = [f"{c.left_attr} {c.operator} {c.right_attr}" for c in node.conditions]
+                    node_str += f" ON {' AND '.join(conditions)}"
+                
+                if node.children:
+                    print(node_str)
+                    print_node(node.children.first, level + 1)
+                    print_node(node.children.second, level + 1)
+            
+            elif isinstance(node, SortingNode):
+                node_str += f" BY {', '.join(node.attributes)}"
+                if node.children:
+                    print(node_str)
+                    print_node(node.children, level + 1)
+            
+            elif isinstance(node, TableNode):
+                node_str += f" [{node.table_name}]"
+                print(node_str)
+        
+        print("\nQuery Plan:")
+        print_node(self.root)
+
+class BFOptimizer(QueryPlanOptimizer):
+    def optimize(self, query: QueryPlan) -> QueryPlan:
+        reachable_plans = self.__generate_possible_plans(query)
+        best_plan = None
+        for plan in reachable_plans:
+            # Not yet implemented
+            pass
+
+        return best_plan
+    
+    def __generate_possible_plans(self, query: QueryPlan) -> List[QueryPlan]:
+        """
+        Generate all possible query plans that can be reached from the given query plan.
+        
+        Args:
+            query: Query plan to generate possible plans from
+        
+        Returns:
+            List of possible query plans
+        """
+        
+        # Not yet implemented
+        pass
+
+if __name__ == "__main__":
+    employees = TableNode("employees")
+    departments = TableNode("departments")
+    salaries = TableNode("salaries")
+    
+    join1 = ConditionalJoinNode(
+        JoinAlgorithm.HASH,
+        [JoinCondition("department_id", "id", "=")]
+    )
+    join1.set_children(Pair(employees, departments))
+    
+    join2 = NaturalJoinNode(JoinAlgorithm.MERGE)
+    join2.set_children(Pair(join1, salaries))
+    
+    sort = SortingNode(["salary"])
+    sort.set_children(join2)
+    
+    project = ProjectNode(["name", "department_name", "salary"])
+    project.set_child(sort)
+    
+    query_plan = QueryPlan(project, BFOptimizer())
+    query_plan.print()
+
+
+        
