@@ -74,7 +74,8 @@ class Lock:
 class ConcurrencyControlManager:
     def __init__(self, algorithm: str):
         self.algorithm = algorithm
-        self.activeLocks = {} # transaction_id: Lock[]
+        self.lock_S = {} # Map Row -> List[transaction_id]
+        self.lock_X = {} # Map Row -> transaction_id
         
     
     def __str__(self):
@@ -87,62 +88,73 @@ class ConcurrencyControlManager:
     def begin_transaction(self) -> int:
         # will return transaction_id: int
         return self.__generate_id()
-    
+
     def log_object(self, object: Row, transaction_id: int):
         # implement lock on an object
         # assign timestamp on the object
         pass
     
     def validate_object(self, object: Row, transaction_id: int, action: Action) -> Response:
-        # decide wether the object is allowed to do a particular action or not
         action = action.lower()
         if(action != "read" and action != "write"):
             raise ValueError(f"Invalid action type: {action}. Allowed actions are \"read\" or \"write\".")
         lockType = 'S' if action == "read" else 'X'
         
-        for trans_id, lock_list in self.activeLocks.items():
-            for idx,activeLock in enumerate(lock_list):
-                # Row nya udah ada yg nge-lock?
-                if(object == activeLock.row):
-                    # Row di lock di transaksi yang berbeda?
-                    if(transaction_id != trans_id):
-                        if(lockType != activeLock.type):
-                            print("Lock not granted S != X")
-                            return Response(False, transaction_id)
-                        else:
-                            if(lockType == 'X'):
-                                print("Lock not granted X == X")
-                                return Response(False, transaction_id)
-                            else:
-                                break
-                else:
-                    continue
-                              
-        # Row tidak di-lock transaksi lain
+        # Suatu row didefinisikan oleh primary key dan tablenya
+        primaryKey = object.pkey.keys
+        table = object.table
+        row = str(primaryKey) + table
         
-        if(transaction_id in self.activeLocks):
-            isAlrExist = False
-            # Transaksi saat ini udah pernah ambil lock?
-            for idx, lock in enumerate(self.activeLocks[transaction_id]):
-                if(object == lock.row):
-                    isAlrExist = True
-                    
-                    # Upgrade lock?
-                    if(lockType == 'X' and lock.type == 'S'):
-                        self.activeLocks[transaction_id][idx].type = 'X'
-                        print("Lock Upgraded")
-                    else:
-                        print(f"Lock {lock.type} already granted")
-                            
-            if not isAlrExist:
-                newLock = Lock(lockType, transaction_id, object)
-                self.activeLocks[transaction_id].append(newLock)
-                print(f"Lock {lockType} Acquired")
+        if lockType == 'S' and (row in self.lock_S and transaction_id in self.lock_S[row]):
+            print(f"Transaction {transaction_id} already has lock-S")
+            return Response(True, transaction_id)
+        
+        if lockType == 'X' and (row in self.lock_X and self.lock_X[row] == transaction_id):
+            print(f"Transaction {transaction_id} already has lock-X")
+            return Response(True, transaction_id)
+        
+        allowed = False
+        if lockType == 'S':
+            # Kalo minta lock-S, di-grant kalo gaada yg lagi megang lock-X (kecuali transaction itu sendiri)
+            if row not in self.lock_X or self.lock_X[row] == transaction_id:
+                allowed = True
         else:
-            newLock = Lock(lockType, transaction_id, object)
-            self.activeLocks[transaction_id] = [newLock]
-            print(f"Lock {lockType} Acquired")
-        return Response(True, transaction_id)
+            # Kalo minta lock-X, di-grant kalo gaada yg lagi megang lock-S maupun lock-X (kecuali transaction itu sendiri)
+            if ((row not in self.lock_S or len(self.lock_S[row]) == 1 and self.lock_S[row] == [transaction_id])
+                and row not in self.lock_X):
+                allowed = True
+                
+        if not allowed:
+            message = "Another transaction is holding lock-X"
+            if lockType == 'X':
+                message += " and/or lock-S"
+            
+            print(f"Lock-{lockType} is not granted to {transaction_id}: {message}")
+            return Response(False, transaction_id)
+        
+        if lockType == 'S':
+            if row in self.lock_X and self.lock_X[row] == transaction_id:
+                print(f"{transaction_id} already has lock-X; all locks must be held till transaction commits")
+            else:
+                print(f"Lock-S is granted to {transaction_id}")
+                if row not in self.lock_S:
+                    self.lock_S[row] = [transaction_id]
+                else:  
+                    self.lock_S[row].append(transaction_id)
+    
+        else:
+            if row in self.lock_S and transaction_id in self.lock_S[row]:
+                print(f"{transaction_id} successfully upgrades from lock-S to lock-X")
+                self.lock_S[row].remove(transaction_id)
+            else:
+                print(f"Lock-X is granted to {transaction_id}")
+                
+            if row not in self.lock_X:
+                self.lock_X[row] = transaction_id
+            else:  
+                self.lock_X[row].append(transaction_id)
+        
+        return Response(True, transaction_id)        
     
     def end_transaction(self, transaction_id: int):
         # Flush objects of a particular transaction after it has successfully committed/aborted
@@ -238,24 +250,24 @@ class WaitForGraph:
 # print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # T
 # print(ccm.validate_object(row_tes_1, tid2,'wriTe')) # F
 
-wfg = WaitForGraph()
-wfg.addEdge(1, 2)
-wfg.addEdge(4, 1)
-wfg.addEdge(2, 3)
-wfg.addEdge(3, 5)
+# wfg = WaitForGraph()
+# wfg.addEdge(1, 2)
+# wfg.addEdge(4, 1)
+# wfg.addEdge(2, 3)
+# wfg.addEdge(3, 5)
 
-print(wfg.isCyclic())
+# print(wfg.isCyclic())
 
-wfg.addEdge(5, 1)
-print(wfg.isCyclic())
+# wfg.addEdge(5, 1)
+# print(wfg.isCyclic())
 
-wfg.deleteEdge(5, 1)
-print(wfg)
+# wfg.deleteEdge(5, 1)
+# print(wfg)
 
-wfg.deleteEdge(4, 1)
-wfg.addEdge(4, 5)
+# wfg.deleteEdge(4, 1)
+# wfg.addEdge(4, 5)
 
-print(wfg)
+# print(wfg)
 
-wfg.deleteNode(5)
-print(wfg)
+# wfg.deleteNode(5)
+# print(wfg)

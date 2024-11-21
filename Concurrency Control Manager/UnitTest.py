@@ -16,11 +16,14 @@ class TestConcurrencyControlManager(unittest.TestCase):
     
     def test_validate_object(self):
         # [Tes-MainMethod] validate_object
-        row_tes = Row('table', 1, {'col1': 1, 'col2': 'SBD'})
+        row_tes = Row('table', PrimaryKey(1), {'col1': 1, 'col2': 'SBD'})
         tid1 = self.ccm.begin_transaction()
         tid2 = self.ccm.begin_transaction()
         
+        print("\n")
+        
         # Tes: Lock S == S (T); Lock S != X (F)
+        print("\nTest case 1:")
         ccm1 = ConcurrencyControlManager(algorithm="Tes")
         
         res1 = ccm1.validate_object(row_tes, tid1,'ReAd')  # T
@@ -35,6 +38,7 @@ class TestConcurrencyControlManager(unittest.TestCase):
         self.assertEqual(res3.transaction_id, tid1)
         
         # Tes: Upgrade Lock
+        print("\nTest case 2:")
         ccm2 = ConcurrencyControlManager(algorithm="Tes")
         
         res1 = ccm2.validate_object(row_tes, tid1,'ReAd')  # T
@@ -49,6 +53,7 @@ class TestConcurrencyControlManager(unittest.TestCase):
         self.assertEqual(res3.transaction_id, tid2)
         
         # Tes: Lock X Already Granted
+        print("\nTest case 3:")
         ccm3 = ConcurrencyControlManager(algorithm="Tes")
         
         res1 = ccm3.validate_object(row_tes, tid1,'wriTe') # T
@@ -63,6 +68,7 @@ class TestConcurrencyControlManager(unittest.TestCase):
         self.assertEqual(res3.transaction_id, tid2)
         
         # Tes: Lock S Already Granted; Lock S == S (T)
+        print("\nTest case 4:")
         ccm4 = ConcurrencyControlManager(algorithm="Tes")
         
         res1 = ccm4.validate_object(row_tes, tid1,'rEAd')  # T
@@ -77,6 +83,7 @@ class TestConcurrencyControlManager(unittest.TestCase):
         self.assertEqual(res3.transaction_id, tid1)
         
         # Tes: Lock X == X (F)
+        print("\nTest case 5:")
         ccm5 = ConcurrencyControlManager(algorithm="Tes")
     
         res1 = ccm5.validate_object(row_tes, tid1,'wriTe') # T
