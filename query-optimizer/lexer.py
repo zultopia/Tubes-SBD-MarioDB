@@ -16,6 +16,7 @@ class Token(Enum):
     NATURAL = 'natural'
     ASC = 'ascending'
     DESC = 'descending'
+    SET = 'set'
 
     # Logical operators
     AND = 'and'
@@ -80,6 +81,7 @@ class Lexer:
     (Token.NATURAL, r"(?i)\bnatural\b"),
     (Token.ASC, r"(?i)\b(ascending|asc)\b"),   
     (Token.DESC, r"(?i)\b(descending|desc)\b"),
+    (Token.SET,r"(?i)\bset\b"),
 
     # Logical operators
     (Token.AND, r"(?i)\band\b"),
@@ -136,9 +138,9 @@ class Lexer:
                     elif token == Token.NUMBER :
                         result.append((token,float(actualValue)))
                     else:
-                        if token in {Token.SELECT, Token.DOT,Token.WHERE, Token.ON}:
+                        if token in {Token.SELECT, Token.DOT,Token.WHERE,Token.ON,Token.SET}:
                             self.state = 0
-                        elif token in {Token.FROM, Token.JOIN}:
+                        elif token in {Token.FROM, Token.JOIN,Token.UPDATE}:
                             self.state = 1
                         result.append((token,actualValue))
                     tempQuery = tempQuery[avLength:].lstrip() # to delete all whitespaces
