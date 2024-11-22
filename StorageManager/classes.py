@@ -10,10 +10,11 @@ class Condition:
         self.operand = operand
 
 class DataRetrieval:
-    def __init__(self, table: str, columns: List[str], conditions: List[Condition]):
+    def __init__(self, table: str, columns: List[str], conditions: List[Condition], search_type: str):
         self.table = table
         self.columns = columns
         self.conditions = conditions
+        self.search_type = search_type
 
 class DataWrite:
     def __init__(self, table: str, columns: List[str], new_values: List[Union[int, str]], conditions: List[Condition] = None):
