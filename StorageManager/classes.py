@@ -22,6 +22,7 @@ class DataWrite:
         self.columns = columns
         self.new_values = new_values
         self.conditions = conditions or []
+        self.old_new_values = []
 
 class DataDeletion:
     def __init__(self, table: str, conditions: List[Condition]):
@@ -38,10 +39,13 @@ class Statistic:
 
 class StorageManager:
     DATA_FILE = "data.dat"
+    LOG_FILE = "log.dat"
 
     def __init__(self):
         self.data = self._load_data()
         self.indexes = {}
+        self.logs = self._load_logs()
+        self.action_logs = []
 
     def _load_data(self):
         if os.path.exists(self.DATA_FILE):
@@ -52,6 +56,27 @@ class StorageManager:
     def _save_data(self):
         with open(self.DATA_FILE, "wb") as file:
             pickle.dump(self.data, file)
+    
+    def _load_logs(self):
+        if os.path.exists(self.LOG_FILE):
+            with open(self.LOG_FILE, "rb") as file:
+                return pickle.load(file)
+        return []
+
+    def _save_logs(self):
+        with open(self.LOG_FILE, "wb") as file:
+            pickle.dump(self.logs, file)
+    
+    def log_action(self, action, table, data, columns=None):
+        log_entry = {
+            "action": action,
+            "table": table,
+            "data": data
+        }
+        if columns:
+            log_entry["columns"] = columns
+        self.action_logs.append(log_entry)
+
 
     def read_block(self, data_retrieval: DataRetrieval):
         table = self.data.get(data_retrieval.table, [])
@@ -59,30 +84,43 @@ class StorageManager:
         for row in table:
             if all(self._evaluate_condition(row, cond) for cond in data_retrieval.conditions):
                 result.append({col: row[col] for col in data_retrieval.columns})
+
+        # Log aksi read
+        self.log_action("read", data_retrieval.table, {"columns": data_retrieval.columns, "conditions": data_retrieval.conditions})
         return result
 
     def write_block(self, data_write: DataWrite):
         table = self.data.setdefault(data_write.table, [])
         affected_rows = 0
+        old_new_values = []
+        
         if data_write.conditions:
             for row in table:
                 if all(self._evaluate_condition(row, cond) for cond in data_write.conditions):
+                    old_row = {col: row[col] for col in data_write.columns}  # Nilai sebelum perubahan
                     for col, val in zip(data_write.columns, data_write.new_values):
                         row[col] = val
+                    new_row = {col: row[col] for col in data_write.columns}  # Nilai setelah perubahan
+                    old_new_values.append({"old": old_row, "new": new_row})
                     affected_rows += 1
         else:
             new_row = {col: val for col, val in zip(data_write.columns, data_write.new_values)}
             table.append(new_row)
+            old_new_values.append({"old": None, "new": new_row})
             affected_rows += 1
+
         self._save_data()
+        self.log_action("write", data_write.table, {"affected_rows": affected_rows, "old_new_values": old_new_values})
         return affected_rows
 
     def delete_block(self, data_deletion: DataDeletion):
         table = self.data.get(data_deletion.table, [])
         initial_size = len(table)
-        table = [row for row in table if not all(self._evaluate_condition(row, cond) for cond in data_deletion.conditions)]
-        self.data[data_deletion.table] = table
+        rows_to_remove = [row for row in table if all(self._evaluate_condition(row, cond) for cond in data_deletion.conditions)]
+        self.data[data_deletion.table] = [row for row in table if row not in rows_to_remove]
         self._save_data()
+
+        self.log_action("delete", data_deletion.table, {"deleted_rows": rows_to_remove})
         return initial_size - len(table)
 
     def set_index(self, table: str, column: str, index_type: str):

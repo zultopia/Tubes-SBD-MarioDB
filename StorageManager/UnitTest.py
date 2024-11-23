@@ -28,6 +28,16 @@ class TestStorageManager(unittest.TestCase):
         removed = self.manager.delete_block(data_deletion)
         self.assertEqual(removed, 1)
         self.assertEqual(len(self.manager.data["Student"]), 1)
+    
+    def test_write_block_with_logging(self):
+        data_write = DataWrite("Student", ["GPA"], [4.0], [Condition("StudentID", "=", 1)])
+        self.manager.write_block(data_write)
+        last_log = self.manager.logs[-1]
+        self.assertEqual(last_log["action"], "write")
+        self.assertIn("old_new_values", last_log["details"])
+        self.assertEqual(last_log["details"]["old_new_values"][0]["old"]["GPA"], 3.5)
+        self.assertEqual(last_log["details"]["old_new_values"][0]["new"]["GPA"], 4.0)
+
 
 if __name__ == "__main__":
     unittest.main()
