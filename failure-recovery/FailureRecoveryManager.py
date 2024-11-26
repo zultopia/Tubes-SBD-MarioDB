@@ -6,7 +6,7 @@ from datetime import datetime
 class FailureRecoveryManager:
     def __init__(self, log_file="log.log"):
         self.log_file = log_file
-        self.wh_logs = []
+        self.wh_logs = ["103|2024-11-21T12:02:45.321Z|IN_PROGRESS|UPDATE employees SET salary = 6000 WHERE id = 1;|Before: {'id': 1, 'name': 'Alice', 'salary': 5000}|After: {'id': 1, 'name': 'Alice', 'salary': 6000}", "CHECKPOINT|2024-11-21T12:03:00.000Z|[103]"]
                 
     def write_log(self, execution_result):
         pass
@@ -42,12 +42,14 @@ class FailureRecoveryManager:
         recovered_transactions = []
         active_transactions = set()
         if criteria and criteria.timestamp:
-            
-            for log_line in self._read_lines_from_end(self.log_file):
+            checkpoint_found = False
+            #baca whl
+            for log_line in self.wh_logs:
                 log_parts = log_line.split("|")
                 
                 if log_parts[0] == "CHECKPOINT":
                     active_transactions = set(json.loads(log_parts[2]))
+                    checkpoint_found = True
                     break
                 elif log_parts[0].isdigit():
                     timestamp = log_parts[1]
@@ -58,14 +60,35 @@ class FailureRecoveryManager:
                         break
                     
                     recovered_transactions.insert(0, log_line)
+            
+            #baca log file
+            if not checkpoint_found:
+                for log_line in self._read_lines_from_end(self.log_file):
+                    log_parts = log_line.split("|")
+
+                    if log_parts[0] == "CHECKPOINT":
+                        active_transactions = set(json.loads(log_parts[2]))
+                        break
+                    elif log_parts[0].isdigit():
+                        timestamp = log_parts[1]
+                        date_timestamp = datetime.fromisoformat(timestamp)
+                        date_criteria_timestamp = datetime.fromisoformat(criteria.timestamp)
+
+                        if date_timestamp < date_criteria_timestamp:
+                            break
+                        
+                        recovered_transactions.insert(0, log_line)
                     
             
         elif criteria and criteria.transaction_id:
-            for log_line in self._read_lines_from_end(self.log_file):
+            checkpoint_found = False
+            for log_line in self.wh_logs:
                 log_parts = log_line.split("|")
                 
                 if log_parts[0] == "CHECKPOINT":
                     active_transactions = set(json.loads(log_parts[2]))
+                    checkpoint_found = True
+                    
                     break
                 
                 elif log_parts[0].isdigit():
@@ -75,6 +98,23 @@ class FailureRecoveryManager:
                         break
                     
                     recovered_transactions.insert(0, log_line)
+            
+            #baca log file
+            if not checkpoint_found:
+                for log_line in self._read_lines_from_end(self.log_file):
+                    log_parts = log_line.split("|")
+                    
+                    if log_parts[0] == "CHECKPOINT":
+                        active_transactions = set(json.loads(log_parts[2]))
+                        break
+                    
+                    elif log_parts[0].isdigit():
+                        transaction_id = log_parts[0]
+                        
+                        if int(transaction_id) < criteria.transaction_id:
+                            break
+                        
+                        recovered_transactions.insert(0, log_line)
                     
         #redo
         for recovered_transaction in recovered_transactions:
