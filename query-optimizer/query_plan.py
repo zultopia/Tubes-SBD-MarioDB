@@ -1,9 +1,9 @@
 from enum import Enum
 from typing import Dict, List, Union, Literal
-from utils import Prototype
+from utils import Prototype, Pair
 from abc import ABC, abstractmethod
-from utils import Pair
-from lexer import Token
+from parse_tree import ParseTree
+
 
 """
 Complete documentation of what this file is about
@@ -238,7 +238,7 @@ class SortingNode(QueryNode):
         attributes: List of attributes to sort by
     """
     attributes: List[str]
-    children: None | QueryNode
+    child: QueryNode
 
     def __init__(self, attributes: List[str]):
         super().__init__(NodeType.SORTING)
@@ -257,8 +257,8 @@ class SortingNode(QueryNode):
     def estimate_cost(self, statistics: Dict) -> float:
         pass
 
-    def set_children(self, children: QueryNode):
-        self.children = children
+    def set_child(self, child: QueryNode):
+        self.child = child
 
 class TableNode(QueryNode):
     """
@@ -266,7 +266,6 @@ class TableNode(QueryNode):
     Reads rows from a table or view.
     """
     table_name: str
-    children: None
 
     def __init__(self, table_name: str):
         super().__init__(NodeType.TABLE)
@@ -315,13 +314,12 @@ class QueryPlan(Prototype):
         children: List of child nodes
     """
     root: QueryNode
-    optimizer: QueryPlanOptimizer
 
-    def __init__(self, root: QueryNode, optimizer: QueryPlanOptimizer):
+    def __init__(self, root: QueryNode):
         self.root = root
     
-    def optimize(self):
-        optimized = self.optimizer.optimize(self)
+    def optimize(self, optimizer: QueryPlanOptimizer):
+        optimized = optimizer.optimize(self)
         self = optimized
     
     def execute(self):
@@ -394,6 +392,11 @@ class BFOptimizer(QueryPlanOptimizer):
         
         # Not yet implemented
         pass
+
+
+
+def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
+    pass
 
 if __name__ == "__main__":
     employees = TableNode("employees")

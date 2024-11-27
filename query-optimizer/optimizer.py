@@ -1,4 +1,4 @@
-from query_plan_tree import QueryPlanTree
+from query_plan import QueryPlan
 
 def get_cost(query_plan_tree):
     print("Getting the cost....")

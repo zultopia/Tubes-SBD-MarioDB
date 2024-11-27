@@ -18,8 +18,6 @@ class Node:
         return f"[{self.token_type}]({self.value})"
 
 
-    
-    
 class ParseTree:
     root: Node | str # root dapat bernilai string untuk auxiliary token yang muncul sebab penggunaan nonterminal pada grammar 
     childs = []
