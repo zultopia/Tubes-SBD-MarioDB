@@ -8,7 +8,8 @@ if __name__ == "__main__":
     write_action = DataWrite(
         table="Student",
         columns=["StudentID", "FullName", "GPA"],
-        new_values=[3, "Eve", 3.9]
+        new_values=[3, "Eve", 3.9],
+        level="row"
     )
     manager.write_block(write_action)
     manager.log_action("write", write_action.table, write_action.new_values, write_action.columns)
@@ -19,7 +20,8 @@ if __name__ == "__main__":
         table="Student",
         columns=["FullName", "GPA"],
         conditions=[Condition("GPA", ">", 3.0)],
-        search_type="sequential"
+        search_type="sequential",
+        level="table"
     )
     results = manager.read_block(read_action)
     manager.log_action("read", read_action.table, results, read_action.columns)
@@ -28,7 +30,8 @@ if __name__ == "__main__":
     # Delete Example
     delete_action = DataDeletion(
         table="Student",
-        conditions=[Condition("StudentID", "=", 1)]
+        conditions=[Condition("StudentID", "=", 1)],
+        level="table"
     )
     removed = manager.delete_block(delete_action)
     manager.log_action("write", delete_action.table, {"deleted_rows": removed})
