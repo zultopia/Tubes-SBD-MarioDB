@@ -87,24 +87,30 @@ class Condition:
         self.operand = operand
 
 class DataRetrieval:
-    def __init__(self, table: str, columns: List[str], conditions: List[Condition], search_type: str):
+    def __init__(self, table: str, columns: List[str], conditions: List[Condition], search_type: str, level: str, attribute: str = None):
         self.table = table
         self.columns = columns
         self.conditions = conditions
         self.search_type = search_type
+        self.level = level
+        self.attribute = attribute # Defaultnya akan None kecuali level = "cell"
 
 class DataWrite:
-    def __init__(self, table: str, columns: List[str], new_values: List[Union[int, str]], conditions: List[Condition] = None):
+    def __init__(self, table: str, columns: List[str], new_values: List[Union[int, str]], level: str, attribute: str = None, conditions: List[Condition] = None):
         self.table = table
         self.columns = columns
         self.new_values = new_values
+        self.level = level
+        self.attribute = attribute # Defaultnya akan None kecuali level = "cell"
         self.conditions = conditions or []
         self.old_new_values = []
 
 class DataDeletion:
-    def __init__(self, table: str, conditions: List[Condition]):
+    def __init__(self, table: str, conditions: List[Condition], level: str, attribute: str = None):
         self.table = table
         self.conditions = conditions
+        self.level = level
+        self.attribute = attribute # Defaultnya akan None kecuali level = "cell"
 
 class Statistic:
     def __init__(self, n_r: int, b_r: int, l_r: int, f_r: int, V_a_r: dict):
