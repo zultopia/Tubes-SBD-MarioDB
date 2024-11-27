@@ -3,6 +3,83 @@ import pickle
 import math
 from typing import List, Union
 
+class Student:
+    def __init__(self, id:int, name:str, dept_name:str, tot_cred:int):
+        self.id = id
+        self.name = name
+        self.dept_name = dept_name
+        self.tot_cred = tot_cred
+
+class Instructor:
+    def __init__(self, id:int, name:str, dept_name:str, salary:int):
+        self.id = id
+        self.name = name
+        self.dept_name = dept_name
+        self.salary = salary
+
+class Department:
+    def __init__(self, dept_name:str, building:str, budget:int):
+        self.dept_name = dept_name
+        self.building = building
+        self.budget = budget
+
+class Course:
+    def __init__(self, course_id:int, title:str, dept_name:str, credits:int):
+        self.course_id = course_id
+        self.title = title
+        self.dept_name = dept_name
+        self.credits = credits
+
+class Section:
+    def __init__(self, course_id:int, sec_id:str, semester:int, year:int, building:str, room_number:int, time_slot_id:int):
+        self.course_id = course_id
+        self.sec_id = sec_id
+        self.semester = semester
+        self.year = year
+        self.building = building
+        self.room_number = room_number
+        self.time_slot_id = time_slot_id
+
+class Teaches:
+    def __init__(self, id:int, course_id:int, sec_id:str, semester:int, year:int):
+        self.id = id
+        self.course_id = course_id
+        self.sec_id = sec_id
+        self.semester = semester
+        self.year = year
+
+class Advisor:
+    def __init__(self, s_id:int, i_id:int):
+        self.s_id = s_id
+        self.i_id = i_id
+    
+class Prerequisite:
+    def __init__(self, course_id:int, prereq_id:str):
+        self.course_id = course_id
+        self.prereq_id = prereq_id
+
+class TimeSlot:
+    def __init__(self, time_slot_id:int, day:str, start_time:str, end_time:str):
+        self.time_slot_id = time_slot_id
+        self.day = day
+        self.start_time = start_time
+        self.end_time = end_time
+
+class Takes:
+    def __init__(self, id:int, course_id:int, sec_id:str, semester:int, year:int, grade:str):
+        self.id = id
+        self.course_id = course_id
+        self.sec_id = sec_id
+        self.semester = semester
+        self.year = year
+        self.grade = grade
+
+class Classroom:
+    def __init__(self, building:str, room_number:int, capacity:int):
+        self.building = building
+        self.room_number = room_number
+        self.capacity = capacity
+
 class Condition:
     def __init__(self, column: str, operation: str, operand: Union[int, str]):
         self.column = column
