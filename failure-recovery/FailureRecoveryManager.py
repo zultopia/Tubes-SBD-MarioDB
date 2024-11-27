@@ -31,21 +31,21 @@ class FailureRecoveryManager:
         # This method accepts execution result object as input and appends 
         # an entry in a write-ahead log based on execution info object. 
 
-        log_entry = {
-            "transaction_id": execution_result.transaction_id,
-            "timestamp": execution_result.timestamp,
-            "message": execution_result.message,
-            "data_before": execution_result.data_before,
-            "data_after": execution_result.data_after,
-            "status": execution_result.status,
-            "query": execution_result.query
-        }
+        # Create log entry
+        def process_rows(rows):
+            return ", ".join([str(item) for item in rows]) 
 
-        log_entry_str = json.dumps(log_entry)
+        log_entry = (
+            f"{execution_result.transaction_id}|"
+            f"{execution_result.timestamp}|"
+            f"{execution_result.status}|"
+            f"{execution_result.query}|"
+            f"Before: {process_rows(execution_result.data_before.data)}|"
+            f"After: {process_rows(execution_result.data_after.data)}"
+        )   # execution_result.message ga kepake (?)
 
-        # Append entry
-        with open(self._wal_log_file, "a") as log_file:
-            log_file.write(log_entry_str + "\n")
+        # Append entry to self._wh_logs
+        self._wh_logs.append(log_entry)
     
     def _save_checkpoint():
         pass
