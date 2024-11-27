@@ -1,5 +1,5 @@
 import unittest
-from classes import StorageManager, DataRetrieval, DataWrite, DataDeletion, Condition
+from StorageManager.classes import StorageManager, DataRetrieval, DataWrite, DataDeletion, Condition
 
 class TestStorageManager(unittest.TestCase):
     def setUp(self):

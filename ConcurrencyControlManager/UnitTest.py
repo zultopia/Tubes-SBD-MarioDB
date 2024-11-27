@@ -1,5 +1,5 @@
 import unittest
-from classes import ConcurrencyControlManager, PrimaryKey, Row, Action, Response, WaitForGraph
+from ConcurrencyControlManager.classes import ConcurrencyControlManager, PrimaryKey, Row, Action, Response, WaitForGraph
 
 class TestConcurrencyControlManager(unittest.TestCase):
     def setUp(self):
