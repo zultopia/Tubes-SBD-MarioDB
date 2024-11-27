@@ -11,7 +11,7 @@ class JoinCondition:
         self.operator = operator
 
 class JoinNode(QueryNode):
-    def __init__(self, algorithm: JoinAlgorithm):
+    def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP):
         super().__init__(NodeType.JOIN)
         self.algorithm = algorithm
         self.children = None
@@ -22,7 +22,7 @@ class JoinNode(QueryNode):
         self.children = children
 
 class ConditionalJoinNode(JoinNode):
-    def __init__(self, algorithm: JoinAlgorithm, conditions: List[JoinCondition]):
+    def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP, conditions: List[JoinCondition] = []):
         super().__init__(algorithm)
         self.conditions = conditions
     
@@ -35,7 +35,7 @@ class ConditionalJoinNode(JoinNode):
 
 
 class NaturalJoinNode(JoinNode):
-    def __init__(self, algorithm: JoinAlgorithm):
+    def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP):
         super().__init__(algorithm)
     
     def estimate_cost(self, statistics: Dict) -> float:
