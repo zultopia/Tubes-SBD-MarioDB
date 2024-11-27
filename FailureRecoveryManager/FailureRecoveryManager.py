@@ -26,10 +26,7 @@ class FailureRecoveryManager:
         self._start_checkpoint_cron_job()
 
         # Write-ahead logs (in-memory)
-        self._wh_logs = [
-            "103|2024-11-21T12:02:45.321Z|IN_PROGRESS|UPDATE employees SET salary = 6000 WHERE id = 1;|Before: {'id': 1, 'name': 'Alice', 'salary': 5000}|After: {'id': 1, 'name': 'Alice', 'salary': 6000}",
-            "CHECKPOINT|2024-11-21T12:03:00.000Z|[103]",
-        ]
+        self._wh_logs = ["102|2024-11-21T12:02:05.678Z|IN_PROGRESS|INSERT INTO employees (id, name, salary) VALUES (2, 'Bob', 4000);|Before: None|After: [{\"id\": 2, \"name\": \"Bob\", \"salary\": 4000}]","102|2024-11-21T12:02:20.123Z|ROLLBACK|DELETE FROM employees WHERE id = 2;|Before: None|After: None","102|2024-11-21T12:02:15.789Z|ABORTED|TRANSACTION END|[{}]","103|2024-11-21T12:02:45.321Z|IN_PROGRESS|UPDATE employees SET salary = 6000 WHERE id = 1;|Before: [{\"id\": 1, \"name\": \"Alice\", \"salary\": 5000}]|After: [{\"id\": 1, \"name\": \"Alice\", \"salary\": 6000}]"]
 
         # Maximum number of Exe buffer (array length)
         self._max_size_buffer = 20
