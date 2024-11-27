@@ -1,1 +1,1 @@
-select azmi from gana natural join hello;
+select azmi from gana join hello on gana.id = hello.id;

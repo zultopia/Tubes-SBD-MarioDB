@@ -11,8 +11,6 @@ from parse_tree import ParseTree, Node
 from lexer import Token 
 
 
-
-
 def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
     """Convert a parse tree to a query plan."""
     if isinstance(parse_tree.root, str) and parse_tree.root == "Query":
@@ -29,7 +27,6 @@ def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
         if table_node:
             project_node.set_child(table_node)
             
-        # Process WHERE clause if it exists (after FROM)
         current_node = table_node
         for i in range(4, len(parse_tree.childs)):
             if isinstance(parse_tree.childs[i].root, Node):
@@ -85,24 +82,32 @@ def process_table_result(table_result_tree: ParseTree) -> QueryNode:
     if not table_result_tree.childs:
         raise ValueError("Empty table result")
 
+    # Process first table term
     current_node = process_table_term(table_result_tree.childs[0])
     
+    # Process joins in TableResultTail if it exists
     if len(table_result_tree.childs) > 1:
         tail = table_result_tree.childs[1]
         while tail and tail.childs:
             if isinstance(tail.root, str) and tail.root == "TableResultTail":
-                if tail.childs[0].root.token_type == Token.NATURAL:
-                    join_node = NaturalJoinNode(JoinAlgorithm.NESTED_LOOP) 
-                    right_node = process_table_term(tail.childs[2])
-                    join_node.set_children(Pair(current_node, right_node))
-                    current_node = join_node
-                elif tail.childs[0].root.token_type == Token.JOIN:
-                    join_node = process_conditional_join(tail)
-                    right_node = process_table_term(tail.childs[1])
-                    join_node.set_children(Pair(current_node, right_node))
-                    current_node = join_node
+                if len(tail.childs) >= 1:  # Make sure we have at least one child
+                    if tail.childs[0].root.token_type == Token.NATURAL:
+                        # Natural Join
+                        join_node = NaturalJoinNode(JoinAlgorithm.HASH)
+                        right_node = process_table_term(tail.childs[2])
+                        join_node.set_children(Pair(current_node, right_node))
+                        current_node = join_node
+                    elif tail.childs[0].root.token_type == Token.JOIN:
+                        # Conditional Join
+                        join_node = process_conditional_join(tail)
+                        right_node = process_table_term(tail.childs[1])
+                        join_node.set_children(Pair(current_node, right_node))
+                        current_node = join_node
                 
-                tail = tail.childs[-1] 
+                if len(tail.childs) > 4:
+                    tail = tail.childs[4] 
+                else:
+                    break
             else:
                 break
             
@@ -122,36 +127,59 @@ def process_table_term(table_term_tree: ParseTree) -> QueryNode:
         return process_table_result(table_term_tree.childs[1])
     else:
         raise ValueError(f"Unexpected token in table term: {table_term_tree.childs[0].root}")
-def process_conditional_join(join_tree: 'ParseTree') -> ConditionalJoinNode:
+
+def process_conditional_join(join_tree: ParseTree) -> ConditionalJoinNode:
     """Process conditional join and create ConditionalJoinNode."""
     conditions = []
     condition_tree = join_tree.childs[3]  # ON clause conditions
     
-    def extract_condition(cond_tree: 'ParseTree') -> Optional[JoinCondition]:
-        if cond_tree.root == "ConditionTerm":
-            # Extract left field, operator, and right field
-            left_field = extract_field_name(cond_tree.childs[0])
-            op = extract_operator(cond_tree.childs[1])
-            right_field = extract_field_name(cond_tree.childs[2])
-            return JoinCondition(left_field, right_field, op)
+    def process_condition_term(cond_term: ParseTree) -> Optional[JoinCondition]:
+        if cond_term.root == "ConditionTerm":
+            left_field = extract_field_value(cond_term.childs[0])
+            operator = cond_term.childs[1].childs[0].root.value
+            right_field = extract_field_value(cond_term.childs[2])
+            return JoinCondition(left_field, right_field, operator)
         return None
-    
-    def extract_field_name(field_tree: 'ParseTree') -> str:
-        if isinstance(field_tree, 'ParseTree') and field_tree.root == "Field":
-            if len(field_tree.childs) == 1:
+
+    def extract_field_value(field_tree: ParseTree) -> str:
+        if field_tree.root == "Field":
+            if len(field_tree.childs) == 3:  # Table.Attribute form
+                return f"{field_tree.childs[0].root.value}.{field_tree.childs[2].root.value}"
+            else:  # Simple attribute form
                 return field_tree.childs[0].root.value
-            else:
-                return field_tree.childs[2].root.value
-        return str(field_tree.root.value)
+        return field_tree.root.value
+
+    def process_and_condition(and_cond: ParseTree):
+        if and_cond.root == "AndCondition":
+            # Process the first condition
+            cond = process_condition_term(and_cond.childs[0])
+            if cond:
+                conditions.append(cond)
+                
+            # Process AndConditionTail if it exists
+            if len(and_cond.childs) > 1 and and_cond.childs[1]:
+                tail = and_cond.childs[1]
+                if tail.root == "AndConditionTail":
+                    # Process each condition in the tail
+                    cond = process_condition_term(tail.childs[1])
+                    if cond:
+                        conditions.append(cond)
+                    # Process nested AndConditionTail if it exists
+                    if len(tail.childs) > 2 and tail.childs[2]:
+                        process_and_condition_tail(tail.childs[2])
+
+    def process_and_condition_tail(tail: ParseTree):
+        if tail and tail.root == "AndConditionTail" and tail.childs:
+            cond = process_condition_term(tail.childs[1])
+            if cond:
+                conditions.append(cond)
+            if len(tail.childs) > 2:
+                process_and_condition_tail(tail.childs[2])
+
+    if condition_tree.root == "Condition":
+        process_and_condition(condition_tree.childs[0])
     
-    def extract_operator(op_tree: 'ParseTree') -> str:
-        return op_tree.childs[0].root.value
-    
-    condition = extract_condition(condition_tree)
-    if condition:
-        conditions.append(condition)
-    
-    return ConditionalJoinNode(JoinAlgorithm.NESTED_LOOP, conditions) 
+    return ConditionalJoinNode(JoinAlgorithm.HASH, conditions)
 
 def process_where_clause(condition_tree: 'ParseTree') -> ProjectNode:
     """Process WHERE clause and create ProjectNode with conditions."""
