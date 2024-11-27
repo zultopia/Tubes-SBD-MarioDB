@@ -71,6 +71,37 @@ class Lock:
     def __str__(self):
         return f"=============== Lock ===============\ntype: {self.type}\ntransaction_id: {self.transaction_id}\nrow:\n{self.row}====================================\n"
 
+class Table:
+    def __init__(self, table: str):
+        self.table = table
+    
+    def __eq__(self, other):
+        return self.table == other.table
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+        
+class Cell:
+    def __init__(self, table: str, pkey: PrimaryKey, attribute: str, value: any):
+        self.table = table
+        self.pkey = pkey
+        self.attribute = attribute
+        self.value = value
+    
+    def __eq__(self, other):
+        return (self.pkey == other.pkey) and (self.attribute == other.attribute) and (self.table == other.table)
+
+class DataItem:
+    def __init__(self, level: str, data_item: Table | Row | Cell):
+        self.level = level
+        self.data_item = data_item
+        
+    def __eq__(self, other):
+        return (self.level == other.level) and (self.data_item == other.data_item)
+    
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
 class Transaction: 
     def __init__(self, tid: int, action: Action, level: int, data_item: str): 
         self.id = tid 
