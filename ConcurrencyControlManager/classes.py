@@ -1,5 +1,6 @@
 # import class Row
 from datetime import datetime
+from typing import Optional, List  # kalo gaboleh dihapus aja
 import time
 
 class PrimaryKey:
@@ -23,6 +24,10 @@ class PrimaryKey:
             f"===== PrimaryKey =====\nisComposite: {self.isComposite}\nkeys: {self.keys}\n======================\n"
         )
 
+class IDataItem:
+    def get_parent(self):
+        pass
+
 class Table:
     def __init__(self, table: str):
         self.table = table
@@ -32,6 +37,9 @@ class Table:
 
     def __ne__(self, other):
         return not self.__eq__(other)
+    
+    def get_parent(self):
+        return None
 
 class Row:
     def __init__(self, table: Table, pkey: PrimaryKey, map: dict):
@@ -56,6 +64,9 @@ class Row:
 
     def get_table(self): 
         return self.table
+    
+    def get_parent(self):
+        return self.get_table()
 
 class Action:
     def __init__(self, action : str):
@@ -85,7 +96,7 @@ class Lock:
     def __str__(self):
         return f"=============== Lock ===============\ntype: {self.type}\ntransaction_id: {self.transaction_id}\nrow:\n{self.row}====================================\n"
 
-class Cell:
+class Cell(IDataItem):
     def __init__(self, row: Row, pkey: PrimaryKey, attribute: str, value: any):
         self.row = row
         self.pkey = pkey
@@ -100,6 +111,9 @@ class Cell:
     
     def get_table(self):
         return self.row.get_table()
+
+    def get_parent(self):
+        return self.get_row()
     
 class DataItem:
     def __init__(self, level: str, data_item: Table | Row | Cell):
@@ -111,6 +125,9 @@ class DataItem:
     
     def __ne__(self, other):
         return not self.__eq__(other)
+    
+    def get_parent(self):
+        return self.data_item.get_parent()
 
 class Transaction: 
     def __init__(self, tid: int, action: Action, level: int, data_item: str): 
@@ -179,6 +196,113 @@ class WaitForGraph:
     def __str__(self):
         return f"{self.waitfor}"
 
+class GranularityNode:
+    # Simpul berupa data item
+    node: DataItem
+    
+    # Daftar lock yg dimiliki data item, format: set[transaction_id]
+    lock_IS: set[str]
+    lock_IX: set[str]
+    lock_S: set[str]
+    lock_SIX: str   # Hanya mungkin dimiliki satu transaction_id
+    lock_X: str     # Hanya mungkin dimiliki satu transaction_id
+    
+    # Parent dan children dari data item
+    parent: Optional['GranularityNode']
+    children: List['GranularityNode']
+    
+    
+    def __init__(self, data_item: DataItem):
+        self.node = data_item
+        self.lock_IS = set()
+        self.lock_IX = set()
+        self.lock_S = set()
+        
+    def validate_lock(self, data_item: DataItem, transaction_id: int, lock_type: str):
+        conflict_matrix = {
+            "IS": {"X"},
+            "IX": {"S", "SIX", "X"},
+            "S": {"IX", "SIX", "X"},
+            "SIX": {"IX", "S", "SIX", "X"},
+            "X": {"IS", "IX", "S", "SIX", "X"}
+        }
+        
+        valid_parent_lock_matrix = {
+            "IS": {"IX", "IS"},
+            "IX": {"IX", "SIX"},
+            "S": {"IX", "IS"},
+            "SIX": {"IX", "SIX"},
+            "X": {"IX", "SIX"}
+        }
+        
+        # Cek apakah aman (ga konflik) di node itu sendiri
+        for held_lock, holders in [
+            ("IS", self.lock_IS),
+            ("IX", self.lock_IX),
+            ("S", self.lock_S),
+            ("SIX", set(self.lock_SIX)),
+            ("X", set(self.lock_X))
+        ]:
+            if holders and lock_type in conflict_matrix[held_lock]:
+                return False, f"Conflict: The requested data item holds {held_lock} lock by another transaction."        
+        
+        
+        parent = self.parent       
+        
+        # Cek apakah aman (ga konflik) di semua parent2 nya sampe root
+        while parent:
+            parent_locks = {
+                "IS": parent.lock_IS,
+                "IX": parent.lock_IX,
+                "S": parent.lock_S,
+                "SIX": parent.lock_SIX,
+                "X": parent.lock_X
+            }
+    
+            valid = False
+            for valid_parent_lock in valid_parent_lock_matrix[lock_type]:
+                if transaction_id in parent_locks[valid_parent_lock]:
+                    valid = True
+            
+            if not valid:
+                return False, f"Conflict: Transaction {transaction_id} does not currently hold the valid parent lock at the {parent.node.level} level" 
+            
+            parent = parent.parent
+
+
+        self.lock_IS.remove(transaction_id)
+        self.lock_IX.remove(transaction_id)
+        self.lock_S.remove(transaction_id)
+        self.lock_SIX = None if self.lock_SIX == transaction_id else self.lock_SIX
+        self.lock_X = None if self.lock_X == transaction_id else self.lock_X
+        
+        locks = {
+            'IS': self.lock_IS,
+            'IX': self.lock_IX,
+            'S': self.lock_S,
+            'SIX': self.lock_SIX,
+            'X': self.lock_X
+        }
+        
+        if lock_type != 'SIX' and lock_type != 'X':
+            locks[lock_type].add(transaction_id)
+        else:
+            locks[lock_type] = transaction_id
+        
+        return Response(success=True, transaction_id=transaction_id, message=f"Lock-{lock_type} granted.")
+            
+class GranularityTree:
+    root: GranularityNode
+    
+    def __init__(self):
+        self.root = None            
+
+
+    # TODO: implementasi
+    def add_node(self, data_item: DataItem):
+        pass
+
+            
 class ConcurrencyControlManager:
     def __init__(self, algorithm: str):
         self.algorithm = algorithm
@@ -232,7 +356,7 @@ class ConcurrencyControlManager:
         return True, None
             
     # Apply lock to a data item and update the ancestor
-    def apply_lock_with_hierarchy(self, data_item, transaction_id, lock_type):
+    def apply_lock_with_hierarchy(self, data_item: DataItem, transaction_id: int, lock_type: str):
         current = data_item
         success = True
         message = None
@@ -243,7 +367,7 @@ class ConcurrencyControlManager:
             return Response(success=False, transaction_id=transaction_id, message=message)
 
         # Apply lock to parent
-        current = data_item
+        current = data_item.data_item
         while current:
             parent = None
             if isinstance(current, Cell):
@@ -333,7 +457,7 @@ class ConcurrencyControlManager:
                     lock_type = "S"
 
                 self.lock(transaction.data_item, transaction.id, lock_type)
-                #TODO: determine when to commit. This line might be the time that 
+                # TODO: determine when to commit. This line might be the time that 
                 # the transaction committed. Hence, the node in waitgraph might be removed    
             
                 self.waiting_list.remove(transaction)
