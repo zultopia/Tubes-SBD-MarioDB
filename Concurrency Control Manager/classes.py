@@ -1,0 +1,385 @@
+# import class Row
+from datetime import datetime
+import time
+
+class PrimaryKey:
+    def __init__(self, *keys):
+        # keys nya langsung value si primary key nya aja
+        self.isComposite = len(keys) > 1
+        self.keys = keys
+
+    def __eq__(self, other):
+        if not isinstance(other, PrimaryKey):
+            return NotImplemented
+        if(self.isComposite != other.isComposite):
+            return False
+        return self.keys == other.keys
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __str__(self):
+        return (
+            f"===== PrimaryKey =====\nisComposite: {self.isComposite}\nkeys: {self.keys}\n======================\n"
+        )
+
+class Row:
+    def __init__(self, table: str, pkey: PrimaryKey, map: dict):
+        self.table = table
+        self.pkey = pkey
+        self.map = map
+        
+    def __getitem__(self, key):
+        # use case: Row['key1'], then it will return the value of that 'key1' key in the map
+        if key in self.map:
+            return self.map[key]
+        raise KeyError(f"Key '{key}' not found")
+    
+    def __eq__(self, other):
+        return (self.pkey == other.pkey) and (self.table == other.table)
+    
+    def __ne__(self, other):
+        return not self.__eq__(other)
+    
+    def __str__(self):
+        return f"=============== Row ===============\ntable: {self.table}\nmap:\n{self.map}\npkey:\n{self.pkey}===================================\n"
+
+class Action:
+    def __init__(self, action):
+        self.action = action
+        
+    def __str__(self):
+        return f"=== Action ===\naction: {self.action}\n==============\n"
+        
+class Response:
+    def __init__(self, allowed: bool, transaction_id: int):
+        self.allowed = allowed
+        self.transaction_id = transaction_id
+        
+    def __str__(self):
+        return f"==== Response ====\nallowed: {self.allowed}\ntransaction_id: {self.transaction_id}\n==================\n"
+
+class Lock:
+    def __init__(self, type: str, transaction_id: int, row: Row):
+        # type is either 'S' or 'X'
+        self.type = type.upper()
+        if(self.type != 'S' and self.type != 'X'):
+            raise ValueError(f"Invalid lock type: {type}. Allowed values are 'S' or 'X'.")
+        self.transaction_id = transaction_id
+        self.row = row
+        
+    def __str__(self):
+        return f"=============== Lock ===============\ntype: {self.type}\ntransaction_id: {self.transaction_id}\nrow:\n{self.row}====================================\n"
+
+class Table:
+    def __init__(self, table: str):
+        self.table = table
+    
+    def __eq__(self, other):
+        return self.table == other.table
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+        
+class Cell:
+    def __init__(self, table: str, pkey: PrimaryKey, attribute: str, value: any):
+        self.table = table
+        self.pkey = pkey
+        self.attribute = attribute
+        self.value = value
+    
+    def __eq__(self, other):
+        return (self.pkey == other.pkey) and (self.attribute == other.attribute) and (self.table == other.table)
+
+class DataItem:
+    def __init__(self, level: str, data_item: Table | Row | Cell):
+        self.level = level
+        self.data_item = data_item
+        
+    def __eq__(self, other):
+        return (self.level == other.level) and (self.data_item == other.data_item)
+    
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+class Transaction: 
+    def __init__(self, tid: int, action: Action, level: int, data_item: str): 
+        self.id = tid 
+        self.action = action
+        self.level  = level
+        # TODO: update data_item
+        self.data_item = data_item
+
+class WaitForGraph:
+    def __init__(self):
+        self.waitfor = {}   # tid_waiting: set[tid_waited]
+    
+    def addEdge(self, tid_waiting: int, tid_waited: int):
+        if tid_waiting not in self.waitfor: 
+            self.waitfor[tid_waiting] = set()
+        self.waitfor[tid_waiting].add(tid_waited)
+    
+    def deleteEdge(self, tid_waiting: int, tid_waited: int):
+        if tid_waiting in self.waitfor and tid_waited in self.waitfor[tid_waiting]:
+            self.waitfor[tid_waiting].remove(tid_waited)
+            if not self.waitfor[tid_waiting]: 
+                del self.waitfor[tid_waiting]
+        
+    def deleteNode(self, tid): 
+        # remove edges that pointing to tid node 
+        for tid_waiting in list(self.waitfor):
+            if tid in self.waitfor[tid_waiting]: 
+                self.waitfor[tid_waiting].remove(tid)
+
+                if not self.waitfor[tid_waiting]: 
+                    del self.waitfor[tid_waiting]
+
+        # remove the tid node
+        if tid in self.waitfor: 
+            del self.waitfor[tid]
+                
+    def isCyclic(self):
+        def dfs(node, visited, rec_stack): 
+            visited.add(node)
+            rec_stack.add(node)
+
+            for neighbor in self.waitfor.get(node, []): 
+                if neighbor not in visited: 
+                    if dfs(neighbor, visited, rec_stack): 
+                        return True
+                elif neighbor in rec_stack: 
+                    return True
+                
+            rec_stack.remove(node)
+            return False
+
+        visited = set()
+        rec_stack = set()
+
+        for node in self.waitfor: 
+            if node not in visited: 
+                if dfs(node, visited, rec_stack): 
+                    return True
+        
+        return False
+    
+    def waiting(self, tid: int): 
+        return tid in self.waitfor
+
+    def __str__(self):
+        return f"{self.waitfor}"
+
+class ConcurrencyControlManager:
+    def __init__(self, algorithm: str):
+        self.algorithm = algorithm
+        self.lock_S = {} # Map Row -> Set[transaction_id]
+        self.lock_X = {} # Map Row -> transaction_id
+        self.wait_for_graph = WaitForGraph()
+        self.transaction_queue = {} # Map transaction_id -> List[Row]
+        self.waiting_list = [Transaction]
+    
+    def __str__(self):
+        return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"
+    
+    def __generate_id(self) -> int:
+        # return int(f"{datetime.now().strftime("%Y%m%d%H%M%S%f")}{random.randint(10000, 99999)}")
+        return int((str(time.perf_counter()*1000000000)).replace('.', ''))
+    
+    def begin_transaction(self) -> int:
+        # will return transaction_id: int
+        transaction_id = self.__generate_id()
+        self.transaction_queue[transaction_id] = []
+        return transaction_id
+
+    def log_object(self, object: Row, transaction_id: int):
+        # implement lock on an object
+        # assign timestamp on the object
+        pass
+    
+    def validate_object(self, object: Row, transaction_id: int, action: Action) -> Response:
+        action = action.lower()
+        if(action != "read" and action != "write"):
+            raise ValueError(f"Invalid action type: {action}. Allowed actions are \"read\" or \"write\".")
+        lockType = 'S' if action == "read" else 'X'
+        
+        # Suatu row didefinisikan oleh primary key dan tablenya
+        primaryKey = object.pkey.keys
+        table = object.table
+        row = str(primaryKey) + table
+        
+        if lockType == 'S' and (row in self.lock_S and transaction_id in self.lock_S[row]):
+            print(f"Transaction {transaction_id} already has lock-S")
+            return Response(True, transaction_id)
+        
+        if lockType == 'X' and (row in self.lock_X and self.lock_X[row] == transaction_id):
+            print(f"Transaction {transaction_id} already has lock-X")
+            return Response(True, transaction_id)
+        
+        allowed = False
+        if lockType == 'S':
+            # Kalo minta lock-S, di-grant kalo gaada yg lagi megang lock-X (kecuali transaction itu sendiri)
+            if row not in self.lock_X or self.lock_X[row] == transaction_id:
+                allowed = True
+        else:
+            # Kalo minta lock-X, di-grant kalo gaada yg lagi megang lock-S maupun lock-X (kecuali transaction itu sendiri)
+            if ((row not in self.lock_S or len(self.lock_S[row]) == 1 and self.lock_S[row] == [transaction_id])
+                and row not in self.lock_X):
+                allowed = True
+                
+        if not allowed:
+            message = "Another transaction is holding lock-X"
+            if lockType == 'X':
+                message += " and/or lock-S"
+            
+            print(f"Lock-{lockType} is not granted to {transaction_id}: {message}")
+            return Response(False, transaction_id)
+        
+        if lockType == 'S':
+            if row in self.lock_X and self.lock_X[row] == transaction_id:
+                print(f"{transaction_id} already has lock-X; all locks must be held till transaction commits")
+            else:
+                print(f"Lock-S is granted to {transaction_id}")
+                if row not in self.lock_S:
+                    self.lock_S[row] = [transaction_id]
+                else:  
+                    self.lock_S[row].append(transaction_id)
+    
+        else:
+            if row in self.lock_S and transaction_id in self.lock_S[row]:
+                print(f"{transaction_id} successfully upgrades from lock-S to lock-X")
+                self.lock_S[row].remove(transaction_id)
+                if self.lock_S[row] == []:
+                    del self.lock_S[row]
+            else:
+                print(f"Lock-X is granted to {transaction_id}")
+                
+            if row not in self.lock_X:
+                self.lock_X[row] = transaction_id
+            else:  
+                self.lock_X[row].append(transaction_id)
+        
+        self.transaction_queue[transaction_id].append(row)
+        
+        return Response(True, transaction_id)    
+
+    # IF: transaction_id can be granted lock with type lock_type to data_item  
+    # FS: transaction_id granted lock with type lock_type to  data_item
+    def lock(self, data_item, transaction_id: int, lock_type: str): 
+        if (lock_type == "X"): 
+            self.lock_X[data_item] = transaction_id 
+        else: # lock_type = "S"
+            self.lock_S[data_item] = transaction_id   
+    
+    def end_transaction(self, transaction_id: int):
+        # Flush objects of a particular transaction after it has successfully committed/aborted
+        # Terminates the transaction
+        for row in self.transaction_queue[transaction_id]:
+            if row in self.lock_X and self.lock_X[row] == transaction_id:
+                del self.lock_X[row]
+            
+            if row in self.lock_S and transaction_id in self.lock_S[row]:
+                self.lock_S[row].remove(row)
+                if self.lock_S[row] == []:
+                    del self.lock_S[row]
+        
+        del self.transaction_queue[transaction_id]
+        self.wait_for_graph.deleteNode(transaction_id)
+        
+    def process_waiting_list(self): 
+        need_check = True
+        while (need_check): 
+            need_check = False
+            for transaction in self.waiting_list: 
+                if self.wait_for_graph.waiting(transaction.id): 
+                    break
+                
+                # TODO: adjust lock type 
+                lock_type = ""
+                if (transaction.action == "WRITE"): 
+                    lock_type = "X"
+                else : 
+                    lock_type = "S"
+
+                self.lock(transaction.data_item, transaction.id, lock_type)
+                #TODO: determine when to commit. This line might be the time that 
+                # the transaction committed. Hence, the node in waitgraph might be removed    
+            
+                self.waiting_list.remove(transaction)
+
+            
+        
+# ccm = ConcurrencyControlManager(algorithm="Test")
+# print(ccm.begin_transaction())
+# print(ccm.begin_transaction())
+# print(ccm.begin_transaction())
+
+# pkey = PrimaryKey("lala", 1)
+# pkey1 = PrimaryKey("lala", 1)
+# print(pkey1)
+# pkey2 = PrimaryKey("lala")
+# print(pkey != pkey1)
+# print(pkey == pkey2)
+
+# row = Row(table="table", pkey=pkey, map={'att1': 15})
+# print(row)
+# row1 = Row(table="table", pkey=pkey, map={'att1': 15})
+# row2 = Row(table="table", pkey=pkey2, map={'att1': 15})
+# row3 = Row(table="table1", pkey=pkey, map={'att1': 15, 'att2': "16"})
+# print("=== tes Row comparison ===")
+# print(row == row1)
+# print(row == row2)
+# print(row == row3)
+# print(row != row1)
+# print(row != row2)
+# print(row != row3)
+
+# print(row3['att1'])
+# print(row3['att2'])
+
+# lock = Lock('S',2,row)
+# print(lock)
+
+# row_tes_1 = Row('table', 1, {'col1': 1, 'col2': 'SBD'})
+# tid1 = ccm.begin_transaction()
+# tid2 = ccm.begin_transaction()
+
+# print(ccm.validate_object(row_tes_1, tid1,'ReAd'))  # T
+# print(ccm.validate_object(row_tes_1, tid2,'reAd'))  # T
+# print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # F
+
+# print(ccm.validate_object(row_tes_1, tid1,'ReAd'))  # T
+# print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # T
+# print(ccm.validate_object(row_tes_1, tid2,'reAd'))  # F
+
+# print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # T
+# print(ccm.validate_object(row_tes_1, tid1,'ReAd'))  # T
+# print(ccm.validate_object(row_tes_1, tid2,'reAd'))  # F
+
+# print(ccm.validate_object(row_tes_1, tid1,'rEAd'))  # T
+# print(ccm.validate_object(row_tes_1, tid2,'ReAd'))  # T
+# print(ccm.validate_object(row_tes_1, tid1,'reAd'))  # T
+
+# print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # T
+# print(ccm.validate_object(row_tes_1, tid2,'wriTe')) # F
+
+# wfg = WaitForGraph()
+# wfg.addEdge(1, 2)
+# wfg.addEdge(4, 1)
+# wfg.addEdge(2, 3)
+# wfg.addEdge(3, 5)
+
+# print(wfg.isCyclic())
+
+# wfg.addEdge(5, 1)
+# print(wfg.isCyclic())
+
+# wfg.deleteEdge(5, 1)
+# print(wfg)
+
+# wfg.deleteEdge(4, 1)
+# wfg.addEdge(4, 5)
+
+# print(wfg)
+
+# wfg.deleteNode(5)
+# print(wfg)
