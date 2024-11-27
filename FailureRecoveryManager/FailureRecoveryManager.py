@@ -109,9 +109,22 @@ class FailureRecoveryManager:
             return
 
         # Save the wh_log to the log.log file (append to the end of the file)
+        active_transactions = set()
         with open(self._log_file, "a") as file:
             for log in self._wh_logs:
+                status = log.split("|")[2]
+                id = log.split("|")[0]
+
+                if status != "COMMITTED" and status != "ABORTED":
+                    active_transactions.add(id)
+                else:
+                    active_transactions.discard(id)
+
                 file.write(log + "\n")
+
+            file.write(
+                f"CHECKPOINT|{datetime.now().isoformat()}|{json.dumps(list(active_transactions))}\n"
+            )
 
         # Clear the wh_log
         self._wh_logs.clear()
