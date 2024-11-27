@@ -341,26 +341,25 @@ class QueryPlan(Prototype):
             
             if isinstance(node, ProjectNode):
                 node_str += f" ({', '.join(node.condition)})"
-                if node.child:
-                    print(node_str)
+                print(node_str)
+                if hasattr(node, 'child') and node.child:
                     print_node(node.child, level + 1)
             
             elif isinstance(node, (JoinNode, ConditionalJoinNode, NaturalJoinNode)):
                 node_str += f" [{node.algorithm.value}]"
-                if isinstance(node, ConditionalJoinNode):
+                if isinstance(node, ConditionalJoinNode) and hasattr(node, 'conditions'):
                     conditions = [f"{c.left_attr} {c.operator} {c.right_attr}" for c in node.conditions]
                     node_str += f" ON {' AND '.join(conditions)}"
-                
-                if node.children:
-                    print(node_str)
+                print(node_str)
+                if hasattr(node, 'children') and node.children:
                     print_node(node.children.first, level + 1)
                     print_node(node.children.second, level + 1)
             
             elif isinstance(node, SortingNode):
                 node_str += f" BY {', '.join(node.attributes)}"
-                if node.children:
-                    print(node_str)
-                    print_node(node.children, level + 1)
+                print(node_str)
+                if hasattr(node, 'child') and node.child:
+                    print_node(node.child, level + 1)
             
             elif isinstance(node, TableNode):
                 node_str += f" [{node.table_name}]"
@@ -413,12 +412,12 @@ if __name__ == "__main__":
     join2.set_children(Pair(join1, salaries))
     
     sort = SortingNode(["salary"])
-    sort.set_children(join2)
+    sort.set_child(join2)
     
     project = ProjectNode(["name", "department_name", "salary"])
     project.set_child(sort)
     
-    query_plan = QueryPlan(project, BFOptimizer())
+    query_plan = QueryPlan(project)
     query_plan.print()
 
 
