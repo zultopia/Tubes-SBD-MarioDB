@@ -12,7 +12,9 @@ class FailureRecoveryManager:
     This class is responsible for managing the failure recovery of the mini database system.
     """
 
-    def __init__(self, log_file="./FailureRecoveryManager/log.log", checkpoint_interval=60 * 5):
+    def __init__(
+        self, log_file="./FailureRecoveryManager/log.log", checkpoint_interval=60 * 5
+    ):
         # Maximum number of logs in memory (array length)
         self._max_size_log = 20
 
@@ -21,7 +23,7 @@ class FailureRecoveryManager:
 
         # Write ahead checkpoint interval (in seconds)
         self._checkpoint_interval = checkpoint_interval
-        self._start_checkpoint_cron(checkpoint_interval)
+        self._start_checkpoint_cron_job()
 
         # Write-ahead logs (in-memory)
         self._wh_logs = [
@@ -100,8 +102,10 @@ class FailureRecoveryManager:
         As a result, it is impossible to have a write log that is not savable in the log.log file.
         """
 
+        print("[FRM]: Saving checkpoint..." + str(datetime.now()))
         # Check write ahead not empty
         if len(self._wh_logs) == 0:
+            print("[FRM]: No logs to save.")
             return
 
         # Save the wh_log to the log.log file (append to the end of the file)
@@ -111,14 +115,27 @@ class FailureRecoveryManager:
 
         # Clear the wh_log
         self._wh_logs.clear()
+        print("[FRM]: Checkpoint saved.")
 
-    def _start_checkpoint_cron(self) -> None:
+    def _start_checkpoint_cron_job(self) -> None:
         """
         Start the checkpoint cron job that runs every _checkpoint_interval seconds.
         Runs on a separate thread and calls _save_checkpoint method.
         """
 
-        self.timer = Timer(self._checkpoint_interval, self._save_checkpoint)
+        self.timer = Timer(self._checkpoint_interval, self._run_checkpoint_cron_job)
+        self.timer.start()
+
+    def _run_checkpoint_cron_job(self) -> None:
+        """
+        This method is called by the timer thread to save the checkpoint.
+        """
+
+        # Save checkpoint
+        self._save_checkpoint()
+
+        # Restart the timer
+        self.timer = Timer(self._checkpoint_interval, self._run_checkpoint_cron_job)
         self.timer.start()
 
     def is_buffer_full(self, spare: int = 0) -> bool:
@@ -242,8 +259,8 @@ class FailureRecoveryManager:
                             break
 
                         recovered_transactions.insert(0, log_line)
-                    
-        #redo
+
+        # redo
         print("recover tx: ", recovered_transactions)
         for recovered_transaction in recovered_transactions:
             log_parts = recovered_transaction.split("|")
@@ -257,17 +274,23 @@ class FailureRecoveryManager:
             elif status == "START":
                 active_transactions.add(transaction_id)
             elif status == "IN_PROGRESS" or status == "ROLLBACK":
-                #memanggil query processor untuk menjalankan ulang query (redo)
+                # memanggil query processor untuk menjalankan ulang query (redo)
                 print("send query: ", transaction_id, " ", log_parts[3])
-        
+
         active_transactions = sorted(active_transactions)
         print("active tx: ", active_transactions)
-        
-        #undo
+
+        # undo
         for tx in active_transactions:
-            log_current_tx =  list(filter(lambda x: int(x.split("|")[0]) == tx and x.split("|")[2] == "IN_PROGRESS", recovered_transactions))
+            log_current_tx = list(
+                filter(
+                    lambda x: int(x.split("|")[0]) == tx
+                    and x.split("|")[2] == "IN_PROGRESS",
+                    recovered_transactions,
+                )
+            )
             print("current tx: ", log_current_tx)
-            
+
             for curr in log_current_tx:
                 log_parts = curr.split("|")
                 sql_operation = log_parts[3]
@@ -285,8 +308,6 @@ class FailureRecoveryManager:
                     else:
                         after_states = json.loads(after_states_raw)
 
-                    
-
                 except IndexError:
                     print("Error: Missing 'Before' or 'After' in log_parts.")
                     exit()
@@ -298,45 +319,67 @@ class FailureRecoveryManager:
 
                 if sql_operation.startswith("INSERT INTO"):
                     table = sql_operation.split(" ")[2]
-                    for after_state in after_states:  
-                        where_clause = " AND ".join([f"{k} = {repr(v)}" for k, v in after_state.items()])
+                    for after_state in after_states:
+                        where_clause = " AND ".join(
+                            [f"{k} = {repr(v)}" for k, v in after_state.items()]
+                        )
                         rollback_query = f"DELETE FROM {table} WHERE {where_clause};"
                         rollback_queries.append(rollback_query)
 
                 elif sql_operation.startswith("DELETE FROM"):
                     table = sql_operation.split(" ")[2]
-                    for before_state in before_states:  
+                    for before_state in before_states:
                         columns = ", ".join(before_state.keys())
                         values = ", ".join([repr(v) for v in before_state.values()])
-                        rollback_query = f"INSERT INTO {table} ({columns}) VALUES ({values});"
+                        rollback_query = (
+                            f"INSERT INTO {table} ({columns}) VALUES ({values});"
+                        )
                         rollback_queries.append(rollback_query)
 
                 elif sql_operation.startswith("UPDATE"):
                     table = sql_operation.split(" ")[1]
-                    for before_state, after_state in zip(before_states, after_states): 
-                        set_clause = ", ".join([f"{k} = {repr(v)}" for k, v in before_state.items()])
-                        where_clause = " AND ".join([f"{k} = {repr(v)}" for k, v in after_state.items()])
-                        rollback_query = f"UPDATE {table} SET {set_clause} WHERE {where_clause};"
+                    for before_state, after_state in zip(before_states, after_states):
+                        set_clause = ", ".join(
+                            [f"{k} = {repr(v)}" for k, v in before_state.items()]
+                        )
+                        where_clause = " AND ".join(
+                            [f"{k} = {repr(v)}" for k, v in after_state.items()]
+                        )
+                        rollback_query = (
+                            f"UPDATE {table} SET {set_clause} WHERE {where_clause};"
+                        )
                         rollback_queries.append(rollback_query)
 
                 print("rollback query: ", rollback_queries)
                 for rollback_query in rollback_queries:
                     print("query rollback: ", rollback_query)
-                    res = None 
+                    res = None
 
                     exec_result = ExecutionResult(
-                        tx, datetime.now().isoformat(), "TRANSACTION ROLLBACK",
-                        Rows(None), Rows(res), "ROLLBACK", rollback_query
+                        tx,
+                        datetime.now().isoformat(),
+                        "TRANSACTION ROLLBACK",
+                        Rows(None),
+                        Rows(res),
+                        "ROLLBACK",
+                        rollback_query,
                     )
                     print("write log: ", exec_result.__dict__)
                     self.write_log(exec_result)
-            
-            exec_result = ExecutionResult(tx, datetime.now().isoformat(), "TRANSACTION END", Rows(None), Rows(None), "ABORT", None)
+
+            exec_result = ExecutionResult(
+                tx,
+                datetime.now().isoformat(),
+                "TRANSACTION END",
+                Rows(None),
+                Rows(None),
+                "ABORT",
+                None,
+            )
             print("write log: ", exec_result.__dict__)
-            
+
             self.write_log(exec_result)
-            
-            
+
     def recover_system_crash(self):
         recovered_transactions = []
         active_transactions = set()
@@ -370,9 +413,15 @@ class FailureRecoveryManager:
 
         # undo
         for tx in active_transactions:
-            log_current_tx =  list(filter(lambda x: int(x.split("|")[0]) == tx and x.split("|")[2] == "IN_PROGRESS", recovered_transactions))
+            log_current_tx = list(
+                filter(
+                    lambda x: int(x.split("|")[0]) == tx
+                    and x.split("|")[2] == "IN_PROGRESS",
+                    recovered_transactions,
+                )
+            )
             print("current tx: ", log_current_tx)
-            
+
             for curr in log_current_tx:
                 log_parts = curr.split("|")
                 sql_operation = log_parts[3]
@@ -390,8 +439,6 @@ class FailureRecoveryManager:
                     else:
                         after_states = json.loads(after_states_raw)
 
-                    
-
                 except IndexError:
                     print("Error: Missing 'Before' or 'After' in log_parts.")
                     exit()
@@ -403,40 +450,63 @@ class FailureRecoveryManager:
 
                 if sql_operation.startswith("INSERT INTO"):
                     table = sql_operation.split(" ")[2]
-                    for after_state in after_states:  
-                        where_clause = " AND ".join([f"{k} = {repr(v)}" for k, v in after_state.items()])
+                    for after_state in after_states:
+                        where_clause = " AND ".join(
+                            [f"{k} = {repr(v)}" for k, v in after_state.items()]
+                        )
                         rollback_query = f"DELETE FROM {table} WHERE {where_clause};"
                         rollback_queries.append(rollback_query)
 
                 elif sql_operation.startswith("DELETE FROM"):
                     table = sql_operation.split(" ")[2]
-                    for before_state in before_states:  
+                    for before_state in before_states:
                         columns = ", ".join(before_state.keys())
                         values = ", ".join([repr(v) for v in before_state.values()])
-                        rollback_query = f"INSERT INTO {table} ({columns}) VALUES ({values});"
+                        rollback_query = (
+                            f"INSERT INTO {table} ({columns}) VALUES ({values});"
+                        )
                         rollback_queries.append(rollback_query)
 
                 elif sql_operation.startswith("UPDATE"):
                     table = sql_operation.split(" ")[1]
-                    for before_state, after_state in zip(before_states, after_states): 
-                        set_clause = ", ".join([f"{k} = {repr(v)}" for k, v in before_state.items()])
-                        where_clause = " AND ".join([f"{k} = {repr(v)}" for k, v in after_state.items()])
-                        rollback_query = f"UPDATE {table} SET {set_clause} WHERE {where_clause};"
+                    for before_state, after_state in zip(before_states, after_states):
+                        set_clause = ", ".join(
+                            [f"{k} = {repr(v)}" for k, v in before_state.items()]
+                        )
+                        where_clause = " AND ".join(
+                            [f"{k} = {repr(v)}" for k, v in after_state.items()]
+                        )
+                        rollback_query = (
+                            f"UPDATE {table} SET {set_clause} WHERE {where_clause};"
+                        )
                         rollback_queries.append(rollback_query)
 
                 print("rollback query: ", rollback_queries)
                 for rollback_query in rollback_queries:
                     print("query rollback: ", rollback_query)
-                    res = None 
+                    res = None
 
                     exec_result = ExecutionResult(
-                        tx, datetime.now().isoformat(), "TRANSACTION ROLLBACK",
-                        Rows(None), Rows(res), "ROLLBACK", rollback_query
+                        tx,
+                        datetime.now().isoformat(),
+                        "TRANSACTION ROLLBACK",
+                        Rows(None),
+                        Rows(res),
+                        "ROLLBACK",
+                        rollback_query,
                     )
                     print("write log: ", exec_result.__dict__)
                     self.write_log(exec_result)
-            
-            exec_result = ExecutionResult(tx, datetime.now().isoformat(), "TRANSACTION END", Rows(None), Rows(None), "ABORT", None)
+
+            exec_result = ExecutionResult(
+                tx,
+                datetime.now().isoformat(),
+                "TRANSACTION END",
+                Rows(None),
+                Rows(None),
+                "ABORT",
+                None,
+            )
             print("write log: ", exec_result.__dict__)
-            
+
             self.write_log(exec_result)
