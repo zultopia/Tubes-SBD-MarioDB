@@ -23,8 +23,18 @@ class PrimaryKey:
             f"===== PrimaryKey =====\nisComposite: {self.isComposite}\nkeys: {self.keys}\n======================\n"
         )
 
+class Table:
+    def __init__(self, table: str):
+        self.table = table
+    
+    def __eq__(self, other):
+        return self.table == other.table
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
 class Row:
-    def __init__(self, table: str, pkey: PrimaryKey, map: dict):
+    def __init__(self, table: Table, pkey: PrimaryKey, map: dict):
         self.table = table
         self.pkey = pkey
         self.map = map
@@ -44,17 +54,21 @@ class Row:
     def __str__(self):
         return f"=============== Row ===============\ntable: {self.table}\nmap:\n{self.map}\npkey:\n{self.pkey}===================================\n"
 
+    def get_table(self): 
+        return self.table
+
 class Action:
-    def __init__(self, action):
-        self.action = action
+    def __init__(self, action : str):
+        self.action = action 
         
     def __str__(self):
         return f"=== Action ===\naction: {self.action}\n==============\n"
         
 class Response:
-    def __init__(self, allowed: bool, transaction_id: int):
+    def __init__(self, allowed: bool, transaction_id: int, message: str = ""):
         self.allowed = allowed
         self.transaction_id = transaction_id
+        self.message = message
         
     def __str__(self):
         return f"==== Response ====\nallowed: {self.allowed}\ntransaction_id: {self.transaction_id}\n==================\n"
@@ -71,19 +85,9 @@ class Lock:
     def __str__(self):
         return f"=============== Lock ===============\ntype: {self.type}\ntransaction_id: {self.transaction_id}\nrow:\n{self.row}====================================\n"
 
-class Table:
-    def __init__(self, table: str):
-        self.table = table
-    
-    def __eq__(self, other):
-        return self.table == other.table
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-        
 class Cell:
-    def __init__(self, table: str, pkey: PrimaryKey, attribute: str, value: any):
-        self.table = table
+    def __init__(self, row: Row, pkey: PrimaryKey, attribute: str, value: any):
+        self.row = row
         self.pkey = pkey
         self.attribute = attribute
         self.value = value
@@ -91,6 +95,12 @@ class Cell:
     def __eq__(self, other):
         return (self.pkey == other.pkey) and (self.attribute == other.attribute) and (self.table == other.table)
 
+    def get_row(self):
+        return self.row
+    
+    def get_table(self):
+        return self.row.get_table()
+    
 class DataItem:
     def __init__(self, level: str, data_item: Table | Row | Cell):
         self.level = level
@@ -172,8 +182,11 @@ class WaitForGraph:
 class ConcurrencyControlManager:
     def __init__(self, algorithm: str):
         self.algorithm = algorithm
-        self.lock_S = {} # Map Row -> Set[transaction_id]
-        self.lock_X = {} # Map Row -> transaction_id
+        self.lock_S = {} # Map DataItem -> Set[transaction_id]
+        self.lock_X = {} # Map DataItem -> transaction_id
+        self.lock_IX = {} # Map DataItem -> transaction_id
+        self.lock_IS = {} # Map DataItem -> transaction_id
+        self.lock_SIX = {} # Map DataItem -> transaction_id
         self.wait_for_graph = WaitForGraph()
         self.transaction_queue = {} # Map transaction_id -> List[Row]
         self.waiting_list = [Transaction]
@@ -196,71 +209,90 @@ class ConcurrencyControlManager:
         # assign timestamp on the object
         pass
     
-    def validate_object(self, object: Row, transaction_id: int, action: Action) -> Response:
-        action = action.lower()
-        if(action != "read" and action != "write"):
-            raise ValueError(f"Invalid action type: {action}. Allowed actions are \"read\" or \"write\".")
-        lockType = 'S' if action == "read" else 'X'
-        
-        # Suatu row didefinisikan oleh primary key dan tablenya
-        primaryKey = object.pkey.keys
-        table = object.table
-        row = str(primaryKey) + table
-        
-        if lockType == 'S' and (row in self.lock_S and transaction_id in self.lock_S[row]):
-            print(f"Transaction {transaction_id} already has lock-S")
-            return Response(True, transaction_id)
-        
-        if lockType == 'X' and (row in self.lock_X and self.lock_X[row] == transaction_id):
-            print(f"Transaction {transaction_id} already has lock-X")
-            return Response(True, transaction_id)
-        
-        allowed = False
-        if lockType == 'S':
-            # Kalo minta lock-S, di-grant kalo gaada yg lagi megang lock-X (kecuali transaction itu sendiri)
-            if row not in self.lock_X or self.lock_X[row] == transaction_id:
-                allowed = True
-        else:
-            # Kalo minta lock-X, di-grant kalo gaada yg lagi megang lock-S maupun lock-X (kecuali transaction itu sendiri)
-            if ((row not in self.lock_S or len(self.lock_S[row]) == 1 and self.lock_S[row] == [transaction_id])
-                and row not in self.lock_X):
-                allowed = True
-                
-        if not allowed:
-            message = "Another transaction is holding lock-X"
-            if lockType == 'X':
-                message += " and/or lock-S"
+    # check if lock is valid to current lock and its ancestor
+    def check_lock_conflict(self, current, lock_type):
+        conflict_matrix = {
+            "IS": {"X"},
+            "IX": {"S", "SIX", "X"},
+            "S": {"IX", "SIX", "X"},
+            "SIX": {"IX", "S", "SIX", "X"},
+            "X": {"IS", "IX", "S", "SIX", "X"}
+        }
+
+        for held_lock, holders in [
+            ("IS", self.lock_IS.get(current, set())),
+            ("IX", self.lock_IX.get(current, set())),
+            ("S", self.lock_S.get(current, set())),
+            ("SIX", self.lock_SIX.get(current, set())),
+            ("X", {self.lock_X.get(current)} if current in self.lock_X else set())
+        ]:
+            if holders and lock_type in conflict_matrix[held_lock]:
+                return False, f"Conflict: Current {current} holds {held_lock} lock by another transaction."
+
+        return True, None
             
-            print(f"Lock-{lockType} is not granted to {transaction_id}: {message}")
-            return Response(False, transaction_id)
-        
-        if lockType == 'S':
-            if row in self.lock_X and self.lock_X[row] == transaction_id:
-                print(f"{transaction_id} already has lock-X; all locks must be held till transaction commits")
-            else:
-                print(f"Lock-S is granted to {transaction_id}")
-                if row not in self.lock_S:
-                    self.lock_S[row] = [transaction_id]
-                else:  
-                    self.lock_S[row].append(transaction_id)
+    # Apply lock to a data item and update the ancestor
+    def apply_lock_with_hierarchy(self, data_item, transaction_id, lock_type):
+        current = data_item
+        success = True
+        message = None
+
+        # Validate lock
+        allowed, message = self.check_lock_conflict(current, lock_type)
+        if not allowed:
+            return Response(success=False, transaction_id=transaction_id, message=message)
+
+        # Apply lock to parent
+        current = data_item
+        while current:
+            parent = None
+            if isinstance(current, Cell):
+                parent = current.get_row()
+            elif isinstance(current, Row):
+                parent = current.get_table()
+
+            # Update parent lock 
+            if parent:
+                if lock_type == "X":
+                    if parent in self.lock_IS and transaction_id in self.lock_IS[parent]:
+                        # Upgrade IS to SIX 
+                        self.lock_IS[parent].remove(transaction_id)
+                        if not self.lock_IS[parent]:
+                            del self.lock_IS[parent]
+                        self.lock_SIX.setdefault(parent, set()).add(transaction_id)
+                    elif parent not in self.lock_SIX:  
+                        self.lock_IX.setdefault(parent, set()).add(transaction_id)
+                elif lock_type == "S":
+                    self.lock_IS.setdefault(parent, set()).add(transaction_id)
+
+            current = parent
+
+        # apply lock to target
+        if lock_type == "S":
+            self.lock_S.setdefault(data_item, set()).add(transaction_id)
+        elif lock_type == "X":
+            self.lock_X[data_item] = transaction_id
+
+        return Response(success=True, transaction_id=transaction_id, message=f"Lock-{lock_type} granted.")
     
-        else:
-            if row in self.lock_S and transaction_id in self.lock_S[row]:
-                print(f"{transaction_id} successfully upgrades from lock-S to lock-X")
-                self.lock_S[row].remove(transaction_id)
-                if self.lock_S[row] == []:
-                    del self.lock_S[row]
-            else:
-                print(f"Lock-X is granted to {transaction_id}")
-                
-            if row not in self.lock_X:
-                self.lock_X[row] = transaction_id
-            else:  
-                self.lock_X[row].append(transaction_id)
-        
-        self.transaction_queue[transaction_id].append(row)
-        
-        return Response(True, transaction_id)    
+    #  Validate and apply lock
+    def validate_object(self, object: DataItem, transaction_id: int, action: str) -> Response:
+        action = action.lower()
+        if action not in ["read", "write"]:
+            raise ValueError(f"Invalid action type: {action}. Allowed actions are 'read' or 'write'.")
+        lock_type = 'S' if action == "read" else 'X'
+
+        data_item = object.data_item
+
+        # Apply lock with hierarchical checks
+        response = self.apply_lock_with_hierarchy(data_item, transaction_id, lock_type)
+        if not response.success:
+            print(f"Failed to grant Lock-{lock_type} on {data_item} for transaction {transaction_id}: {response.message}")
+            return response
+
+        # If successful, return response
+        print(f"Lock-{lock_type} granted on {data_item} for transaction {transaction_id}")
+        return response
 
     # IF: transaction_id can be granted lock with type lock_type to data_item  
     # FS: transaction_id granted lock with type lock_type to  data_item
