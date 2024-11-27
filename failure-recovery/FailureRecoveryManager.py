@@ -4,12 +4,13 @@ from ExecutionResult import ExecutionResult
 from datetime import datetime
 
 class FailureRecoveryManager:
-    def __init__(self, log_file="log.log"):
+    def __init__(self, log_file="log.log", wal_log_file = "wal.log"):
         self._max_size_log = 20 #sesuaikan lagi
         self._max_size_buffer = 20 #sesuaikan lagi
         self._log_file = log_file
         self._wh_logs = ["103|2024-11-21T12:02:45.321Z|IN_PROGRESS|UPDATE employees SET salary = 6000 WHERE id = 1;|Before: {'id': 1, 'name': 'Alice', 'salary': 5000}|After: {'id': 1, 'name': 'Alice', 'salary': 6000}", "CHECKPOINT|2024-11-21T12:03:00.000Z|[103]"]
         self._buffer = []
+        self._wal_log_file = wal_log_file 
         
     def get_buffer(self):
         return self._buffer()
@@ -26,8 +27,25 @@ class FailureRecoveryManager:
     def remove_buffer(self, data):
         self._buffer.remove(data)
                        
-    def write_log(self, execution_result):
-        pass
+    def write_log(self, execution_result: ExecutionResult) -> None:
+        # This method accepts execution result object as input and appends 
+        # an entry in a write-ahead log based on execution info object. 
+
+        log_entry = {
+            "transaction_id": execution_result.transaction_id,
+            "timestamp": execution_result.timestamp,
+            "message": execution_result.message,
+            "data_before": execution_result.data_before,
+            "data_after": execution_result.data_after,
+            "status": execution_result.status,
+            "query": execution_result.query
+        }
+
+        log_entry_str = json.dumps(log_entry)
+
+        # Append entry
+        with open(self._wal_log_file, "a") as log_file:
+            log_file.write(log_entry_str + "\n")
     
     def _save_checkpoint():
         pass
