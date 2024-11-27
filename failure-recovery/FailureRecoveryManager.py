@@ -5,9 +5,27 @@ from datetime import datetime
 
 class FailureRecoveryManager:
     def __init__(self, log_file="log.log"):
-        self.log_file = log_file
-        self.wh_logs = ["103|2024-11-21T12:02:45.321Z|IN_PROGRESS|UPDATE employees SET salary = 6000 WHERE id = 1;|Before: {'id': 1, 'name': 'Alice', 'salary': 5000}|After: {'id': 1, 'name': 'Alice', 'salary': 6000}", "CHECKPOINT|2024-11-21T12:03:00.000Z|[103]"]
-                
+        self._max_size_log = 20 #sesuaikan lagi
+        self._max_size_buffer = 20 #sesuaikan lagi
+        self._log_file = log_file
+        self._wh_logs = ["103|2024-11-21T12:02:45.321Z|IN_PROGRESS|UPDATE employees SET salary = 6000 WHERE id = 1;|Before: {'id': 1, 'name': 'Alice', 'salary': 5000}|After: {'id': 1, 'name': 'Alice', 'salary': 6000}", "CHECKPOINT|2024-11-21T12:03:00.000Z|[103]"]
+        self._buffer = []
+        
+    def get_buffer(self):
+        return self._buffer()
+    
+    def set_buffer(self, buffer):
+        self._buffer = buffer
+    
+    def add_buffer(self, data):
+        self._buffer.append(data)
+    
+    def clear_buffer(self):
+        self._buffer.clear()
+        
+    def remove_buffer(self, data):
+        self._buffer.remove(data)
+                       
     def write_log(self, execution_result):
         pass
     
@@ -44,7 +62,7 @@ class FailureRecoveryManager:
         if criteria and criteria.timestamp:
             checkpoint_found = False
             #baca whl
-            for log_line in self.wh_logs:
+            for log_line in self._wh_logs:
                 log_parts = log_line.split("|")
                 
                 if log_parts[0] == "CHECKPOINT":
@@ -63,7 +81,7 @@ class FailureRecoveryManager:
             
             #baca log file
             if not checkpoint_found:
-                for log_line in self._read_lines_from_end(self.log_file):
+                for log_line in self._read_lines_from_end(self._log_file):
                     log_parts = log_line.split("|")
 
                     if log_parts[0] == "CHECKPOINT":
@@ -82,7 +100,7 @@ class FailureRecoveryManager:
             
         elif criteria and criteria.transaction_id:
             checkpoint_found = False
-            for log_line in self.wh_logs:
+            for log_line in self._wh_logs:
                 log_parts = log_line.split("|")
                 
                 if log_parts[0] == "CHECKPOINT":
@@ -101,7 +119,7 @@ class FailureRecoveryManager:
             
             #baca log file
             if not checkpoint_found:
-                for log_line in self._read_lines_from_end(self.log_file):
+                for log_line in self._read_lines_from_end(self._log_file):
                     log_parts = log_line.split("|")
                     
                     if log_parts[0] == "CHECKPOINT":
@@ -176,7 +194,7 @@ class FailureRecoveryManager:
         recovered_transactions = []
         active_transactions = set()
 
-        for log_line in self._read_lines_from_end(self.log_file):
+        for log_line in self._read_lines_from_end(self._log_file):
             log_parts = log_line.split("|")
             
             if log_parts[0] == "CHECKPOINT":
