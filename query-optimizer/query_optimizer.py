@@ -1,6 +1,6 @@
 from parser import parse
 from parse_tree import ParseTree
-from query_plan import from_parse_tree
+from from_parse_tree import from_parse_tree
 from optimizer import optimize
 
 def get_parse_tree(query_string) -> ParseTree:

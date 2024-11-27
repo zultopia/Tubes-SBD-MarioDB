@@ -33,7 +33,6 @@ class ConditionalJoinNode(JoinNode):
         return 1
 
 
-
 class NaturalJoinNode(JoinNode):
     def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP):
         super().__init__(algorithm)
