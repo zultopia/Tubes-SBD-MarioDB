@@ -2,6 +2,7 @@ import os
 import pickle
 import math
 from typing import List, Union
+from ..ConcurrencyControlManager.classes import PrimaryKey
 
 class Student:
     def __init__(self, id:int, name:str, dept_name:str, tot_cred:int):
@@ -9,6 +10,7 @@ class Student:
         self.name = name
         self.dept_name = dept_name
         self.tot_cred = tot_cred
+        self.primary_key = PrimaryKey(id)
 
 class Instructor:
     def __init__(self, id:int, name:str, dept_name:str, salary:int):
@@ -16,12 +18,14 @@ class Instructor:
         self.name = name
         self.dept_name = dept_name
         self.salary = salary
+        self.primary_key = PrimaryKey(id)
 
 class Department:
     def __init__(self, dept_name:str, building:str, budget:int):
         self.dept_name = dept_name
         self.building = building
         self.budget = budget
+        self.primary_key = PrimaryKey(dept_name)
 
 class Course:
     def __init__(self, course_id:int, title:str, dept_name:str, credits:int):
@@ -29,6 +33,7 @@ class Course:
         self.title = title
         self.dept_name = dept_name
         self.credits = credits
+        self.primary_key = PrimaryKey(course_id)
 
 class Section:
     def __init__(self, course_id:int, sec_id:str, semester:int, year:int, building:str, room_number:int, time_slot_id:int):
@@ -39,6 +44,7 @@ class Section:
         self.building = building
         self.room_number = room_number
         self.time_slot_id = time_slot_id
+        self.primary_key = PrimaryKey(course_id, sec_id, semester, year)
 
 class Teaches:
     def __init__(self, id:int, course_id:int, sec_id:str, semester:int, year:int):
@@ -47,16 +53,19 @@ class Teaches:
         self.sec_id = sec_id
         self.semester = semester
         self.year = year
+        self.primary_key = PrimaryKey(id, course_id, sec_id, semester, year)
 
 class Advisor:
     def __init__(self, s_id:int, i_id:int):
         self.s_id = s_id
         self.i_id = i_id
+        self.primary_key = PrimaryKey(s_id)
     
 class Prerequisite:
     def __init__(self, course_id:int, prereq_id:str):
         self.course_id = course_id
         self.prereq_id = prereq_id
+        self.primary_key = PrimaryKey(course_id, prereq_id)
 
 class TimeSlot:
     def __init__(self, time_slot_id:int, day:str, start_time:str, end_time:str):
@@ -64,6 +73,7 @@ class TimeSlot:
         self.day = day
         self.start_time = start_time
         self.end_time = end_time
+        self.primary_key = PrimaryKey(time_slot_id)
 
 class Takes:
     def __init__(self, id:int, course_id:int, sec_id:str, semester:int, year:int, grade:str):
@@ -73,12 +83,14 @@ class Takes:
         self.semester = semester
         self.year = year
         self.grade = grade
+        self.primary_key = PrimaryKey(id, course_id, sec_id, semester, year)
 
 class Classroom:
     def __init__(self, building:str, room_number:int, capacity:int):
         self.building = building
         self.room_number = room_number
         self.capacity = capacity
+        self.primary_key = PrimaryKey(building, room_number)
 
 class Condition:
     def __init__(self, column: str, operation: str, operand: Union[int, str]):
