@@ -2,7 +2,7 @@ import os
 import pickle
 import math
 from typing import List, Union
-from ..ConcurrencyControlManager.classes import PrimaryKey
+from ConcurrencyControlManager.classes import PrimaryKey
 
 class Student:
     def __init__(self, id:int, name:str, dept_name:str, tot_cred:int):
