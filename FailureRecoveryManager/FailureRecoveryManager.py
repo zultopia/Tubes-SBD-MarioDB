@@ -73,6 +73,8 @@ class FailureRecoveryManager:
 
         # Append entry to self._wh_logs
         self._wh_logs.append(log_entry)
+        # Append wal entry to buffer
+        self._buffer.append(self._wh_logs)
 
     def is_wh_log_full(self, spare: int = 0) -> bool:
         """
@@ -141,12 +143,26 @@ class FailureRecoveryManager:
         This method is called by the timer thread to save the checkpoint.
         """
 
-        # Save checkpoint
-        self._save_checkpoint()
+        try:
+            # Save checkpoint
+            self._save_checkpoint()
 
-        # Restart the timer
-        self.timer = Timer(self._checkpoint_interval, self._run_checkpoint_cron_job)
-        self.timer.start()
+            # Restart the timer
+            if self.timer:
+                self.timer.cancel()  # Cancel any existing timer
+            self.timer = Timer(self._checkpoint_interval, self._run_checkpoint_cron_job)
+            self.timer.start()
+
+        except Exception as e:
+            print(f"Error in checkpoint cron job: {e}")
+    
+    def _stop_checkpoint_cron_job(self):
+        """
+        Stop the checkpoint cron job.
+        """
+        if self.timer:
+            self.timer.cancel()
+            self.timer = None
 
     def is_buffer_full(self, spare: int = 0) -> bool:
         """
@@ -162,10 +178,10 @@ class FailureRecoveryManager:
 
         return len(self._buffer) >= self._max_size_buffer - spare
 
-    def _manage_buffer():
-        """
-        Handles the buffer if it reaches its limit
-        """
+    # def _manage_buffer():
+    #     """
+    #     Handles the buffer if it reaches its limit
+    #     """
 
     def _read_lines_from_end(self, file_path, chunk_size=1024):
 
