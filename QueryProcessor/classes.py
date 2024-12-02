@@ -56,29 +56,11 @@ def check_first_child(query_tree: ParseTree):
     first_child_node = query_tree.childs[0]
     # jika child pertama merupakan token SELECT
     if (isinstance(first_child_node.root, Node)) and (first_child_node.root.token_type in {Token.SELECT}):
-        # child selanjutnya adalah node SelectList
-        SelectList_node = query_tree.childs[1]
-        # child pertama dari node SelectList adalah node Field
-        field_node = SelectList_node.childs[0]
-        # inisialisasi Dict[str, List[str]] untuk menyimpan atribut apa saja yang di-SELECT
-        retrieval_schema = {}
-
-        # jika atribut hanya disebutkan namanya (contoh: SELECT id)
-        if len(field_node.childs) == 1:
-            # child pertama dari node Field adalah atribut pertama yang di-SELECT, tambahkan ke columns dengan key UNKNOWN karena nama tabel belum diketahui
-            add_to_schema(retrieval_schema, "UNKNOWN", field_node.childs[0].root.value)
-        # jika menggunakan alias (contoh: SELECT t.id FROM table AS t)
-        else:
-            # child pertama dari node Field adalah alias tabel, child kedua adalah ., child ketiga adalah atributnya
-            add_to_schema(retrieval_schema, field_node.childs[0].root.value, field_node.childs[2].root.value)
-        # kalau atribut yang di-SELECT cuma 1
-        if len(SelectList_node.childs) == 1:
-            return retrieval_schema
-        # kalau atribut yang di-SELECT lebih dari 1
-        else:
-            return add_schema_from_SelectListTail(SelectList_node.childs[1], retrieval_schema)
-    else:
-        return {}
+        # panggil fungsi execute_SELECT
+        return(execute_SELECT(query_tree))
+    elif (isinstance(first_child_node.root, Node)) and (first_child_node.root.token_type) in (Token.UPDATE):
+        # panggil fungsi execute_UPDATE
+        return(execute_UPDATE(query_tree))
 
 # menambahkan atribut yang di-SELECT ke dalam schema dari node SelectListTail
 def add_schema_from_SelectListTail(SelectListTail_node: ParseTree, schema: Dict[str, List[str]]):
@@ -93,7 +75,7 @@ def add_schema_from_SelectListTail(SelectListTail_node: ParseTree, schema: Dict[
         # child pertama dari node Field adalah alias tabel, child kedua adalah ., child ketiga adalah atributnya
         add_to_schema(schema, field_node.childs[0].root.value, field_node.childs[2].root.value)
     # jika tidak atribut lagi selanjutnya, kembalikan schema
-    if len(SelectListTail_node.childs) == 2:
+    if (len(SelectListTail_node.childs) == 2):
         return schema
     # jika masih ada atribut selanjutnya yang di-SELECT, panggil fungsi secara rekursif
     else:
@@ -123,10 +105,15 @@ def add_table_to_schema(schema: Dict[str, List[str]], query_tree: ParseTree):
         # ganti key alias tabel dengan nama asli tabel
         schema[TableTerm_node.childs[0].root.value] = schema.pop(TableTerm_node.childs[2].root.value)
     # jika tabel dalam klausa FROM lebih dari 1
-    if len(FromList_node.childs) == 2:
+    # tabel-tabel dalam bentuk terpisah dengan koma
+    if (len(FromList_node.childs) == 2):
         add_table_from_FromListTail(schema, FromList_node.childs[1])
+    # tabel-tabel dalam bentuk JOIN
+    elif (len(FromList_node.childs[0].childs) == 2):
+        add_table_from_TableResultTail(schema, FromList_node.childs[0].childs[1])
 
 # menempatkan nama asli tabel untuk tabel selain tabel pertama ke dalam schema
+# jika menggunakan bentuk comma separated
 def add_table_from_FromListTail(schema: Dict[str, List[str]], FromListTail_node: ParseTree):
     # nama tabel disimpan dalam node TableTerm
     TableTerm_node = FromListTail_node.childs[1].childs[0]
@@ -136,3 +123,51 @@ def add_table_from_FromListTail(schema: Dict[str, List[str]], FromListTail_node:
     # jika tabel yang tersisa lebih dari 1
     if len(FromListTail_node.childs) == 3:
         add_table_from_FromListTail(schema, FromListTail_node.childs[2])
+
+# menempatkan nama asli tabel untuk tabel selain tabel pertama ke dalam schema
+# jika menggunakan bentuk JOIN
+def add_table_from_TableResultTail(schema: Dict[str, List[str]], TableResultTail_node: ParseTree):
+    # nama tabel disimpan dalam node TableTerm
+    TableTerm_node = TableResultTail_node.childs[2]
+    if len(TableTerm_node.childs) == 3:
+        schema[TableTerm_node.childs[0].root.value] = schema.pop(TableTerm_node.childs[2].root.value)
+    # jika tabel yang tersisa lebih dari 1
+    if len(TableResultTail_node.childs) == 4:
+        add_table_from_FromListTail(schema, TableResultTail_node.childs[3])
+
+# handle query SELECT, menerima input node query tree
+def execute_SELECT(query_tree: ParseTree):
+    # child kedua dari query tree adalah node SelectList
+    SelectList_node = query_tree.childs[1]
+    # child pertama dari node SelectList adalah node Field
+    field_node = SelectList_node.childs[0]
+    # inisialisasi Dict[str, List[str]] untuk menyimpan atribut apa saja yang di-SELECT
+    retrieval_schema = {}
+
+    # jika atribut hanya disebutkan namanya (contoh: SELECT id)
+    if len(field_node.childs) == 1:
+        # child pertama dari node Field adalah atribut pertama yang di-SELECT, tambahkan ke columns dengan key UNKNOWN karena nama tabel belum diketahui
+        add_to_schema(retrieval_schema, "UNKNOWN", field_node.childs[0].root.value)
+    # jika menggunakan alias (contoh: SELECT t.id FROM table AS t)
+    else:
+        # child pertama dari node Field adalah alias tabel, child kedua adalah ., child ketiga adalah atributnya
+        add_to_schema(retrieval_schema, field_node.childs[0].root.value, field_node.childs[2].root.value)
+    # kalau atribut yang di-SELECT cuma 1
+    if len(SelectList_node.childs) == 1:
+        return retrieval_schema
+    # kalau atribut yang di-SELECT lebih dari 1
+    else:
+        return add_schema_from_SelectListTail(SelectList_node.childs[1], retrieval_schema)
+
+# TODO (sekarang)
+# fungsi untuk ORDER BY dan LIMIT
+
+# TODO (menunggu kelompok query optimizer)
+# handle query UPDATE, menerima input node query tree
+def execute_UPDATE(query_tree: ParseTree):
+    pass
+
+# TODO (menunggu kelompok query optimizer)
+# handle query BEGIN TRANSACTION, menerima input query tree
+def execute_BEGIN_TRANSCATION(query_tree: ParseTree):
+    pass
