@@ -19,7 +19,7 @@ class SQLGrammar:
             raise SyntaxError(f"Expected {expected_token}, found {self.current_token()}")
 
     def Query(self) -> ParseTree:
-        """Parse Query -> SELECT SelectList FROM FromList (WHERE Condition) (ORDER_BY Condition) (LIMIT NUMBER) SEMICOLON."""
+        """Parse Query -> SELECT SelectList FROM FromList (WHERE Condition) (ORDER_BY Field (DESC | ASC)) (LIMIT NUMBER) SEMICOLON."""
         tree = ParseTree()
         tree.root = "Query"
         self.match(tree, Token.SELECT)
@@ -33,7 +33,11 @@ class SQLGrammar:
 
         if self.current_token() and self.current_token()[0] == Token.ORDER_BY:
             self.match(tree, Token.ORDER_BY)
-            tree.add_child(self.Condition())
+            tree.add_child(self.Field())
+            if self.current_token() and self.current_token()[0] == Token.ASC:
+                self.match(tree, Token.ASC)
+            elif self.current_token() and self.current_token()[0] == Token.DESC:
+                self.match(tree, Token.DESC)
 
         if self.current_token() and self.current_token()[0] == Token.LIMIT:
             self.match(tree, Token.LIMIT)
@@ -60,11 +64,14 @@ class SQLGrammar:
         return tree
 
     def SelectList(self) -> ParseTree:
-        """Parse SelectList -> Field SelectListTail."""
+        """Parse SelectList -> Field SelectListTail | *"""
         tree = ParseTree()
-        tree.root = "SelectList"
-        tree.add_child(self.Field())
-        tree.add_child(self.SelectListTail())
+        if self.current_token() and self.current_token()[0] == Token.ASTERISK:
+            self.match(tree, Token.ASTERISK)
+        else:
+            tree.root = "SelectList"
+            tree.add_child(self.Field())
+            tree.add_child(self.SelectListTail())
         return tree
 
     def SelectListTail(self) -> ParseTree | None:
@@ -239,7 +246,7 @@ class SQLGrammar:
 
 def parse(query_string) -> ParseTree:
     tokens = Lexer(query_string).tokenize()
-
+    print(tokens)
     SQL_grammar = SQLGrammar(tokens)
     parse_tree = SQL_grammar.Query()
     return parse_tree

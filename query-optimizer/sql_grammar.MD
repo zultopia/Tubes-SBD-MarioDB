@@ -1,11 +1,11 @@
 # Query
 
-Query -> SELECT SelectList FROM FromList (WHERE Condition) (ORDER_BY Condition) (LIMIT NUMBER) SEMICOLON
+Query -> SELECT SelectList FROM FromList (WHERE Condition) (ORDER_BY Field (DESC | ASC)) (LIMIT NUMBER) SEMICOLON
 
 
 # Select list
 Field -> ATTRIBUTE | TABLE DOT ATTRIBUTE
-SelectList -> Field SelectListTail
+SelectList -> Field SelectListTail | *
 SelectListTail -> COMMA Field SelectListTail | e
 
 # From list (including join)
