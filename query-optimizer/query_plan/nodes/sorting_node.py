@@ -22,3 +22,8 @@ class SortingNode(QueryNode):
 
     def __str__(self) -> str:
         return f"SORT BY {', '.join(self.attributes)} ASC" if self.ascending else f"SORT BY {', '.join(self.attributes)} DESC"
+
+    def clone(self) -> 'SortingNode':
+        ret = SortingNode(self.attributes, self.ascending)
+        ret.set_child(self.child)
+        return ret

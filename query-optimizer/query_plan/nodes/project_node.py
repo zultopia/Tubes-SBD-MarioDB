@@ -20,3 +20,8 @@ class ProjectNode(QueryNode):
 
     def __str__(self) -> str:
         return f"PROJECT {', '.join(self.attributes)}"
+
+    def clone(self) -> 'ProjectNode':
+        ret = ProjectNode(self.attributes)
+        ret.set_child(self.child)
+        return ret

@@ -18,6 +18,7 @@ class SelectionCondition:
 
     def __str__(self) -> str:
         return f"{self.left_operand} {self.operator.value} {self.right_operand}"
+    
 
 class SelectionNode(QueryNode):
     # Conjunction of conditions
@@ -39,6 +40,11 @@ class SelectionNode(QueryNode):
     def __str__(self) -> str:
         return f"SELECT {', '.join([str(c) for c in self.conditions])}"
 
+    def clone(self) -> 'SelectionNode':
+        ret = SelectionNode(self.conditions)
+        ret.set_child(self.child)
+        return ret
+
 class UnionSelectionNode(QueryNode):
     def __init__(self, children: List[SelectionNode]):
         super().__init__(NodeType.UNION_SELECTION)  # Make sure to add this to NodeType enum
@@ -57,5 +63,9 @@ class UnionSelectionNode(QueryNode):
 
     def __str__(self) -> str:
         return f"UNION"
+
+    def clone(self) -> 'UnionSelectionNode':
+        ret = UnionSelectionNode(self.children)
+        return ret
     
     

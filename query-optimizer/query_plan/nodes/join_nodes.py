@@ -20,6 +20,17 @@ class JoinNode(QueryNode):
 
     def set_children(self, children: Pair[QueryNode, QueryNode]):
         self.children = children
+    
+    def clone(self) -> 'JoinNode':
+        ret: 'JoinNode'
+        ret = JoinNode(self.algorithm)
+        ret.set_children(self.children)
+        return ret
+        
+
+
+
+
 
 class ConditionalJoinNode(JoinNode):
     def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP, conditions: List[JoinCondition] = []):
@@ -35,6 +46,11 @@ class ConditionalJoinNode(JoinNode):
     def __str__(self) -> str:
         return f"JOIN [{self.algorithm.value}]" if len(self.conditions) == 0 else f"JOIN [{self.algorithm.value}] ON {', '.join([f'{c.left_attr} {c.operator} {c.right_attr}' for c in self.conditions])}"
 
+    def clone(self) -> 'ConditionalJoinNode':
+        ret = ConditionalJoinNode(self.algorithm, self.conditions)
+        ret.set_children(self.children)
+        return ret
+
 
 class NaturalJoinNode(JoinNode):
     def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP):
@@ -48,3 +64,8 @@ class NaturalJoinNode(JoinNode):
 
     def __str__(self) -> str:
         return f"NATURAL JOIN [{self.algorithm.value}]"
+    
+    def clone(self) -> 'NaturalJoinNode':
+        ret = NaturalJoinNode(self.algorithm)
+        ret.set_children(self.children)
+        return ret

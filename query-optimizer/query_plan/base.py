@@ -1,10 +1,10 @@
 # base.py
 from abc import ABC, abstractmethod
 from typing import Dict, Union, List
-from utils import Pair
+from utils import Pair, Prototype
 from .enums import NodeType
 
-class QueryNode(ABC):
+class QueryNode(ABC, Prototype):
     node_type: NodeType
     children: Union['QueryNode', Pair['QueryNode', 'QueryNode'], None, List['QueryNode']]
 
@@ -30,3 +30,8 @@ class QueryNode(ABC):
     @abstractmethod
     def __str__(self) -> str:
         pass
+
+    @abstractmethod
+    def clone(self):
+        pass
+

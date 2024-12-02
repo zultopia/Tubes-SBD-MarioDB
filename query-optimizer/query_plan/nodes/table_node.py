@@ -20,5 +20,10 @@ class TableNode(QueryNode):
 
     def __str__(self) -> str:
         return f"TABLE {self.table_name} AS {self.alias}" if self.alias != self.table_name else f"TABLE {self.table_name}"
+
+    def clone(self) -> 'TableNode':
+        ret = TableNode(self.table_name, self.alias)
+        ret.set_child(self.child)
+        return ret
     
     

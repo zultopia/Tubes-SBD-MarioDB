@@ -3,14 +3,11 @@ sys.setrecursionlimit(1000) # tambahin jika perlu
 from parse_tree import ParseTree
 from query_optimizer import get_parse_tree
 from from_parse_tree import from_parse_tree
+from query_plan.optimizers.bf_optimizer import BFOptimizer
 
-query_string = input('Please enter your query: ')
 
-tree = get_parse_tree(query_string)
-query_plan = from_parse_tree(tree)
-query_plan.print()
 
-print(tree)
+current = 'gana'
 
 # from query_plan.nodes.table_node import TableNode
 # from query_plan.nodes.join_nodes import ConditionalJoinNode, NaturalJoinNode, JoinCondition
@@ -44,3 +41,17 @@ print(tree)
     
 #     query_plan = QueryPlan(project)
 #     query_plan.print()
+
+if (current == 'gana'):
+    query_string = input('Please enter your query: ')
+    tree = get_parse_tree(query_string)
+    query_plan = from_parse_tree(tree)
+    query_plan.print()
+
+    print(tree)
+
+
+    # bf = BFOptimizer()
+    # plans = bf.generate_possible_plans(query_plan)
+    # for plan in plans:
+    #     plan.print()
