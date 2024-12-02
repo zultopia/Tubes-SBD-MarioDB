@@ -11,14 +11,16 @@ class QueryNode(ABC, Prototype):
     def __init__(self, node_type: NodeType):
         self.node_type = node_type
     
-    #for rule 5,6
-    def switchChildren(self):
-        self.children.first,self.children.second = self.children.second,self.children.first
+    def switchChildren(self) -> None:
+        if(isinstance(self.children,Pair)):
+            self.children.first,self.children.second = self.children.second,self.children.first
 
-    #for rule 2
-    def replaceParent(self):
+    def replaceParent(self) -> None:
         self,self.children=self.children,self
 
+    def hasOneChild(self) -> bool:
+        return(isinstance(self.children,QueryNode))
+    
     @abstractmethod
     def estimate_cost(self, statistics: Dict) -> float:
         pass
