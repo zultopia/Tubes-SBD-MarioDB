@@ -88,11 +88,11 @@ class Lexer:
     (Token.NOT, r"(?i)\bnot\b"),
     (Token.OR, r"(?i)\bor\b"),
 
-    # Operators
-    (Token.GREATER, r">"),      
-    (Token.GREATER_EQ, r">="),   
-    (Token.LESS, r"<"),         
-    (Token.LESS_EQ, r"<="),      
+    # Operators      
+    (Token.GREATER_EQ, r">="),  
+    (Token.LESS_EQ, r"<="),
+    (Token.GREATER, r">"), 
+    (Token.LESS, r"<"),               
     (Token.EQ, r"="),           
     (Token.NEQ, r"<>"),
     (Token.ADD,r'\+'),

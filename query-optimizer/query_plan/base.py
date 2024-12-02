@@ -11,6 +11,14 @@ class QueryNode(ABC):
     def __init__(self, node_type: NodeType):
         self.node_type = node_type
     
+    #for rule 5,6
+    def switchChildren(self):
+        self.children.first,self.children.second = self.children.second,self.children.first
+
+    #for rule 2
+    def replaceParent(self):
+        self,self.children=self.children,self
+
     @abstractmethod
     def estimate_cost(self, statistics: Dict) -> float:
         pass
