@@ -1,1 +1,1 @@
-select azmi from gana join hello on gana.id = hello.id;
+select azmi from gana join hello on gana.id = hello.id where gana.id = azmi.id and azmiganteng = true and azmi = ganteng;

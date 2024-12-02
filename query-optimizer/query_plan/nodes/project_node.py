@@ -3,9 +3,10 @@ from ..base import QueryNode
 from ..enums import NodeType
 
 class ProjectNode(QueryNode):
-    def __init__(self, condition: List[str]):
-        super().__init__(NodeType.PROJECT)
-        self.condition = condition
+    attributes: List[str]
+
+    def __init__(self, attributes: List[str]):
+        self.attributes = attributes
         self.child = None
     
     def set_child(self, child: QueryNode):
@@ -16,3 +17,6 @@ class ProjectNode(QueryNode):
 
     def _calculate_operation_cost(self, statistics: Dict) -> float:
         return 1
+
+    def __str__(self) -> str:
+        return f"PROJECT {', '.join(self.attributes)}"

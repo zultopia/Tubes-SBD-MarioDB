@@ -27,5 +27,6 @@ class QueryNode(ABC):
     def _calculate_operation_cost(self, statistics: Dict) -> float:
         pass
 
+    @abstractmethod
     def __str__(self) -> str:
-        return self.node_type.value
+        pass

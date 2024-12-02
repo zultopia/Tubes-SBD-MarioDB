@@ -10,3 +10,11 @@ class JoinAlgorithm(Enum):
     NESTED_LOOP = "nested_loop"
     MERGE = "merge"
     HASH = "hash"
+
+class SelectionOperation(Enum):
+    GREATER = '>'
+    GREATER_EQ = '>='
+    LESS = '<'
+    LESS_EQ = '<='
+    EQ = '='
+    NEQ = '<>'
