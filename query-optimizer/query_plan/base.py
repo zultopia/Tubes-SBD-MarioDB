@@ -1,12 +1,12 @@
 # base.py
 from abc import ABC, abstractmethod
-from typing import Dict, Union
+from typing import Dict, Union, List
 from utils import Pair
 from .enums import NodeType
 
 class QueryNode(ABC):
     node_type: NodeType
-    children: Union['QueryNode', Pair['QueryNode', 'QueryNode'], None]
+    children: Union['QueryNode', Pair['QueryNode', 'QueryNode'], None, List['QueryNode']]
 
     def __init__(self, node_type: NodeType):
         self.node_type = node_type

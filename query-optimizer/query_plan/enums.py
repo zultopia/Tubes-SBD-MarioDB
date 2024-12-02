@@ -5,6 +5,8 @@ class NodeType(Enum):
     JOIN = "JOIN"         
     SORTING = "SORTING"
     TABLE = "TABLE"
+    SELECTION = "SELECTION"
+    UNION_SELECTION = "UNION"
 
 class JoinAlgorithm(Enum):
     NESTED_LOOP = "nested_loop"

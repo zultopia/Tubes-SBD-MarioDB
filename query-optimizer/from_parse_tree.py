@@ -6,7 +6,7 @@ from query_plan.nodes.join_nodes import JoinCondition, ConditionalJoinNode, Natu
 from query_plan.nodes.sorting_node import SortingNode
 from query_plan.nodes.project_node import ProjectNode
 from query_plan.nodes.table_node import TableNode
-from query_plan.nodes.selection_node import SelectionNode, SelectionCondition
+from query_plan.nodes.selection_node import SelectionNode, SelectionCondition, UnionSelectionNode
 from query_plan.enums import JoinAlgorithm, SelectionOperation
 from parse_tree import ParseTree, Node
 from lexer import Token 
@@ -16,31 +16,33 @@ def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
     if isinstance(parse_tree.root, str) and parse_tree.root == "Query":
         project_node = process_select_list(parse_tree.childs[1])
         
+        # First process the base table structure (FROM/JOIN)
         table_node = None
         for i, child in enumerate(parse_tree.childs):
             if isinstance(child.root, Node) and child.root.token_type == Token.FROM:
                 table_node = process_from_list(parse_tree.childs[i + 1])
                 break
-                
-        if table_node:
-            project_node.set_child(table_node)
-            
-        current_node = table_node
-        for i in range(4, len(parse_tree.childs)):
-            if isinstance(parse_tree.childs[i].root, Node):
-                if parse_tree.childs[i].root.token_type == Token.WHERE:
-                    condition_node = process_where_clause(parse_tree.childs[i + 1])
-                    if isinstance(condition_node, QueryNode) and isinstance(current_node, QueryNode):
-                        condition_node.set_child(current_node)
-                        current_node = condition_node
-                        project_node.set_child(current_node)  # Update project_node's child
-                elif parse_tree.childs[i].root.token_type == Token.ORDER_BY:
-                    sort_node = process_order_by(parse_tree.childs[i + 1])
-                    if isinstance(sort_node, QueryNode) and isinstance(current_node, QueryNode):
-                        sort_node.set_child(current_node)
-                        current_node = sort_node
-                        project_node.set_child(current_node)  # Update project_node's child
 
+        # Process WHERE with possible unions
+        where_index = None
+        for i, child in enumerate(parse_tree.childs):
+            if isinstance(child.root, Node) and child.root.token_type == Token.WHERE:
+                where_index = i
+                break
+
+        if where_index is not None:
+            condition_node = process_where_clause(parse_tree.childs[where_index + 1])
+            if isinstance(condition_node, UnionSelectionNode):
+                # For each branch in the union, create a complete copy of the table structure
+                for selection_node in condition_node.children:
+                    table_copy = process_from_list(parse_tree.childs[3])  # Create fresh copy of table structure
+                    selection_node.set_child(table_copy)
+            else:
+                condition_node.set_child(table_node)
+            table_node = condition_node
+
+        project_node.set_child(table_node)
+        
         return QueryPlan(project_node)
 
 def process_select_list(select_list_tree: ParseTree) -> ProjectNode:
@@ -168,10 +170,8 @@ def process_conditional_join(join_tree: ParseTree) -> ConditionalJoinNode:
 
     return ConditionalJoinNode(JoinAlgorithm.HASH, conditions)
 
-def process_where_clause(condition_tree: ParseTree) -> SelectionNode:
-    """Process WHERE clause and create SelectionNode."""
-    conditions: List[SelectionCondition] = []
-    
+def process_where_clause(condition_tree: ParseTree) -> QueryNode:
+    """Process WHERE clause and create either SelectionNode or UnionSelectionNode."""
     def convert_operator(op_token: Token) -> SelectionOperation:
         """Convert Token to SelectionOperation."""
         token_to_op = {
@@ -190,7 +190,7 @@ def process_where_clause(condition_tree: ParseTree) -> SelectionNode:
             op_token = cond_term.childs[1].childs[0].root.token_type
             op = convert_operator(op_token)
             right = extract_operand(cond_term.childs[2])
-            return SelectionCondition(left, right, op)  # Pass directly to constructor
+            return SelectionCondition(left, right, op)
         return None
     
     def extract_operand(tree: ParseTree) -> str:
@@ -208,16 +208,20 @@ def process_where_clause(condition_tree: ParseTree) -> SelectionNode:
         else:
             return f"{field_tree.childs[0].root.value}.{field_tree.childs[2].root.value}"
 
-    if condition_tree.root == "Condition":
-        current = condition_tree.childs[0]  # AndCondition
-        if current.root == "AndCondition":
-            cond = extract_condition_term(current.childs[0])
+    def process_or_conditions(condition_tree: ParseTree) -> List[SelectionNode]:
+        selection_nodes = []
+        conditions = []
+
+        def process_and_condition(and_condition: ParseTree):
+            conditions.clear()
+            # Process first condition
+            cond = extract_condition_term(and_condition.childs[0])
             if cond:
                 conditions.append(cond)
             
-            # Process AndConditionTail
-            if len(current.childs) > 1 and current.childs[1]:
-                tail = current.childs[1]
+            # Process AndConditionTail if exists
+            if len(and_condition.childs) > 1 and and_condition.childs[1]:
+                tail = and_condition.childs[1]
                 while tail and tail.root == "AndConditionTail":
                     if len(tail.childs) >= 2:
                         cond = extract_condition_term(tail.childs[1])
@@ -227,8 +231,37 @@ def process_where_clause(condition_tree: ParseTree) -> SelectionNode:
                         tail = tail.childs[2]
                     else:
                         break
+            
+            if conditions:
+                selection_nodes.append(SelectionNode(conditions.copy()))
+        
+        if condition_tree.root == "Condition":
+            current = condition_tree.childs[0]  # First AndCondition
+            process_and_condition(current)
+            
+            # Process ConditionTail (OR conditions)
+            if len(condition_tree.childs) > 1 and condition_tree.childs[1]:
+                tail = condition_tree.childs[1]
+                while tail and tail.root == "ConditionTail":
+                    if len(tail.childs) >= 2:  # Should have "OR" and AndCondition
+                        process_and_condition(tail.childs[1])
+                    if len(tail.childs) > 2:
+                        tail = tail.childs[2]  # Next ConditionTail
+                    else:
+                        break
+        
+        return selection_nodes
 
-    return SelectionNode(conditions)
+    selection_nodes = process_or_conditions(condition_tree)
+    
+    # If there's only one selection node (no OR conditions), return it directly
+    if len(selection_nodes) == 1:
+        return selection_nodes[0]
+    # If there are multiple selections (OR conditions), wrap them in a UnionSelectionNode
+    elif len(selection_nodes) > 1:
+        return UnionSelectionNode(selection_nodes)
+    else:
+        raise ValueError("No conditions found in WHERE clause")
 
 def process_order_by(order_tree: ParseTree) -> SortingNode:
     """Process ORDER BY clause and create SortingNode."""
