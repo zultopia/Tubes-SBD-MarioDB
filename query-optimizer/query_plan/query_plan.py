@@ -48,6 +48,7 @@ class QueryPlan(Prototype):
             elif isinstance(node, TableNode):
                 node_str += f" [{node.table_name}]"
                 print(node_str)
+                
         
         print("\nQuery Plan:")
         print_node(self.root)

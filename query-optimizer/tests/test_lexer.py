@@ -41,7 +41,7 @@ def test_select_with_join():
     ]
 
 def test_where_clause_with_float():
-    assert Lexer("SELECT age1 FROM user WHERE age1 > 20.234;").tokenize() == [
+    assert Lexer("SELECT age1 FROM user WHERE age1 <= 20.234;").tokenize() == [
         (Token.SELECT, 'SELECT'),
         (Token.ATTRIBUTE, 'age1'),
         (Token.FROM, 'FROM'),
