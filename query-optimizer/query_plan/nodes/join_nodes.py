@@ -32,6 +32,9 @@ class ConditionalJoinNode(JoinNode):
     def _calculate_operation_cost(self, statistics: Dict) -> float:
         return 1
 
+    def __str__(self) -> str:
+        return f"JOIN [{self.algorithm.value}]" if len(self.conditions) == 0 else f"JOIN [{self.algorithm.value}] ON {', '.join([f'{c.left_attr} {c.operator} {c.right_attr}' for c in self.conditions])}"
+
 
 class NaturalJoinNode(JoinNode):
     def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP):
@@ -42,3 +45,6 @@ class NaturalJoinNode(JoinNode):
 
     def _calculate_operation_cost(self, statistics: Dict) -> float:
         return 1
+
+    def __str__(self) -> str:
+        return f"NATURAL JOIN [{self.algorithm.value}]"

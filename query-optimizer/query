@@ -1,1 +1,1 @@
-select azmi from gana join hello on gana.id = hello.id;
+select a from b where a = b and b = c and c = d or e = f and b = d or b = e and t = 1 and g < 2 or b < 3 and t > 5 or x < 5 or s = 4 and s = 5;
