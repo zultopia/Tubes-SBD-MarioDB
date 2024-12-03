@@ -1,7 +1,8 @@
 import os
 import pickle
 import math
-from typing import List, Union
+from typing import List, Union, Dict, Tuple
+from .BPlusTree import BPlusTree
 from ConcurrencyControlManager.classes import PrimaryKey
 
 class Student:
@@ -139,6 +140,7 @@ class StorageManager:
     def __init__(self):
         self.data = self._load_data()
         self.indexes = {}
+        self.bplusindexes: Dict[object, Tuple[str, BPlusTree]] = {}
         self.logs = self._load_logs()
         self.action_logs = []
 
@@ -219,29 +221,51 @@ class StorageManager:
         return initial_size - len(table)
 
     def set_index(self, table: str, column: str, index_type: str):
-        if index_type != "hash":
+        if index_type != "hash" and index_type != "B+":
             raise ValueError("Index yang digunakan adalah hash index.")
         
         if table not in self.data:
             raise ValueError(f"Table {table} tidak ditemukan.")
         
-        # Membuat indeks berbasis hash
-        self.index[(table, column)] = {}
-        for row in self.data[table]:
-            key = row[column]
-            if key not in self.index[(table, column)]:
-                self.index[(table, column)][key] = []
-            self.index[(table, column)][key].append(row)
-
-        print(f"Hash index dibuat pada {table}.{column}")
-
-    def read_block_with_index(self, table: str, column: str, value):
+        if index_type == "hash":
+            # Membuat indeks berbasis hash
+            self.indexes[(table, column)] = {}
+            for row in self.data[table]:
+                key = row[column]
+                if key not in self.indexes[(table, column)]:
+                    self.indexes[(table, column)][key] = []
+                self.indexes[(table, column)][key].append(row)
+            print(f"Hash index dibuat pada {table}.{column}")
+        else:
+            if table in self.bplusindexes.keys:
+                raise ValueError(f"Table {table} sudah memiliki index B+ Tree di kolom {self.bplusindexes[table][0]}.")
+            self.bplusindexes[table] = (column, BPlusTree(8))
+            for row in self.data[table]:
+                key = row[column]
+                self.bplusindexes[table][1].insert(key, row)
+            
+    def read_block_with_hash(self, table: str, column: str, value):
         # Gunain indeks kalo ada
         index_key = (table, column)
-        if index_key in self.index:
-            return self.index[index_key].get(value, [])
+        if index_key in self.indexes.keys:
+            return self.indexes[index_key].get(value, [])
         else:
             raise ValueError(f"Indeks tidak ditemukan untuk {table}.{column}.")
+        
+    def read_range_with_bplus(self, table: str, column: str, min, max):
+        index_key = table
+        if index_key not in self.bplusindexes.keys or self.bplusindexes[index_key][0] != column:
+            raise ValueError(f"Indeks B+ tidak ditemukan untuk {table}.{column}.")
+        return self.bplusindexes[index_key][1].range_query(min, max)
+    
+    def read_one_with_bplus(self, table: str, column: str, value):
+        index_key = table
+        if index_key not in self.bplusindexes.keys or self.bplusindexes[index_key][0] != column:
+            raise ValueError(f"Indeks B+ tidak ditemukan untuk {table}.{column}.")
+        query_result = self.bplusindexes[index_key][1].query(value)
+        if query_result is None:
+            raise ValueError(f"Key {value} tidak ditemukan di {table}.{column}")
+        return query_result
         
     def get_stats(self):
         stats = {}
