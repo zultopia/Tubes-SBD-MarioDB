@@ -1,7 +1,7 @@
 import os
 import pickle
 import math
-from typing import List, Union
+from typing import List, fasdfasdfUnion
 
 class Condition:
     def __init__(self, column: str, operation: str, operand: Union[int, str]):
