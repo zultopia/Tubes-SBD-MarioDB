@@ -168,6 +168,18 @@ class FailureRecoveryManager:
         """
 
     def _read_lines_from_end(self, file_path, chunk_size=1024):
+        
+        """
+        This method is private method to help FailureRecoverManager to read a file from the end of the file. This method is important to FailureRecoverManager when read log file
+        
+        Args:
+            file_path (string): path where file is located
+            chunk_size (int, optional): Defaults to 1024.
+
+        Yields:
+            string: one line text from file
+        """
+         
 
         with open(file_path, "rb") as file:
             file.seek(0, 2)
@@ -192,6 +204,14 @@ class FailureRecoveryManager:
                 yield buffer.decode("utf-8")
 
     def recover(self, criteria: RecoverCriteria = None):
+        """
+        This method is used to perform recovery on the database. The recovery process will apply to all transactions that meet the specified criteria. A transaction is considered to meet the criteria if its transaction_id or timestamp is greater than or equal to the given criteria.
+        
+        For transactions that have already been completed (COMMITTED or ABORTED), the recovery will involve re-executing the queries. For transactions that are still pending, the recovery will involve performing a rollback, and the final status will be marked as aborted.
+
+        Args:
+            criteria (RecoverCriteria, optional): criteria to choose what transactio need to be recover. Criteria can be transaction_id or timestamp. Defaults to None.
+        """
         recovered_transactions = []
         active_transactions = set()
         if criteria and criteria.timestamp:
@@ -291,7 +311,7 @@ class FailureRecoveryManager:
         print("active tx: ", active_transactions)
 
         # undo
-        for tx in active_transactions:
+        for tx in active_transactions[::-1]:
             log_current_tx = list(
                 filter(
                     lambda x: int(x.split("|")[0]) == tx
