@@ -43,12 +43,15 @@ class QueryProcessor:
         query_tree: ParseTree = get_parse_tree(query_string)
         # cek child pertama untuk menentukan jenis query (lengkapnya cek komentar dari fungsi di bawah ini)
         schema = check_first_child(query_tree)
+        # inisialisasi dictionary untuk menyimpan alias tabel
+        alias = {}
         # tambahkan nama tabel ke dalam skema dari node FromList
-        add_table_to_schema(schema, query_tree)
+        add_table_to_schema(schema, alias, query_tree)
         # Testing
         print("schema =", schema, "\n")
+        print("alias =", alias, "\n")
         print(query_tree)
-        # query_plan belum jadi, sementara proses query tree dulu, lagipula nanti query plan juga bentukna objek query tree, tapi teroptimasi
+        # query_plan belum jadi, sementara proses query tree dulu, lagipula nanti query plan juga bentuknya objek query tree, tapi teroptimasi
 
 # cek child pertama dari parse tree untuk menentukan jenis query SQL (SELECT, UPDATE, atau TRANSACTION)
 def check_first_child(query_tree: ParseTree):
@@ -90,8 +93,9 @@ def add_to_schema(schema: Dict[str, List[str]], table: str, column: str):
     else:
         schema[table] = [column]
 
-# menempatkan nama asli tabel dalam klausa FROM dalam dictionary schema
-def add_table_to_schema(schema: Dict[str, List[str]], query_tree: ParseTree):
+# menempatkan nama asli tabel (beserta alias jika ada) dalam klausa FROM dalam dictionary schema
+# alias perlu disimpan karena klausa berikutnya (WHERE, ORDER BY, dll) mungkin menggunakan alias
+def add_table_to_schema(schema: Dict[str, List[str]], alias: Dict[str, str], query_tree: ParseTree):
     # tabel pertama dalam klausa FROM
     FromList_node = query_tree.childs[3]
     # nama tabel pertama disimpan dalam node TableTerm
@@ -104,36 +108,42 @@ def add_table_to_schema(schema: Dict[str, List[str]], query_tree: ParseTree):
     else:
         # ganti key alias tabel dengan nama asli tabel
         schema[TableTerm_node.childs[0].root.value] = schema.pop(TableTerm_node.childs[2].root.value)
+        # tambahkan key berupa alias tabel dan value berupa nama asli tabel ke dalam dictionary
+        alias[TableTerm_node.childs[2].root.value] = TableTerm_node.childs[0].root.value
     # jika tabel dalam klausa FROM lebih dari 1
     # tabel-tabel dalam bentuk terpisah dengan koma
     if (len(FromList_node.childs) == 2):
-        add_table_from_FromListTail(schema, FromList_node.childs[1])
+        add_table_from_FromListTail(schema, alias, FromList_node.childs[1])
     # tabel-tabel dalam bentuk JOIN
     elif (len(FromList_node.childs[0].childs) == 2):
-        add_table_from_TableResultTail(schema, FromList_node.childs[0].childs[1])
+        add_table_from_TableResultTail(schema, alias, FromList_node.childs[0].childs[1])
 
-# menempatkan nama asli tabel untuk tabel selain tabel pertama ke dalam schema
+# menempatkan nama asli tabel (beserta alias jika ada) untuk tabel selain tabel pertama ke dalam schema
 # jika menggunakan bentuk comma separated
-def add_table_from_FromListTail(schema: Dict[str, List[str]], FromListTail_node: ParseTree):
+def add_table_from_FromListTail(schema: Dict[str, List[str]], alias: Dict[str, str], FromListTail_node: ParseTree):
     # nama tabel disimpan dalam node TableTerm
     TableTerm_node = FromListTail_node.childs[1].childs[0]
     # jika menggunakan alias, langsung menggunakan nama asli tabel
     if len(TableTerm_node.childs) == 3:
         schema[TableTerm_node.childs[0].root.value] = schema.pop(TableTerm_node.childs[2].root.value)
+        # tambahkan key berupa alias tabel dan value berupa nama asli tabel ke dalam dictionary
+        alias[TableTerm_node.childs[2].root.value] = TableTerm_node.childs[0].root.value
     # jika tabel yang tersisa lebih dari 1
     if len(FromListTail_node.childs) == 3:
-        add_table_from_FromListTail(schema, FromListTail_node.childs[2])
+        add_table_from_FromListTail(schema, alias, FromListTail_node.childs[2])
 
-# menempatkan nama asli tabel untuk tabel selain tabel pertama ke dalam schema
+# menempatkan nama asli tabel (beserta alias jika ada) untuk tabel selain tabel pertama ke dalam schema
 # jika menggunakan bentuk JOIN
-def add_table_from_TableResultTail(schema: Dict[str, List[str]], TableResultTail_node: ParseTree):
+def add_table_from_TableResultTail(schema: Dict[str, List[str]], alias: Dict[str, str], TableResultTail_node: ParseTree):
     # nama tabel disimpan dalam node TableTerm
     TableTerm_node = TableResultTail_node.childs[2]
     if len(TableTerm_node.childs) == 3:
         schema[TableTerm_node.childs[0].root.value] = schema.pop(TableTerm_node.childs[2].root.value)
+        # tambahkan key berupa alias tabel dan value berupa nama asli tabel ke dalam dictionary
+        alias[TableTerm_node.childs[2].root.value] = TableTerm_node.childs[0].root.value
     # jika tabel yang tersisa lebih dari 1
     if len(TableResultTail_node.childs) == 4:
-        add_table_from_FromListTail(schema, TableResultTail_node.childs[3])
+        add_table_from_FromListTail(schema, alias, TableResultTail_node.childs[3])
 
 # handle query SELECT, menerima input node query tree
 def execute_SELECT(query_tree: ParseTree):
