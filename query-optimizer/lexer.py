@@ -159,4 +159,4 @@ class Lexer:
         return result
     
 
-print(Lexer("select men from people order by salary asc").tokenize())
+#print(Lexer("select men from people order by salary asc").tokenize())

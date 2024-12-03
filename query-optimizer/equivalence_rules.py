@@ -1,6 +1,9 @@
 from query_plan.base import QueryNode
 from query_plan.nodes.selection_node import SelectionNode,SelectionCondition
 from query_plan.nodes.join_nodes import ConditionalJoinNode,NaturalJoinNode, JoinCondition
+from query_plan.nodes.table_node import TableNode
+from query_plan.enums import NodeType
+from utils import Pair
 from typing import List
 
 class EquivalenceRules:
@@ -43,7 +46,7 @@ class EquivalenceRules:
     '''
     @staticmethod
     def combineJoinCondition(parent:QueryNode,node: QueryNode) -> None:
-        if(node.hasOneChild())and(isinstance(node,SelectionNode)):
+        if(isinstance(node.children,QueryNode))and(isinstance(node,SelectionNode)):
             if(isinstance(node.children,ConditionalJoinNode)):
                 combinedNode = node.children
                 newConditions = []
@@ -51,16 +54,15 @@ class EquivalenceRules:
                     newCondition = JoinCondition(
                         condition.left_operand,
                         condition.right_operand,
-                        condition.operator.value 
+                        condition.operator
                     )
                     newConditions.append(newCondition) 
-                for c in newCondition:
-                    combinedNode.conditions.append(c)
-                parent.children=combinedNode
-            #idk how to get the attribute with the same name
-            elif (isinstance(node.children,NaturalJoinNode)):
-                pass
-
+                combinedNode.conditions.extend(newConditions)
+            if parent:
+                parent.children = combinedNode
+            else: #if in root
+                node = None
+            
 
     '''
     RULE 5
@@ -72,3 +74,31 @@ class EquivalenceRules:
             node.switchChildren()
         
 
+# test functions 
+
+def test_combineJoinCondition():
+    selection_condition = SelectionCondition("a.id", "b.id", "=")
+    join_condition = JoinCondition("c", "d", "=")
+    selection_node = SelectionNode([selection_condition])
+    join_node = ConditionalJoinNode(conditions=[join_condition])
+    selection_node.children = join_node
+    parent_node = SelectionNode([])
+    parent_node.children = selection_node
+    EquivalenceRules.combineJoinCondition(parent_node, selection_node)
+    assert isinstance(parent_node.children, ConditionalJoinNode)  # Should now point to the join node
+    assert len(parent_node.children.conditions) == 2  # One condition added
+    assert parent_node.children.conditions[1].left_attr == "a.id"
+    assert parent_node.children.conditions[1].right_attr == "b.id"
+    print("Success")
+
+
+def test_switchChildrenJoin():
+    child1 = TableNode("a")
+    child2 = TableNode("b")
+    join_condition = JoinCondition("c", "d", "=")
+    join_node = ConditionalJoinNode(conditions=[join_condition])
+    join_node.children = Pair(child1, child2)
+    EquivalenceRules.switchChildrenJoin(join_node)
+    assert join_node.children.first == child2  # Check if children are swapped
+    assert join_node.children.second == child1
+    print("Success")

@@ -19,7 +19,7 @@ class QueryNode(ABC, Prototype):
         self,self.children=self.children,self
 
     def hasOneChild(self) -> bool:
-        return(isinstance(self.children,QueryNode))
+        return self.children is not None and isinstance(self.children, QueryNode)
     
     @abstractmethod
     def estimate_cost(self, statistics: Dict) -> float:
