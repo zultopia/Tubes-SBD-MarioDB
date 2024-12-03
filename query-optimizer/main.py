@@ -42,13 +42,14 @@ current = 'gana'
 #     query_plan = QueryPlan(project)
 #     query_plan.print()
 
+
 if (current == 'gana'):
     query_string = input('Please enter your query: ')
     tree = get_parse_tree(query_string)
     query_plan = from_parse_tree(tree)
-    query_plan.print()
-
-    print(tree)
+    #query_plan.print()
+    query_plan.apply_rules_and_print()
+    #print(tree)
 
 
     # bf = BFOptimizer()

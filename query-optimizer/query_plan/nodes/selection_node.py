@@ -25,8 +25,10 @@ class SelectionNode(QueryNode):
     conditions: List[SelectionCondition]
 
     def __init__(self, conditions: List[SelectionCondition]):
+        super().__init__(NodeType.SELECTION)
         self.conditions = conditions
         self.child = None
+        self.children = None
     
     def set_child(self, child: QueryNode):
         self.child = child

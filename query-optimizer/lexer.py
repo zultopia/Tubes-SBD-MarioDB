@@ -138,7 +138,7 @@ class Lexer:
                     elif token == Token.NUMBER :
                         result.append((token,float(actualValue)))
                     else:
-                        if token in {Token.SELECT, Token.DOT,Token.WHERE,Token.ON,Token.SET}:
+                        if token in {Token.SELECT, Token.DOT,Token.WHERE,Token.ON,Token.SET,Token.ORDER_BY}:
                             self.state = 0
                         elif token in {Token.FROM, Token.JOIN,Token.UPDATE}:
                             self.state = 1
@@ -157,3 +157,6 @@ class Lexer:
                 result[i-1] = tuple(result[i-1])
         self.state=0
         return result
+    
+
+#print(Lexer("select men from people order by salary asc").tokenize())
