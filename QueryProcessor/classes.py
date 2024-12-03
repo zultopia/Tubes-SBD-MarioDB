@@ -171,6 +171,27 @@ def execute_SELECT(query_tree: ParseTree):
 
 # TODO (sekarang)
 # fungsi untuk ORDER BY dan LIMIT
+def apply_order_by_and_limit(data: List[Dict[str, Union[int, str]]], 
+                             order_by: Optional[Dict[str, str]], 
+                             limit: Optional[int]) -> List[Dict[str, Union[int, str]]]:
+    # :param data: daftar/list berisi baris hasil query yang tiap baris direpresentasikan sbg dictionary
+    # :param order_by: dictionary -> column: nama kolom yg ingin diurutkan, direction: ascending/descendingDictionary with 'column' and 'direction' for ordering.
+                     # contoh: order_by = {"column": "age", "direction": "DESC"}.
+    # :param limit: jumlah max baris yang diinginkan pada hasil query
+    # :return: mengembalikan daftar/list order by dan limit
+    if order_by:
+        column = order_by.get("column")
+        direction = order_by.get("direction", "ASC").upper()
+        reverse = direction == "DESC"
+
+        # mengurutkan daftar data
+        data.sort(key=lambda x: x.get(column, None), reverse=reverse)
+
+    if limit is not None:
+        # mengambil jumlah elemen sesuai limit dari daftar data
+        data = data[:limit]
+
+    return data
 
 # TODO (menunggu kelompok query optimizer)
 # handle query UPDATE, menerima input node query tree
