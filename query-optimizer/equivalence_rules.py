@@ -2,6 +2,7 @@ from query_plan.base import QueryNode
 from query_plan.nodes.selection_node import SelectionNode,SelectionCondition
 from query_plan.nodes.join_nodes import ConditionalJoinNode,NaturalJoinNode, JoinCondition
 from query_plan.nodes.table_node import TableNode
+from query_plan.nodes.project_node import ProjectNode
 from query_plan.enums import NodeType
 from utils import Pair
 from typing import List
@@ -38,6 +39,46 @@ class EquivalenceRules:
             ret.append(parent)
 
         return ret
+    
+    @staticmethod
+    def commute_selections(node: QueryNode) -> List[QueryNode]:
+        """
+        RULE 2: Selection operations are commutative
+        """
+        if not isinstance(node, SelectionNode) or not node.child or not isinstance(node.child, SelectionNode):
+            return [node]
+        
+        # Create new node with swapped conditions
+        new_parent = SelectionNode(node.child.conditions)
+        new_child = SelectionNode(node.conditions)
+        
+        # Preserve the original child's child
+        if node.child.child:
+            new_child.set_child(node.child.child)
+        
+        new_parent.set_child(new_child)
+        return [new_parent]
+
+    @staticmethod
+    def collapse_projections(node: QueryNode) -> List[QueryNode]:
+        """
+        RULE 3: Only the last projection in a sequence is needed
+        """
+        if not isinstance(node, ProjectNode):
+            return [node]
+        
+        # Find the deepest child node
+        current = node
+        while isinstance(current.child, ProjectNode):
+            current = current.child
+        
+        if current == node:  # No projection sequence found
+            return [node]
+        
+        # Create new node with original projection but connected to deepest child
+        new_node = ProjectNode(node.attributes)
+        new_node.set_child(current.child)
+        return [new_node]
 
     '''
     RULE 4

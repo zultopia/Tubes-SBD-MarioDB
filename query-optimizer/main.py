@@ -4,6 +4,7 @@ from parse_tree import ParseTree
 from query_optimizer import get_parse_tree
 from from_parse_tree import from_parse_tree
 from query_plan.optimizers.bf_optimizer import BFOptimizer
+from generator import generate_possible_plans
 
 
 
@@ -51,7 +52,9 @@ if (current == 'gana'):
     query_plan.apply_rules_and_print()
     #print(tree)
 
-
+    plans = generate_possible_plans(query_plan)
+    for plan in plans:
+        plan.print()
     # bf = BFOptimizer()
     # plans = bf.generate_possible_plans(query_plan)
     # for plan in plans:
