@@ -130,12 +130,12 @@ class DataItem:
         return self.data_item.get_parent()
 
 class Transaction: 
-    def __init__(self, tid: int, action: Action, level: int, data_item: str): 
+    def __init__(self, tid: int, action: Action, level: int, data_item: DataItem, old_data_item: DataItem = None): 
         self.id = tid 
         self.action = action
         self.level  = level
-        # TODO: update data_item
         self.data_item = data_item
+        self.old_data_item = old_data_item
 
 class WaitForGraph:
     def __init__(self):
