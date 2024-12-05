@@ -323,12 +323,13 @@ class FailureRecoveryManager:
                 # memanggil query processor untuk menjalankan ulang query (redo)
                 print("send query: ", transaction_id, " ", log_parts[3])
 
-        active_transactions = sorted(active_transactions)
         print("active tx: ", active_transactions)
 
         # undo
         log_active_transaction = list(filter(lambda x: int(x.split("|")[0]) in active_transactions, recovered_transactions))
         log_active_transaction = sorted(log_active_transaction, key=lambda x: datetime.fromisoformat(x.split("|")[1]))
+        
+        # make rollback query
         for curr in log_active_transaction[::-1]:
             transaction_id = int(curr.split("|")[0])
             log_parts = curr.split("|")
@@ -382,6 +383,8 @@ class FailureRecoveryManager:
                     )
                     rollback_queries.append((transaction_id, rollback_query))
         print("rollback query: ", rollback_queries)
+        
+        # execute rollback query
         for tx_id, rb_query in rollback_queries:
             print("query rollback: ", rb_query)
             
@@ -447,6 +450,8 @@ class FailureRecoveryManager:
         # undo
         log_active_transaction = list(filter(lambda x: int(x.split("|")[0]) in active_transactions, recovered_transactions))
         log_active_transaction = sorted(log_active_transaction, key=lambda x: datetime.fromisoformat(x.split("|")[1]))
+        
+        # make rollback query
         for curr in log_active_transaction[::-1]:
             transaction_id = int(curr.split("|")[0])
             log_parts = curr.split("|")
@@ -500,6 +505,8 @@ class FailureRecoveryManager:
                     )
                     rollback_queries.append((transaction_id, rollback_query))
         print("rollback query: ", rollback_queries)
+        
+        # execute rollback query
         for tx_id, rb_query in rollback_queries:
             print("query rollback: ", rb_query)
             
