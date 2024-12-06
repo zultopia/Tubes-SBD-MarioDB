@@ -1,229 +1,96 @@
-from typing import List, Union, Dict
+from typing import Union, List, Dict
 
-class Node(object):
-    def __init__(self, parent: Union[None, 'Node']=None):
-        self.keys: List = []
-        self.values: List[Node] = []
-        self.parent: Node = parent
+class BPlusTreeNode:
+    def __init__(self, is_leaf=False):
+        self.is_leaf = is_leaf
+        self.keys = []
+        self.children: List[Union[Dict, BPlusTreeNode]] = []
 
-    def __getitem__(self, item):
-        return self.values[self.index(item)]
+class BPlusTree:
+    def __init__(self, degree):
+        self.root = BPlusTreeNode(is_leaf=True)
+        self.degree = degree
 
-    def __setitem__(self, key, value: 'Node'):
-        i = self.index(key)
-        self.keys[i: i] = [key]
-        self.values.pop(i)
-        self.values[i: i] = value
+    def _find_leaf(self, node: BPlusTreeNode, key):
+        if node.is_leaf:
+            return node
+        for i in range(len(node.keys)):
+            if key < node.keys[i]:
+                return self._find_leaf(node.children[i], key)
+        return self._find_leaf(node.children[-1], key)
 
-    def __delitem__(self, key):
-        i = self.index(key)
-        del self.values[i]
-        if i < len(self.keys):
-            del self.keys[i]
-        else:
-            del self.keys[i - 1]
-            
-    def index(self, key):
-        for i, item in enumerate(self.keys):
-            if key < item:
-                return i
-        return len(self.keys)
+    def get(self, key):
+        leaf = self._find_leaf(self.root, key)
+        for i, item in enumerate(leaf.keys):
+            if item == key:
+                return leaf.children[i]
+        return None
 
-    def split(self):
-        left = Node(self.parent)
-        mid = len(self.keys) // 2
-        left.keys = self.keys[: mid]
-        left.values = self.values[: mid + 1]
-        for child in left.values:
-            child.parent = left
-        key = self.keys[mid]
-        self.keys = self.keys[mid + 1:]
-        self.values = self.values[mid + 1:]
-        return key, [left, self]
-
-    def fusion(self):
-        index = self.parent.index(self.keys[0])
-        if index < len(self.parent.keys):
-            next_node: Node = self.parent.values[index + 1]
-            next_node.keys[0: 0] = self.keys + [self.parent.keys[index]]
-            for child in self.values:
-                child.parent = next_node
-            next_node.values[0: 0] = self.values
-        else: 
-            prev: Node = self.parent.values[-2]
-            prev.keys += [self.parent.keys[-1]] + self.keys
-            for child in self.values:
-                child.parent = prev
-            prev.values += self.values
-
-    def borrow_key(self, minimum: int):
-        index = self.parent.index(self.keys[0])
-        if index < len(self.parent.keys):
-            next_node: Node = self.parent.values[index + 1]
-            if len(next_node.keys) > minimum:
-                self.keys += [self.parent.keys[index]]
-                borrow_node = next_node.values.pop(0)
-                borrow_node.parent = self
-                self.values += [borrow_node]
-                self.parent.keys[index] = next_node.keys.pop(0)
-                return True
-        elif index != 0:
-            prev: Node = self.parent.values[index - 1]
-            if len(prev.keys) > minimum:
-                self.keys[0: 0] = [self.parent.keys[index - 1]]
-                borrow_node = prev.values.pop()
-                borrow_node.parent = self
-                self.values[0: 0] = [borrow_node]
-                self.parent.keys[index - 1] = prev.keys.pop()
-                return True
-        return False
-    
-class Leaf(Node):
-    def __init__(self, parent: Union[None, 'Node']=None, 
-                 prev_node: Union[None, 'Node']=None, 
-                 next_node: Union[None, 'Node']=None):
-        super(Leaf, self).__init__(parent)
-        self.next: Leaf = next_node
-        if next_node is not None:
-            next_node.prev = self
-        self.prev: Leaf = prev_node
-        if prev_node is not None:
-            prev_node.next = self
-
-    def __getitem__(self, item):
-        return self.values[self.keys.index(item)]
-
-    def __setitem__(self, key, value: Dict):
-        i = self.index(key)
-        if key not in self.keys:
-            self.keys[i:i] = [key]
-            self.values[i:i] = [value]
-        else:
-            self.values[i - 1] = value
-
-    def __delitem__(self, key):
-        i = self.keys.index(key)
-        del self.keys[i]
-        del self.values[i]
-        
-    def split(self):
-        left = Leaf(self.parent, self.prev, self)
-        mid = len(self.keys) // 2
-        left.keys = self.keys[:mid]
-        left.values = self.values[:mid]
-        self.keys: list = self.keys[mid:]
-        self.values: list = self.values[mid:]
-        return self.keys[0], [left, self]
-
-    def fusion(self):
-        if self.next is not None and self.next.parent == self.parent:
-            self.next.keys[0: 0] = self.keys
-            self.next.values[0: 0] = self.values
-        else:
-            self.prev.keys += self.keys
-            self.prev.values += self.values
-        if self.next is not None:
-            self.next.prev = self.prev
-        if self.prev is not None:
-            self.prev.next = self.next
-
-    def borrow_key(self, minimum: int):
-        index = self.parent.index(self.keys[0])
-        if index < len(self.parent.keys) and len(self.next.keys) > minimum:
-            self.keys += [self.next.keys.pop(0)]
-            self.values += [self.next.values.pop(0)]
-            self.parent.keys[index] = self.next.keys[0]
-            return True
-        elif index != 0 and len(self.prev.keys) > minimum:
-            self.keys[0: 0] = [self.prev.keys.pop()]
-            self.values[0: 0] = [self.prev.values.pop()]
-            self.parent.keys[index - 1] = self.keys[0]
-            return True
-        return False
-    
-class BPlusTree(object):
-    root: Node
-
-    def __init__(self, maximum=4):
-        self.root = Leaf()
-        self.maximum: int = maximum if maximum > 2 else 2
-        self.minimum: int = self.maximum // 2
-        self.depth = 0
-
-    def __getitem__(self, item):
-        return self.find(item)[item]
-
-    def __setitem__(self, key, value: Dict, leaf: Union[None, Leaf]=None):
-        if leaf is None:
-            leaf = self.find(key)
-        leaf[key] = value
-        if len(leaf.keys) > self.maximum:
-            self.insert_index(*leaf.split())
-            
-    def find(self, key) -> Leaf:
-        node = self.root
-        while type(node) is not Leaf:
-            node = node[key]
-        return node
-
-    def query(self, key):
-        leaf = self.find(key)
-        return leaf[key] if key in leaf.keys else None
-
-    def change(self, key, value: Dict):
-        leaf = self.find(key)
-        if key not in leaf.keys:
-            return False, leaf
-        else:
-            leaf[key] = value
-            return True, leaf
-
-    def insert(self, key, value: Dict):
-        leaf = self.find(key)
+    def insert(self, key, value):
+        leaf = self._find_leaf(self.root, key)
         if key in leaf.keys:
-            return False, leaf
-        else:
-            self.__setitem__(key, value, leaf)
-            return True, leaf
+            raise ValueError(f"Key {key} tidak unik.")
+        self._insert_in_leaf(leaf, key, value)
+        if len(leaf.keys) == self.degree:
+            self._split_node(leaf)
 
-    def insert_index(self, key, values: list[Node]):
-        parent = values[1].parent
-        if parent is None:
-            values[0].parent = values[1].parent = self.root = Node()
-            self.depth += 1
-            self.root.keys = [key]
-            self.root.values = values
-            return
-        parent[key] = values
-        if len(parent.keys) > self.maximum:
-            self.insert_index(*parent.split())
-
-    def delete(self, key, node: Node = None):
-        if node is None:
-            node = self.find(key)
-        del node[key]
-        if len(node.keys) < self.minimum:
-            if node == self.root:
-                if len(self.root.keys) == 0 and len(self.root.values) > 0:
-                    self.root = self.root.values[0]
-                    self.root.parent = None
-                    self.depth -= 1
+    def update(self, key, value):
+        leaf = self._find_leaf(self.root, key)
+        for i, item in enumerate(leaf.keys):
+            if item == key:
+                leaf.children[i] = value
                 return
-            elif not node.borrow_key(self.minimum):
-                node.fusion()
-                self.delete(key, node.parent)
-    
-    def range_query(self, minimum, maximum):
-        leaf = self.find(minimum)
-        stop = False
-        query_result = []
-        while leaf is not None and not stop:
-            for i, key in enumerate(leaf.keys):
-                if minimum <= key <= maximum:
-                    query_result += leaf.values[i]
-                elif key > maximum:
-                    stop = True
-                    break
-            leaf = leaf.next
-        return query_result
-        
+        raise KeyError(f"Key {key} tidak ditemukan.")
+
+    def delete(self, key):
+        leaf = self._find_leaf(self.root, key)
+        if key in leaf.keys:
+            index = leaf.keys.index(key)
+            del leaf.keys[index]
+            del leaf.children[index]
+        else:
+            raise KeyError(f"Key {key} tidak ditemukan.")
+
+    def _insert_in_leaf(self, leaf: BPlusTreeNode, key, value):
+        index = 0
+        while index < len(leaf.keys) and key > leaf.keys[index]:
+            index += 1
+        leaf.keys.insert(index, key)
+        leaf.children.insert(index, value)
+
+    def _split_node(self, node: BPlusTreeNode):
+        middle = len(node.keys) // 2
+        sibling = BPlusTreeNode(is_leaf=node.is_leaf)
+        sibling.keys = node.keys[middle:]
+        sibling.children = node.children[middle:]
+        node.keys = node.keys[:middle]
+        node.children = node.children[:middle]
+
+        if node == self.root:
+            new_root = BPlusTreeNode()
+            new_root.keys = [sibling.keys[0]]
+            new_root.children = [node, sibling]
+            self.root = new_root
+        else:
+            parent = self._find_parent(self.root, node)
+            self._insert_in_internal(parent, sibling.keys[0], sibling)
+
+    def _find_parent(self, current: BPlusTreeNode, child):
+        if current.is_leaf or current.children[0].is_leaf:
+            return None
+        for node in current.children:
+            if node == child:
+                return current
+            parent = self._find_parent(node, child)
+            if parent:
+                return parent
+        return None
+
+    def _insert_in_internal(self, parent: BPlusTreeNode, key, child):
+        index = 0
+        while index < len(parent.keys) and key > parent.keys[index]:
+            index += 1
+        parent.keys.insert(index, key)
+        parent.children.insert(index + 1, child)
+        if len(parent.keys) == self.degree:
+            self._split_node(parent)
