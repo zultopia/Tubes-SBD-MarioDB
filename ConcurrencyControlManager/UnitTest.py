@@ -1,9 +1,12 @@
 import unittest
-from ConcurrencyControlManager.classes import ConcurrencyControlManager, PrimaryKey, Row, Action, Response, WaitForGraph
+from ConcurrencyControlManager.classes import ConcurrencyControlManager, PrimaryKey, Row, Table, Cell, DataItem, Action, Response, WaitForGraph
 
 class TestConcurrencyControlManager(unittest.TestCase):
     def setUp(self):
         self.ccm = ConcurrencyControlManager(algorithm="Tes")
+        self.table = Table("TestTable")
+        self.row = Row(self.table, PrimaryKey("id"), {"column1": "value1"})
+        self.cell = Cell(self.row, PrimaryKey("id"), "column1", "value1")
     
     # Main Methods
     
@@ -192,5 +195,66 @@ class TestConcurrencyControlManager(unittest.TestCase):
         lenWaitFor = len(wfg.waitfor)
         self.assertEqual(lenWaitFor, 2)
 
+    def test_validate_object_read(self):
+        tid = self.ccm.begin_transaction()
+        response = self.ccm.validate_object(DataItem("Row", self.row), tid, "read")
+        self.assertTrue(response.allowed)
+        self.assertEqual(response.transaction_id, tid)
+        self.assertIn(self.row, self.ccm.lock_S)
+        self.assertIn(tid, self.ccm.lock_S[self.row])
+
+    def test_validate_object_write(self):
+        tid = self.ccm.begin_transaction()
+        response = self.ccm.validate_object(DataItem("Row", self.row), tid, "write")
+        self.assertTrue(response.allowed)
+        self.assertEqual(response.transaction_id, tid)
+        self.assertIn(self.row, self.ccm.lock_X)
+        self.assertEqual(self.ccm.lock_X[self.row], tid)
+
+    def test_validate_object_conflict(self):
+        tid1 = self.ccm.begin_transaction()
+        tid2 = self.ccm.begin_transaction()
+        # Lock row with write by tid1
+        self.ccm.validate_object(DataItem("Row", self.row), tid1, "write")
+        # Try to read with tid2, should fail
+        response = self.ccm.validate_object(DataItem("Row", self.row), tid2, "read")
+        self.assertFalse(response.allowed)
+        self.assertEqual(response.transaction_id, tid2)
+
+    def test_apply_lock_with_hierarchy_read(self):
+        tid = self.ccm.begin_transaction()
+        response = self.ccm.apply_lock_with_hierarchy(DataItem("Row", self.row), tid, "S")
+        self.assertTrue(response.allowed)
+        self.assertIn(self.row, self.ccm.lock_S)
+        self.assertIn(tid, self.ccm.lock_S[self.row])
+
+    def test_apply_lock_with_hierarchy_write(self):
+        tid = self.ccm.begin_transaction()
+        response = self.ccm.apply_lock_with_hierarchy(DataItem("Row", self.row), tid, "X")
+        self.assertTrue(response.allowed)
+        self.assertIn(self.row, self.ccm.lock_X)
+        self.assertEqual(self.ccm.lock_X[self.row], tid)
+
+    def test_apply_lock_with_hierarchy_conflict(self):
+        tid1 = self.ccm.begin_transaction()
+        tid2 = self.ccm.begin_transaction()
+        self.ccm.apply_lock_with_hierarchy(DataItem("Row", self.row), tid1, "X")
+        response = self.ccm.apply_lock_with_hierarchy(DataItem("Row", self.row), tid2, "S")
+        self.assertFalse(response.allowed)
+
+    def test_check_lock_conflict_no_conflict(self):
+        tid = self.ccm.begin_transaction()
+        self.ccm.apply_lock_with_hierarchy(DataItem("Row", self.row), tid, "S")
+        allowed, message = self.ccm.check_lock_conflict(self.row, "S")
+        self.assertTrue(allowed)
+        self.assertIsNone(message)
+
+    def test_check_lock_conflict_with_conflict(self):
+        tid = self.ccm.begin_transaction()
+        self.ccm.apply_lock_with_hierarchy(DataItem("Row", self.row), tid, "X")
+        allowed, message = self.ccm.check_lock_conflict(self.row, "S")
+        self.assertFalse(allowed)
+        self.assertIsNotNone(message)
+    
 if __name__ == "__main__":
     unittest.main(verbosity=2)

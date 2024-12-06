@@ -141,12 +141,28 @@ class FailureRecoveryManager:
         This method is called by the timer thread to save the checkpoint.
         """
 
-        # Save checkpoint
-        self._save_checkpoint()
+        try:
+            # Save checkpoint
+            self._save_checkpoint()
 
-        # Restart the timer
-        self.timer = Timer(self._checkpoint_interval, self._run_checkpoint_cron_job)
-        self.timer.start()
+            # Restart the timer
+            if self.timer:
+                self.timer.cancel()  # Cancel any existing timer
+            self.timer = Timer(self._checkpoint_interval, self._run_checkpoint_cron_job)
+            self.timer.start()
+
+        except Exception as e:
+            print(f"Error in checkpoint cron job: {e}")
+    
+    def _stop_checkpoint_cron_job(self):
+        """
+        Stop the checkpoint cron job.
+        """
+        if self.timer:
+            self.timer.cancel()
+            self.timer = None
+    
+
 
     def is_buffer_full(self, spare: int = 0) -> bool:
         """
@@ -168,6 +184,18 @@ class FailureRecoveryManager:
         """
 
     def _read_lines_from_end(self, file_path, chunk_size=1024):
+        
+        """
+        This method is private method to help FailureRecoverManager to read a file from the end of the file. This method is important to FailureRecoverManager when read log file
+        
+        Args:
+            file_path (string): path where file is located
+            chunk_size (int, optional): Defaults to 1024.
+
+        Yields:
+            string: one line text from file
+        """
+         
 
         with open(file_path, "rb") as file:
             file.seek(0, 2)
@@ -192,6 +220,14 @@ class FailureRecoveryManager:
                 yield buffer.decode("utf-8")
 
     def recover(self, criteria: RecoverCriteria = None):
+        """
+        This method is used to perform recovery on the database. The recovery process will apply to all transactions that meet the specified criteria. A transaction is considered to meet the criteria if its transaction_id or timestamp is greater than or equal to the given criteria.
+        
+        For transactions that have already been completed (COMMITTED or ABORTED), the recovery will involve re-executing the queries. For transactions that are still pending, the recovery will involve performing a rollback, and the final status will be marked as aborted.
+
+        Args:
+            criteria (RecoverCriteria, optional): criteria to choose what transactio need to be recover. Criteria can be transaction_id or timestamp. Defaults to None.
+        """
         recovered_transactions = []
         active_transactions = set()
         if criteria and criteria.timestamp:
@@ -246,9 +282,9 @@ class FailureRecoveryManager:
                     break
 
                 elif log_parts[0].isdigit():
-                    transaction_id = log_parts[0]
+                    transaction_id = int(log_parts[0])
 
-                    if int(transaction_id) < criteria.transaction_id:
+                    if transaction_id < criteria.transaction_id:
                         break
 
                     recovered_transactions.insert(0, log_line)
@@ -263,9 +299,9 @@ class FailureRecoveryManager:
                         break
 
                     elif log_parts[0].isdigit():
-                        transaction_id = log_parts[0]
+                        transaction_id = int(log_parts[0])
 
-                        if int(transaction_id) < criteria.transaction_id:
+                        if transaction_id < criteria.transaction_id:
                             break
 
                         recovered_transactions.insert(0, log_line)
@@ -274,7 +310,7 @@ class FailureRecoveryManager:
         print("recover tx: ", recovered_transactions)
         for recovered_transaction in recovered_transactions:
             log_parts = recovered_transaction.split("|")
-            transaction_id = log_parts[0]
+            transaction_id = int(log_parts[0])
             status = log_parts[2]
 
             if status == "COMMITTED":
@@ -287,103 +323,95 @@ class FailureRecoveryManager:
                 # memanggil query processor untuk menjalankan ulang query (redo)
                 print("send query: ", transaction_id, " ", log_parts[3])
 
-        active_transactions = sorted(active_transactions)
         print("active tx: ", active_transactions)
 
         # undo
-        for tx in active_transactions:
-            log_current_tx = list(
-                filter(
-                    lambda x: int(x.split("|")[0]) == tx
-                    and x.split("|")[2] == "IN_PROGRESS",
-                    recovered_transactions,
-                )
-            )
-            print("current tx: ", log_current_tx)
-
-            for curr in log_current_tx:
-                log_parts = curr.split("|")
-                sql_operation = log_parts[3]
-                try:
-                    before_states_raw = log_parts[4].split("Before: ")[1].strip()
-                    after_states_raw = log_parts[5].split("After: ")[1].strip()
-
-                    if before_states_raw == "None":
-                        before_states = None
-                    else:
-                        before_states = json.loads(before_states_raw)
-
-                    if after_states_raw == "None":
-                        after_states = None
-                    else:
-                        after_states = json.loads(after_states_raw)
-
-                except IndexError:
-                    print("Error: Missing 'Before' or 'After' in log_parts.")
-                    exit()
-                except json.JSONDecodeError as e:
-                    print(f"Error decoding JSON: {e}")
-                    exit()
-
-                rollback_queries = []
-
-                if sql_operation.startswith("INSERT INTO"):
-                    table = sql_operation.split(" ")[2]
-                    for after_state in after_states:
-                        where_clause = " AND ".join(
-                            [f"{k} = {repr(v)}" for k, v in after_state.items()]
-                        )
-                        rollback_query = f"DELETE FROM {table} WHERE {where_clause};"
-                        rollback_queries.append(rollback_query)
-
-                elif sql_operation.startswith("DELETE FROM"):
-                    table = sql_operation.split(" ")[2]
-                    for before_state in before_states:
-                        columns = ", ".join(before_state.keys())
-                        values = ", ".join([repr(v) for v in before_state.values()])
-                        rollback_query = (
-                            f"INSERT INTO {table} ({columns}) VALUES ({values});"
-                        )
-                        rollback_queries.append(rollback_query)
-
-                elif sql_operation.startswith("UPDATE"):
-                    table = sql_operation.split(" ")[1]
-                    for before_state, after_state in zip(before_states, after_states):
-                        set_clause = ", ".join(
-                            [f"{k} = {repr(v)}" for k, v in before_state.items()]
-                        )
-                        where_clause = " AND ".join(
-                            [f"{k} = {repr(v)}" for k, v in after_state.items()]
-                        )
-                        rollback_query = (
-                            f"UPDATE {table} SET {set_clause} WHERE {where_clause};"
-                        )
-                        rollback_queries.append(rollback_query)
-
-                print("rollback query: ", rollback_queries)
-                for rollback_query in rollback_queries:
-                    print("query rollback: ", rollback_query)
-                    res = None
-
-                    exec_result = ExecutionResult(
-                        tx,
-                        datetime.now().isoformat(),
-                        "TRANSACTION ROLLBACK",
-                        Rows(None),
-                        Rows(res),
-                        "ROLLBACK",
-                        rollback_query,
+        log_active_transaction = list(filter(lambda x: int(x.split("|")[0]) in active_transactions, recovered_transactions))
+        log_active_transaction = sorted(log_active_transaction, key=lambda x: datetime.fromisoformat(x.split("|")[1]))
+        
+        # make rollback query
+        for curr in log_active_transaction[::-1]:
+            transaction_id = int(curr.split("|")[0])
+            log_parts = curr.split("|")
+            sql_operation = log_parts[3]
+            try:
+                before_states_raw = log_parts[4].split("Before: ")[1].strip()
+                after_states_raw = log_parts[5].split("After: ")[1].strip()
+                if before_states_raw == "None":
+                    before_states = None
+                else:
+                    before_states = json.loads(before_states_raw)
+                if after_states_raw == "None":
+                    after_states = None
+                else:
+                    after_states = json.loads(after_states_raw)
+            except IndexError:
+                print("Error: Missing 'Before' or 'After' in log_parts.")
+                exit()
+            except json.JSONDecodeError as e:
+                print(f"Error decoding JSON: {e}")
+                exit()
+            rollback_queries = []
+            if sql_operation.startswith("INSERT INTO"):
+                table = sql_operation.split(" ")[2]
+                for after_state in after_states:
+                    where_clause = " AND ".join(
+                        [f"{k} = {repr(v)}" for k, v in after_state.items()]
                     )
-                    print("write log: ", exec_result.__dict__)
-                    self.write_log(exec_result)
-
+                    rollback_query = f"DELETE FROM {table} WHERE {where_clause};"
+                    rollback_queries.append((transaction_id, rollback_query))
+            elif sql_operation.startswith("DELETE FROM"):
+                table = sql_operation.split(" ")[2]
+                for before_state in before_states:
+                    columns = ", ".join(before_state.keys())
+                    values = ", ".join([repr(v) for v in before_state.values()])
+                    rollback_query = (
+                        f"INSERT INTO {table} ({columns}) VALUES ({values});"
+                    )
+                    rollback_queries.append((transaction_id, rollback_query))
+            elif sql_operation.startswith("UPDATE"):
+                table = sql_operation.split(" ")[1]
+                for before_state, after_state in zip(before_states, after_states):
+                    set_clause = ", ".join(
+                        [f"{k} = {repr(v)}" for k, v in before_state.items()]
+                    )
+                    where_clause = " AND ".join(
+                        [f"{k} = {repr(v)}" for k, v in after_state.items()]
+                    )
+                    rollback_query = (
+                        f"UPDATE {table} SET {set_clause} WHERE {where_clause};"
+                    )
+                    rollback_queries.append((transaction_id, rollback_query))
+        print("rollback query: ", rollback_queries)
+        
+        # execute rollback query
+        for tx_id, rb_query in rollback_queries:
+            print("query rollback: ", rb_query)
+            
+            #panggil query procesor to process rollback query
+            res = None
+            
             exec_result = ExecutionResult(
-                tx,
+                tx_id,
+                datetime.now().isoformat(),
+                "TRANSACTION ROLLBACK",
+                Rows(None),
+                Rows(res),
+                "ROLLBACK",
+                rb_query,
+            )
+            print("write log: ", exec_result.__dict__)
+            self.write_log(exec_result)
+        
+        #close undo process give abort status
+        for tx_id in active_transactions:
+            exec_result = ExecutionResult(
+                tx_id,
                 datetime.now().isoformat(),
                 "TRANSACTION END",
                 Rows(None),
                 Rows(None),
-                "ABORT",
+                "ABORTED",
                 None,
             )
             print("write log: ", exec_result.__dict__)
@@ -406,7 +434,7 @@ class FailureRecoveryManager:
         # redo
         for recovered_transaction in recovered_transactions:
             log_parts = recovered_transaction.split("|")
-            transaction_id = log_parts[0]
+            transaction_id = int(log_parts[0])
             status = log_parts[2]
 
             if status == "COMMITTED":
@@ -419,102 +447,93 @@ class FailureRecoveryManager:
                 # memanggil query processor untuk menjalankan ulang query (redo)
                 pass
 
-        active_transactions = sorted(active_transactions)
-
         # undo
-        for tx in active_transactions:
-            log_current_tx = list(
-                filter(
-                    lambda x: int(x.split("|")[0]) == tx
-                    and x.split("|")[2] == "IN_PROGRESS",
-                    recovered_transactions,
-                )
-            )
-            print("current tx: ", log_current_tx)
-
-            for curr in log_current_tx:
-                log_parts = curr.split("|")
-                sql_operation = log_parts[3]
-                try:
-                    before_states_raw = log_parts[4].split("Before: ")[1].strip()
-                    after_states_raw = log_parts[5].split("After: ")[1].strip()
-
-                    if before_states_raw == "None":
-                        before_states = None
-                    else:
-                        before_states = json.loads(before_states_raw)
-
-                    if after_states_raw == "None":
-                        after_states = None
-                    else:
-                        after_states = json.loads(after_states_raw)
-
-                except IndexError:
-                    print("Error: Missing 'Before' or 'After' in log_parts.")
-                    exit()
-                except json.JSONDecodeError as e:
-                    print(f"Error decoding JSON: {e}")
-                    exit()
-
-                rollback_queries = []
-
-                if sql_operation.startswith("INSERT INTO"):
-                    table = sql_operation.split(" ")[2]
-                    for after_state in after_states:
-                        where_clause = " AND ".join(
-                            [f"{k} = {repr(v)}" for k, v in after_state.items()]
-                        )
-                        rollback_query = f"DELETE FROM {table} WHERE {where_clause};"
-                        rollback_queries.append(rollback_query)
-
-                elif sql_operation.startswith("DELETE FROM"):
-                    table = sql_operation.split(" ")[2]
-                    for before_state in before_states:
-                        columns = ", ".join(before_state.keys())
-                        values = ", ".join([repr(v) for v in before_state.values()])
-                        rollback_query = (
-                            f"INSERT INTO {table} ({columns}) VALUES ({values});"
-                        )
-                        rollback_queries.append(rollback_query)
-
-                elif sql_operation.startswith("UPDATE"):
-                    table = sql_operation.split(" ")[1]
-                    for before_state, after_state in zip(before_states, after_states):
-                        set_clause = ", ".join(
-                            [f"{k} = {repr(v)}" for k, v in before_state.items()]
-                        )
-                        where_clause = " AND ".join(
-                            [f"{k} = {repr(v)}" for k, v in after_state.items()]
-                        )
-                        rollback_query = (
-                            f"UPDATE {table} SET {set_clause} WHERE {where_clause};"
-                        )
-                        rollback_queries.append(rollback_query)
-
-                print("rollback query: ", rollback_queries)
-                for rollback_query in rollback_queries:
-                    print("query rollback: ", rollback_query)
-                    res = None
-
-                    exec_result = ExecutionResult(
-                        tx,
-                        datetime.now().isoformat(),
-                        "TRANSACTION ROLLBACK",
-                        Rows(None),
-                        Rows(res),
-                        "ROLLBACK",
-                        rollback_query,
+        log_active_transaction = list(filter(lambda x: int(x.split("|")[0]) in active_transactions, recovered_transactions))
+        log_active_transaction = sorted(log_active_transaction, key=lambda x: datetime.fromisoformat(x.split("|")[1]))
+        
+        # make rollback query
+        for curr in log_active_transaction[::-1]:
+            transaction_id = int(curr.split("|")[0])
+            log_parts = curr.split("|")
+            sql_operation = log_parts[3]
+            try:
+                before_states_raw = log_parts[4].split("Before: ")[1].strip()
+                after_states_raw = log_parts[5].split("After: ")[1].strip()
+                if before_states_raw == "None":
+                    before_states = None
+                else:
+                    before_states = json.loads(before_states_raw)
+                if after_states_raw == "None":
+                    after_states = None
+                else:
+                    after_states = json.loads(after_states_raw)
+            except IndexError:
+                print("Error: Missing 'Before' or 'After' in log_parts.")
+                exit()
+            except json.JSONDecodeError as e:
+                print(f"Error decoding JSON: {e}")
+                exit()
+            rollback_queries = []
+            if sql_operation.startswith("INSERT INTO"):
+                table = sql_operation.split(" ")[2]
+                for after_state in after_states:
+                    where_clause = " AND ".join(
+                        [f"{k} = {repr(v)}" for k, v in after_state.items()]
                     )
-                    print("write log: ", exec_result.__dict__)
-                    self.write_log(exec_result)
-
+                    rollback_query = f"DELETE FROM {table} WHERE {where_clause};"
+                    rollback_queries.append((transaction_id, rollback_query))
+            elif sql_operation.startswith("DELETE FROM"):
+                table = sql_operation.split(" ")[2]
+                for before_state in before_states:
+                    columns = ", ".join(before_state.keys())
+                    values = ", ".join([repr(v) for v in before_state.values()])
+                    rollback_query = (
+                        f"INSERT INTO {table} ({columns}) VALUES ({values});"
+                    )
+                    rollback_queries.append((transaction_id, rollback_query))
+            elif sql_operation.startswith("UPDATE"):
+                table = sql_operation.split(" ")[1]
+                for before_state, after_state in zip(before_states, after_states):
+                    set_clause = ", ".join(
+                        [f"{k} = {repr(v)}" for k, v in before_state.items()]
+                    )
+                    where_clause = " AND ".join(
+                        [f"{k} = {repr(v)}" for k, v in after_state.items()]
+                    )
+                    rollback_query = (
+                        f"UPDATE {table} SET {set_clause} WHERE {where_clause};"
+                    )
+                    rollback_queries.append((transaction_id, rollback_query))
+        print("rollback query: ", rollback_queries)
+        
+        # execute rollback query
+        for tx_id, rb_query in rollback_queries:
+            print("query rollback: ", rb_query)
+            
+            #panggil query procesor to process rollback query
+            res = None
+            
             exec_result = ExecutionResult(
-                tx,
+                tx_id,
+                datetime.now().isoformat(),
+                "TRANSACTION ROLLBACK",
+                Rows(None),
+                Rows(res),
+                "ROLLBACK",
+                rb_query,
+            )
+            print("write log: ", exec_result.__dict__)
+            self.write_log(exec_result)
+        
+        #close undo process give abort status
+        for tx_id in active_transactions:
+            exec_result = ExecutionResult(
+                tx_id,
                 datetime.now().isoformat(),
                 "TRANSACTION END",
                 Rows(None),
                 Rows(None),
-                "ABORT",
+                "ABORTED",
                 None,
             )
             print("write log: ", exec_result.__dict__)

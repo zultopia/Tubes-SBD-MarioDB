@@ -130,12 +130,12 @@ class DataItem:
         return self.data_item.get_parent()
 
 class Transaction: 
-    def __init__(self, tid: int, action: Action, level: int, data_item: str): 
+    def __init__(self, tid: int, action: Action, level: int, data_item: DataItem, old_data_item: DataItem = None): 
         self.id = tid 
         self.action = action
         self.level  = level
-        # TODO: update data_item
         self.data_item = data_item
+        self.old_data_item = old_data_item
 
 class WaitForGraph:
     def __init__(self):
@@ -343,15 +343,32 @@ class ConcurrencyControlManager:
             "X": {"IS", "IX", "S", "SIX", "X"}
         }
 
-        for held_lock, holders in [
-            ("IS", self.lock_IS.get(current, set())),
-            ("IX", self.lock_IX.get(current, set())),
-            ("S", self.lock_S.get(current, set())),
-            ("SIX", self.lock_SIX.get(current, set())),
-            ("X", {self.lock_X.get(current)} if current in self.lock_X else set())
-        ]:
-            if holders and lock_type in conflict_matrix[held_lock]:
-                return False, f"Conflict: Current {current} holds {held_lock} lock by another transaction."
+        # Build the hierarchy stack
+        validate_stack = []
+
+        while current :
+            if isinstance(current, Cell):
+                parent = current.get_row()
+            elif isinstance(current, Row):
+                parent = current.get_table()
+            else:
+                parent = None
+
+            validate_stack.append(current)
+            current = parent
+
+        # Validate against the conflict matrix
+        while validate_stack:
+            current = validate_stack.pop()
+            for held_lock, holders in [
+                ("IS", self.lock_IS.get(current, set())),
+                ("IX", self.lock_IX.get(current, set())),
+                ("S", self.lock_S.get(current, set())),
+                ("SIX", self.lock_SIX.get(current, set())),
+                ("X", self.lock_X.get(current, set())),
+            ]:
+                if holders and lock_type in conflict_matrix[held_lock]:
+                    return False, f"Conflict: Current {current} holds {held_lock} lock by transaction(s) {holders}."
 
         return True, None
             
