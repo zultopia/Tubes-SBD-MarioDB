@@ -324,6 +324,19 @@ class StorageManager:
             V_a_r = {col: len(set(row[col] for row in table)) for col in table[0]} if table else {}
             stats[table_name] = Statistic(n_r, b_r, l_r, f_r, V_a_r)
         return stats
+    
+    def _evaluate_condition(self, row, condition: Condition):
+        value = row.get(condition.column)
+        operand = condition.operand
+        operation = condition.operation
+        return {
+            "=": value == operand,
+            "<>": value != operand,
+            ">": value > operand,
+            ">=": value >= operand,
+            "<": value < operand,
+            "<=": value <= operand,
+        }[operation]
 
     def _evaluate_conditions(self, row, condition_group: ConditionGroup):
         if condition_group.logic_operator == "AND":
