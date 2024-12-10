@@ -37,11 +37,17 @@ class Table(IDataItem):
     def __init__(self, table: str):
         self.table = table
     
-    def __eq__(self, other):
+    def __eq__(self, other: 'Table'):
         return self.table == other.table
 
-    def __ne__(self, other):
+    def __ne__(self, other: 'Table'):
         return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self.table)
+    
+    def __str__(self):
+        return self.table
     
 class Row(IDataItem):
     def __init__(self, table: Table, pkey: PrimaryKey, map: dict):
@@ -64,6 +70,9 @@ class Row(IDataItem):
     def __str__(self):
         return f"=============== Row ===============\ntable: {self.table}\nmap:\n{self.map}\npkey:\n{self.pkey}===================================\n"
 
+    def __hash__(self):
+        return hash(self.table.__str__() + self.pkey.__str__())
+    
     def get_table(self): 
         return self.table
     
@@ -71,8 +80,9 @@ class Row(IDataItem):
         return self.get_table()
 
 class Cell(IDataItem):
-    def __init__(self, row: Row, pkey: PrimaryKey, attribute: str, value: any):
+    def __init__(self, table: Table, row: Row, pkey: PrimaryKey, attribute: str, value: any):
         self.row = row
+        self.table = table
         self.pkey = pkey
         self.attribute = attribute
         self.value = value
@@ -80,6 +90,9 @@ class Cell(IDataItem):
     def __eq__(self, other):
         return (self.pkey == other.pkey) and (self.attribute == other.attribute) and (self.table == other.table)
 
+    def __hash__(self):
+        return hash(self.table + self.pkey.__str__() + self.attribute)
+    
     def get_row(self):
         return self.row
     
@@ -99,6 +112,9 @@ class DataItem:
     
     def __ne__(self, other):
         return not self.__eq__(other)
+
+    def __hash__(self):
+        return self.data_item.__hash__()
     
     def get_parent(self):
         return self.data_item.get_parent()
@@ -223,7 +239,7 @@ class ConcurrencyControlManager:
     def begin_transaction(self) -> int:
         # will return transaction_id: int
         transaction_id = self.__generate_id()
-        self.transaction_dataitem_map[transaction_id] = []
+        self.transaction_dataitem_map[transaction_id] = {}
         return transaction_id
 
     def log_object(self, transactionAction: TransactionAction):
@@ -233,7 +249,7 @@ class ConcurrencyControlManager:
     # check if lock is valid to current lock and its ancestor
     def apply_lock(self, transaction_action: TransactionAction):
         current = transaction_action.data_item
-        lock_type = transaction_action.action
+        lock_type = "S" if transaction_action.action.lower() == "read" else "X" if transaction_action.action.lower() == "write" else "SIX"
         transaction_id = transaction_action.id
         
         conflict_matrix = {
@@ -242,6 +258,14 @@ class ConcurrencyControlManager:
             "S": {"IX", "SIX", "X"},
             "SIX": {"IX", "S", "SIX", "X"},
             "X": {"IS", "IX", "S", "SIX", "X"}
+        }
+        
+        minimum_lock_matrix = {
+            "IS": {"IX", "S", "SIX", "X"},
+            "S": {"SIX", "X"},
+            "IX": {"X", "SIX"},
+            "SIX": {"X"},
+            "X": {}
         }
 
         # Build the hierarchy stack
@@ -273,44 +297,108 @@ class ConcurrencyControlManager:
                 ("SIX", self.lock_SIX.get(current, set())),
                 ("X", self.lock_X.get(current, set())),
             ]:
-                if transaction_id in holders: 
-                    holders.remove(transaction_id)
 
-                if holders and lock_type in conflict_matrix[held_lock]:
-                    failed = True
-                    conflict_list.append(holders)
+                minimum_lock_type = lock_type
+                if len(validate_stack) > 0:
+                    if lock_type == "S":
+                        minimum_lock_type = "IS"
+                    elif lock_type == "X":
+                        minimum_lock_type = "IX"
+                        
+                if self.transaction_dataitem_map[transaction_id].get(current, None) == minimum_lock_type:
+                    break
+                
+                if holders and minimum_lock_type in conflict_matrix[held_lock]:
+                    if len(holders) > 1 or transaction_id not in holders:
+                        failed = True
+                        conflict_list.append(holders)
+                        
+                        for tid in holders:
+                            if tid != transaction_id:
+                                if held_lock == "S":
+                                    self.wait_for_graph.addEdge(transaction_id, tid)
+                                if held_lock == "IS":
+                                    self.wait_for_graph.addEdge(transaction_id, tid)
+                                if held_lock == "S":
+                                    self.wait_for_graph.addEdge(transaction_id, tid)
+                                if held_lock == "S":
+                                    self.wait_for_graph.addEdge(transaction_id, tid)
+                                if held_lock == "S":
+                                    self.wait_for_graph.addEdge(transaction_id, tid)
             
+            abort_transaction_id = []
             if failed:
-                for held_lock, holders in conflict_list:
+                for holders in conflict_list:
                     for other_transaction_id in holders:
+                        # Wait-die
                         if other_transaction_id > transaction_id:
                             abort = True
-                
+                        # Wound-wait
+                        # if transaction_id > other_transaction_id:
+                        #     abort_transaction_id.append(other_transaction_id)
+                        #     self.end_transaction(other_transaction_id, 'abort')
+                        #     self.transaction_queue.add(transaction_id)
+                        #     self.wait_for_graph.addEdge(other_transaction_id, transaction_id)
+                        #     # TODO: recovery, append to waiting_list
+                            
                 if not abort:
-                    self.transaction_queue.append(transaction_id)
+                    self.transaction_queue.add(transaction_id)
                     self.waiting_list.append(transaction_action)
+                    # self.wait_for_graph.addEdge()
                 
                 # while (not self.wait_for_graph.waiting(transaction_action)): 
                 #     TODO: threading
                 return False, abort, f"Transaction {transaction_id} failed to get lock-{lock_type} on {transaction_action.data_item}"
             
             
-            if lock_type == "S":
-                if len(validate_stack) > 0:
-                    self.lock_IS.setdefault(parent, set()).add(transaction_id)
-                else:
-                    self.lock_S.setdefault(parent, set()).add(transaction_id)
-                    
+            current_lock = self.transaction_dataitem_map[transaction_id].get(current,None)
+            if not current_lock:
+                if minimum_lock_type == "IS":
+                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                    self.lock_IS.setdefault(current, set()).add(transaction_id)
+                elif minimum_lock_type == "IX":
+                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                    self.lock_IS.setdefault(current, set()).add(transaction_id)
+                elif minimum_lock_type == "S":
+                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                    self.lock_S.setdefault(current, set()).add(transaction_id)
+                elif minimum_lock_type == "X":
+                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                    self.lock_X.setdefault(current, set()).add(transaction_id)
+                elif minimum_lock_type == "SIX":
+                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                    self.lock_SIX.setdefault(current, set()).add(transaction_id)
+                   
             else:
-                if len(validate_stack) > 0:
-                    self.lock_IX.setdefault(parent, set()).add(transaction_id)
-                elif lock_type == "X":
-                    self.lock_X.setdefault(parent, set()).add(transaction_id)
-                    self.log_object(transaction_action)
-                else:
-                    self.lock_SIX.setdefault(parent, set()).add(transaction_id)
-                    
-            self.transaction_dataitem_map[transaction_id].append({transaction_action.data_item: lock_type})
+                if current_lock not in minimum_lock_matrix[minimum_lock_type]:
+                    if current_lock == "S":
+                        if current in self.lock_S:
+                            self.lock_S[current].discard(transaction_id)
+                    elif current_lock == "IS":
+                        if current in self.lock_IS:
+                            self.lock_IS[current].discard(transaction_id)
+                    elif current_lock == "IX":
+                        if current in self.lock_IX:
+                            self.lock_IX[current].discard(transaction_id)
+                    elif current_lock == "SIX":
+                        if current in self.lock_SIX:
+                            self.lock_SIX[current].discard(transaction_id)
+
+                    if minimum_lock_type == "S":
+                        print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                        self.lock_S.setdefault(current, set()).add(transaction_id)
+                    elif minimum_lock_type == "IX":
+                        print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                        self.lock_IX.setdefault(current, set()).add(transaction_id)
+                    elif minimum_lock_type == "SIX":
+                        print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                        self.lock_SIX.setdefault(current, set()).add(transaction_id)
+                    elif minimum_lock_type == "X":
+                        print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                        self.lock_X.setdefault(current, set()).add(transaction_id)
+                
+            self.log_object(transaction_action)        
+            self.transaction_dataitem_map[transaction_id][transaction_action.data_item] = lock_type
         
         return True, None, f"Transaction {transaction_id} successfully get lock-{lock_type} on {transaction_action.data_item}"
     
@@ -347,19 +435,25 @@ class ConcurrencyControlManager:
         # Flush objects of a particular transaction after it has successfully committed/aborted
         # Terminates the transaction
         for data_item, lock_type in self.transaction_dataitem_map[transaction_id]: 
-            if (lock_type == "X"): 
+            if (lock_type == "X"):
+                print(f"Transaction {transaction_id} remove X on {data_item}")
                 self.lock_X[data_item].remove(transaction_id)
             if (lock_type == "S"): 
+                print(f"Transaction {transaction_id} remove S on {data_item}")
                 self.lock_S[data_item].remove(transaction_id)
             if (lock_type == "IX"): 
+                print(f"Transaction {transaction_id} remove IX on {data_item}")
                 self.lock_IX[data_item].remove(transaction_id)
             if (lock_type == "IS"): 
+                print(f"Transaction {transaction_id} remove IS on {data_item}")
                 self.lock_IS[data_item].remove(transaction_id)
             if (lock_type == "SIX"): 
+                print(f"Transaction {transaction_id} remove SIX on {data_item}")
                 self.lock_SIX[data_item].remove(transaction_id)
         
         self.transaction_queue.remove(transaction_id)
         self.wait_for_graph.deleteNode(transaction_id)
+        del self.transaction_dataitem_map[transaction_id]
         
         t_action = TransactionAction(transaction_id, status, None, None, None)
         self.log_object(t_action)
