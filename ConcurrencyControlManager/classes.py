@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import Optional, List  # kalo gaboleh dihapus aja
 import time
 
+from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
+
 class PrimaryKey:
     def __init__(self, *keys):
         # keys nya langsung value si primary key nya aja
@@ -216,6 +218,7 @@ class ConcurrencyControlManager:
         self.transaction_queue = set() # Set transaction_id
         self.transaction_dataitem_map = {} # Map transaction_id -> List[DataItem]
         self.waiting_list = [TransactionAction]
+        self.failure_recovery = FailureRecoveryManager()
     
     def __str__(self):
         return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"
@@ -230,10 +233,8 @@ class ConcurrencyControlManager:
         self.transaction_dataitem_map[transaction_id] = []
         return transaction_id
 
-    def log_object(self, transactionAction: TransactionAction, transaction_id: int):
-        # implement lock on an object
-        # assign timestamp on the object
-        pass
+    def log_object(self, transactionAction: TransactionAction):
+        self.failure_recovery.write_log(transactionAction)
     
     # check if lock is valid to current lock and its ancestor
     def apply_lock(self, transaction_action: TransactionAction):
@@ -307,6 +308,7 @@ class ConcurrencyControlManager:
                     self.lock_IX.setdefault(parent, set()).add(transaction_id)
                 elif lock_type == "X":
                     self.lock_X.setdefault(parent, set()).add(transaction_id)
+                    self.log_object(transaction_action)
                 else:
                     self.lock_SIX.setdefault(parent, set()).add(transaction_id)
                     
@@ -369,7 +371,8 @@ class ConcurrencyControlManager:
         self.transaction_queue.remove(transaction_id)
         self.wait_for_graph.deleteNode(transaction_id)
         
-        self.log_object()
+        t_action = TransactionAction(transaction_id, status, None, None, None)
+        self.log_object(t_action)
         
     def process_waiting_list(self): 
         need_check = True
