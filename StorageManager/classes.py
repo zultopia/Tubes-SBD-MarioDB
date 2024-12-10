@@ -134,6 +134,11 @@ class Statistic:
         self.f_r = f_r
         self.V_a_r = V_a_r
 
+class ConditionGroup:
+    def __init__(self, conditions: List[Union[Condition, "ConditionGroup"]], logic_operator: str = "AND"):
+        self.conditions = conditions
+        self.logic_operator = logic_operator.upper()  # "AND" or "OR"
+
 class StorageManager:
     DATA_FILE = "data.dat/"
     LOG_FILE = "log.dat"
@@ -320,15 +325,18 @@ class StorageManager:
             stats[table_name] = Statistic(n_r, b_r, l_r, f_r, V_a_r)
         return stats
 
-    def _evaluate_condition(self, row, condition: Condition):
-        value = row.get(condition.column)
-        operand = condition.operand
-        operation = condition.operation
-        return {
-            "=": value == operand,
-            "<>": value != operand,
-            ">": value > operand,
-            ">=": value >= operand,
-            "<": value < operand,
-            "<=": value <= operand,
-        }[operation]
+    def _evaluate_conditions(self, row, condition_group: ConditionGroup):
+        if condition_group.logic_operator == "AND":
+            return all(
+                self._evaluate_conditions(row, cond) if isinstance(cond, ConditionGroup) 
+                else self._evaluate_condition(row, cond)
+                for cond in condition_group.conditions
+            )
+        elif condition_group.logic_operator == "OR":
+            return any(
+                self._evaluate_conditions(row, cond) if isinstance(cond, ConditionGroup) 
+                else self._evaluate_condition(row, cond)
+                for cond in condition_group.conditions
+            )
+        else:
+            raise ValueError("Invalid logic_operator. Use 'AND' or 'OR'.")
