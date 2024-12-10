@@ -105,8 +105,8 @@ def process_table_result(table_result_tree: ParseTree) -> QueryNode:
                         join_node.set_children(Pair(current_node, right_node))
                         current_node = join_node
                 
-                if len(tail.childs) > 4:
-                    tail = tail.childs[4] 
+                if len(tail.childs) == 4: 
+                    tail = tail.childs[3]
                 else:
                     break
             else:

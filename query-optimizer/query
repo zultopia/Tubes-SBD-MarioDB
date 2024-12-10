@@ -1,1 +1,1 @@
-select * from b where a = b and b = c and c = d and d = e and e = f and f = g;
+select * from b natural join c natural join d;
