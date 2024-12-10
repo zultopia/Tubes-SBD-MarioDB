@@ -100,9 +100,14 @@ class Condition:
         self.column = column
         self.operation = operation
         self.operand = operand
+        
+class ConditionGroup:
+    def __init__(self, conditions: List[Union[Condition, "ConditionGroup"]], logic_operator: str = "AND"):
+        self.conditions = conditions
+        self.logic_operator = logic_operator.upper()  # "AND" or "OR"
 
 class DataRetrieval:
-    def __init__(self, table: str, columns: List[str], conditions: List[Condition], search_type: str, level: str, attribute: str = None):
+    def __init__(self, table: str, columns: List[str], conditions: ConditionGroup, search_type: str, level: str, attribute: str = None):
         self.table = table
         self.columns = columns
         self.conditions = conditions
@@ -110,7 +115,7 @@ class DataRetrieval:
         self.attribute = attribute # Defaultnya akan None kecuali level = "cell"
 
 class DataWrite:
-    def __init__(self, table: str, columns: List[str], new_values: List[Union[int, str]], level: str, attribute: str = None, conditions: List[Condition] = None):
+    def __init__(self, table: str, columns: List[str], new_values: List[Union[int, str]], level: str, attribute: str = None, conditions: ConditionGroup = None):
         self.table = table
         self.columns = columns
         self.new_values = new_values
@@ -120,7 +125,7 @@ class DataWrite:
         self.old_new_values = []
 
 class DataDeletion:
-    def __init__(self, table: str, conditions: List[Condition], level: str, attribute: str = None):
+    def __init__(self, table: str, conditions: ConditionGroup, level: str, attribute: str = None):
         self.table = table
         self.conditions = conditions
         self.level = level
@@ -133,11 +138,6 @@ class Statistic:
         self.l_r = l_r
         self.f_r = f_r
         self.V_a_r = V_a_r
-
-class ConditionGroup:
-    def __init__(self, conditions: List[Union[Condition, "ConditionGroup"]], logic_operator: str = "AND"):
-        self.conditions = conditions
-        self.logic_operator = logic_operator.upper()  # "AND" or "OR"
 
 class StorageManager:
     DATA_FILE = "data.dat/"
@@ -205,21 +205,40 @@ class StorageManager:
         table = data_write.table
         columns = data_write.columns
         new_values = data_write.new_values
+        conditions = data_write.conditions
         blocks = sorted(int(file.split('_')[-1].split('.')[0]) for file in os.listdir(self.DATA_DIR) if file.startswith(table))
+        if not data_write.conditions:
+                # add operation
+            for block_id in blocks:
+                block = self._load_block(table, block_id)
+                if len(block) < self.BLOCK_SIZE:
+                    block.append(dict(zip(columns, new_values)))
+                    self._save_block(table, block_id, block)
+                    self.log_action("write", table, {"block_id": block_id, "data": new_values})
+                    return 1
 
+            # If no space, create a new block
+            new_block_id = max(blocks, default=-1) + 1
+            new_block = [dict(zip(columns, new_values))]
+            self._save_block(table, new_block_id, new_block)
+            self.log_action("write", table, {"block_id": new_block_id, "data": new_values})
+            return 1
+        # UPDATE 
+        numUpdated = 0
         for block_id in blocks:
             block = self._load_block(table, block_id)
-            if len(block) < self.BLOCK_SIZE:
-                block.append(dict(zip(columns, new_values)))
-                self._save_block(table, block_id, block)
-                self.log_action("write", table, {"block_id": block_id, "data": new_values})
-                return
-
-        # If no space, create a new block
-        new_block_id = max(blocks, default=-1) + 1
-        new_block = [dict(zip(columns, new_values))]
-        self._save_block(table, new_block_id, new_block)
-        self.log_action("write", table, {"block_id": new_block_id, "data": new_values})
+            new_block = []
+            for row in block:
+                if self._evaluate_conditions(row, conditions):
+                    new_row = row
+                    for column, new_value in zip(columns, new_values):
+                        new_row[column] = new_value
+                    new_block.append(new_row)
+                    numUpdated += 1
+                else:
+                    new_block.append(row)
+            self._save_block(table, block_id, new_block)
+        return numUpdated
     
     def read_block(self, data_retrieval: DataRetrieval):
         table = data_retrieval.table
@@ -232,7 +251,7 @@ class StorageManager:
                 block_id = int(file.split('_')[-1].split('.')[0])
                 block = self._load_block(table, block_id)
                 for row in block:
-                    if all(self._evaluate_condition(row, cond) for cond in conditions):
+                    if self._evaluate_conditions(row, conditions):
                         results.append({col: row[col] for col in columns})
         return results
     
@@ -245,7 +264,7 @@ class StorageManager:
             if file.startswith(table):
                 block_id = int(file.split('_')[-1].split('.')[0])
                 block = self._load_block(table, block_id)
-                new_block = [row for row in block if not all(self._evaluate_condition(row, cond) for cond in conditions)]
+                new_block = [row for row in block if not self._evaluate_conditions(row, conditions)]
                 total_deleted += len(block) - len(new_block)
                 self._save_block(table, block_id, new_block)
         return total_deleted
@@ -324,8 +343,21 @@ class StorageManager:
             V_a_r = {col: len(set(row[col] for row in table)) for col in table[0]} if table else {}
             stats[table_name] = Statistic(n_r, b_r, l_r, f_r, V_a_r)
         return stats
+    
+    def _evaluate_condition(self, row: Dict, condition: Condition):
+        value = row[condition.column]
+        operand = condition.operand
+        operation = condition.operation
+        return {
+            "=": value == operand,
+            "<>": value != operand,
+            ">": value > operand,
+            ">=": value >= operand,
+            "<": value < operand,
+            "<=": value <= operand,
+        }[operation]
 
-    def _evaluate_conditions(self, row, condition_group: ConditionGroup):
+    def _evaluate_conditions(self, row: Dict, condition_group: ConditionGroup):
         if condition_group.logic_operator == "AND":
             return all(
                 self._evaluate_conditions(row, cond) if isinstance(cond, ConditionGroup) 

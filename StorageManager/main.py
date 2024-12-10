@@ -1,4 +1,4 @@
-from StorageManager.classes import StorageManager, DataRetrieval, DataWrite, DataDeletion, Condition
+from StorageManager.classes import ConditionGroup, StorageManager, DataRetrieval, DataWrite, DataDeletion, Condition
 
 if __name__ == "__main__":
     manager = StorageManager()
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     read_action = DataRetrieval(
         table="Student",
         columns=["FullName", "GPA"],
-        conditions=[Condition("GPA", ">", 3.0)],
+        conditions=ConditionGroup([Condition("GPA", ">", 3.0)], "AND"),
         search_type="sequential",
         level="table"
     )
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     # Delete Example
     delete_action = DataDeletion(
         table="Student",
-        conditions=[Condition("StudentID", "=", 1)],
+        conditions=ConditionGroup([Condition("GPA", ">", 3.0)], "AND"),
         level="table"
     )
     removed = manager.delete_block(delete_action)
