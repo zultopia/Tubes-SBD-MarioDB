@@ -43,7 +43,7 @@ class ConditionalJoinNode(JoinNode):
         self.conditions = conditions if conditions is not None else []
 
     def clone(self) -> 'ConditionalJoinNode':
-        cloned_conditions = [Condition(c.left_attr, c.right_attr, c.operator) for c in self.conditions]
+        cloned_conditions = [Condition(c.left_operand, c.right_operand, c.operator) for c in self.conditions]
         cloned_children = None
         
         
@@ -66,7 +66,7 @@ class ConditionalJoinNode(JoinNode):
     def __str__(self) -> str:
         if not self.conditions:
             return f"JOIN [{self.algorithm.value}]"
-        conditions_str = ', '.join([f"{c.left_attr} {c.operator} {c.right_attr}" for c in self.conditions])
+        conditions_str = ', '.join([f"{c.left_operand} {c.operator} {c.right_operand}" for c in self.conditions])
         return f"JOIN [{self.algorithm.value}] ON {conditions_str}"
 
 

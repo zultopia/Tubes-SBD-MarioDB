@@ -118,90 +118,40 @@ class EquivalenceRules:
         new_node.set_child(current.child)
         return [new_node]
 
-    '''
-    RULE 4
-    assumption: a ConditionalJoinNode which has no condition is a cartesian product
-    kinda cheated on this one by making parent a parameter, sebaiknya ada atribut parent di base.py
-    '''
+    """
+    RULE 4: Combine join conditions into ConditionalJoinNode.
+    """
     @staticmethod
-    def combineJoinCondition(parent:QueryNode,node: QueryNode) -> None:
-        if(isinstance(node.children,QueryNode))and(isinstance(node,SelectionNode)):
-            if(isinstance(node.children,ConditionalJoinNode)):
-                combinedNode = node.children
-                newConditions = []
-                for condition in node.conditions:
-                    newCondition = Condition(
-                        condition.left_operand,
-                        condition.right_operand,
-                        condition.operator
-                    )
-                    newConditions.append(newCondition) 
-                combinedNode.conditions.extend(newConditions)
-            if parent:
-                parent.children = combinedNode
-            else: #if in root
-                node = None
-            
+    def combineJoinCondition(node: QueryNode) -> List[QueryNode]:
+        nodeClone = node.clone()
+        if not isinstance(nodeClone, SelectionNode) or not isinstance(nodeClone.child, ConditionalJoinNode):
+            return [nodeClone]
+        combinedNode = nodeClone.child
+        newConditions = [
+            Condition(
+                condition.left_operand,
+                condition.right_operand,
+                condition.operator
+            )
+            for condition in nodeClone.conditions
+        ]
+        combinedNode.conditions.extend(newConditions)
+        return [combinedNode]
 
     '''
     RULE 5
     switches the children of natural and theta joins
     '''
-    @staticmethod
-    def switchChildrenJoin(node: QueryNode) -> None:
-        if (isinstance(node,ConditionalJoinNode)or isinstance(node,NaturalJoinNode)):
-            node.switchChildren()
-    
-    """
-    RULE 6: Associativity of Natural and Theta Joins
-    - Natural joins are associative: R ⋈ S ⋈ T = (R ⋈ S) ⋈ T = R ⋈ (S ⋈ T)
-    - Theta joins are associative when conditions are preserved
-    
-    @credit: @Leaguemen
-    """ 
-    @staticmethod
-    def associativeJoins(node: QueryNode) -> List[QueryNode]:
-        if not isinstance(node, (NaturalJoinNode, ConditionalJoinNode)):
+    #revised
+    def switchChildrenJoin(node: QueryNode) -> List[QueryNode]:
+        if not isinstance(node, (ConditionalJoinNode, NaturalJoinNode)):
             return [node]
-        if not isinstance(node.children, Pair) or not node.children.first or not node.children.second:
-            return [node]
-
-        left_child = node.children.first
-        right_child = node.children.second
-        ret = []
-
-        def create_associative_node(parent: QueryNode, outer: QueryNode, inner: QueryNode, is_left: bool) -> QueryNode:
-            """Semua logic sebenearnya di sini"""
-            if hasattr(inner, 'children') and isinstance(inner.children, Pair):
-                grandchild_left = inner.children.first
-                grandchild_right = inner.children.second
-                # takes the class of input, assign the condition if it has the attribute else bakal jadi natural join
-                associated_inner = parent.__class__(inner.conditions if hasattr(inner, 'conditions') else None)
-                if is_left:
-                    associated_inner.set_children(grandchild_right, outer)
-                    new_node = parent.__class__(parent.conditions if hasattr(parent, 'conditions') else None)
-                    new_node.set_children(grandchild_left, associated_inner)
-                else:
-                    associated_inner.set_children(outer, grandchild_left)
-                    new_node = parent.__class__(parent.conditions if hasattr(parent, 'conditions') else None)
-                    new_node.set_children(associated_inner, grandchild_right)
-                return new_node
-            return parent  # Return original parent if no transformation applies
-
-        # Handle (left ⋈ middle) ⋈ right
-        if isinstance(left_child, (NaturalJoinNode, ConditionalJoinNode)):
-            new_node = create_associative_node(node, right_child, left_child, is_left=True)
-            ret.append(new_node)
-
-        # Handle left ⋈ (middle ⋈ right)
-        if isinstance(right_child, (NaturalJoinNode, ConditionalJoinNode)):
-            new_node = create_associative_node(node, left_child, right_child, is_left=False)
-            ret.append(new_node)
-
-        # Return the transformations or the original node if no transformation was applied
-        return ret or [node] # kalau ret itu kosong aka falsy, maka akan dikirim [node]
-    
-
+        nodeClone = node.clone()
+        temp = nodeClone.children.first
+        nodeClone.children.first = nodeClone.children.second
+        nodeClone.children.second = temp
+        return [nodeClone, node]
+        
 
 # test functions 
 
