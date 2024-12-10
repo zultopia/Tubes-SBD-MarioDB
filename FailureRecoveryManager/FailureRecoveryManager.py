@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from threading import Timer
+from threading import Lock, Timer
 
 from FailureRecoveryManager.ExecutionResult import ExecutionResult
 from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
@@ -15,6 +15,9 @@ class FailureRecoveryManager:
     def __init__(
         self, log_file="./FailureRecoveryManager/log.log", checkpoint_interval=60 * 5
     ):
+        # Create mutex lock for saving checkpoint operation
+        self._checkpoint_lock = Lock()
+
         # Maximum number of logs in memory (array length)
         self._max_size_log = 20
 
@@ -103,42 +106,57 @@ class FailureRecoveryManager:
 
     def _save_checkpoint(self) -> None:
         """
-        I.S. The write ahead log is initialized and not empty.
-        F.S. The write ahead log is saved in the log.log and saved.
+        I.S. The write ahead log and buffer is initialized.
+        F.S. 1. The write ahead log is saved in the log.log and and cleared
+             2. The buffer cache is cleared.
 
-        For saving the wa_logs in the log.log files in every 5 minutes interval OR when the in memory write ahead log reaches its limit.
+        For saving the wh_logs in the log.log files in every 5 minutes interval OR when the in memory write ahead log reaches its limit.
+        Buffer is cleared after the checkpoint is saved.
 
         Note that write_log method always adds the wa_log 1 element on each call and the limit is determined by the number of elements in the wa_log,
         As a result, it is impossible to have a write log that is not savable in the log.log file.
         """
 
-        print("[FRM]: Saving checkpoint..." + str(datetime.now()))
+        print(f"[FRM | {str(datetime.now())}]: Saving checkpoint...")
+
+        # MANAGE BUFFER
+        # Clear the buffer
+        self.clear_buffer()
+        print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
+
+        # MANAGE WH LOG
         # Check write ahead not empty
-        if len(self._wa_logs) == 0:
-            print("[FRM]: No logs to save.")
+        if len(self._wh_logs) == 0:
+            print(f"[FRM | {str(datetime.now())}]: No logs to save.")
             return
 
-        # Save the wa_log to the log.log file (append to the end of the file)
-        active_transactions = set()
-        with open(self._log_file, "a") as file:
-            for log in self._wa_logs:
-                status = log.split("|")[2]
-                id = log.split("|")[0]
+        # Save the wh_log to the log.log file (append to the end of the file)\
+        with self._checkpoint_lock:
+            try:
+                # After transaction is commited or aborted, it cannot do more operation.
+                # So it is guarenteed that the remaining transaction id in the set is active.
+                active_transactions = set()
+                with open(self._log_file, "a") as file:
+                    for log in self._wh_logs:
+                        status = log.split("|")[2]
+                        id = log.split("|")[0]
 
-                if status != "COMMIT" and status != "ABORT":
-                    active_transactions.add(id)
-                else:
-                    active_transactions.discard(id)
+                        if status != "COMMITTED" and status != "ABORTED":
+                            active_transactions.add(id)
+                        else:
+                            active_transactions.discard(id)
 
-                file.write(log + "\n")
+                        file.write(log + "\n")
 
-            file.write(
-                f"CHECKPOINT|{datetime.now().isoformat()}|{json.dumps(list(active_transactions))}\n"
-            )
+                    file.write(
+                        f"CHECKPOINT|{datetime.now().isoformat()}|{json.dumps(list(active_transactions))}\n"
+                    )
 
-        # Clear the wa_log
-        self._wa_logs.clear()
-        print("[FRM]: Checkpoint saved.")
+                # Clear the wh_log
+                self._wh_logs.clear()
+                print(f"[FRM | {str(datetime.now())}]: write ahead log saved.")
+            except Exception as e:
+                print(f"[FRM | {str(datetime.now())}]: Error saving checkpoint: {e}")
 
     def _start_checkpoint_cron_job(self) -> None:
         """
@@ -166,7 +184,7 @@ class FailureRecoveryManager:
 
         except Exception as e:
             print(f"Error in checkpoint cron job: {e}")
-    
+
     def _stop_checkpoint_cron_job(self):
         """
         Stop the checkpoint cron job.
@@ -174,8 +192,6 @@ class FailureRecoveryManager:
         if self.timer:
             self.timer.cancel()
             self.timer = None
-    
-
 
     def is_buffer_full(self, spare: int = 0) -> bool:
         """
@@ -197,10 +213,9 @@ class FailureRecoveryManager:
         """
 
     def _read_lines_from_end(self, file_path, chunk_size=1024):
-        
         """
         This method is private method to help FailureRecoverManager to read a file from the end of the file. This method is important to FailureRecoverManager when read log file
-        
+
         Args:
             file_path (string): path where file is located
             chunk_size (int, optional): Defaults to 1024.
@@ -208,7 +223,6 @@ class FailureRecoveryManager:
         Yields:
             string: one line text from file
         """
-         
 
         with open(file_path, "rb") as file:
             file.seek(0, 2)
@@ -430,5 +444,5 @@ class FailureRecoveryManager:
                 
 
             if len(active_transactions) == 0:
-                break;
+                break
         
