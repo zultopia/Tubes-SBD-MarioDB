@@ -3,5 +3,8 @@ from QueryProcessor.classes import QueryProcessor
 from QueryOptimizer.parse_tree import ParseTree
 
 QueryProcessor = QueryProcessor()
-query_string = input('Please enter your query: ')
-QueryProcessor.execute_query(query_string)
+while(True) :
+    query_string = input('Please enter your query: ')
+    if (query_string == "\\q") :
+        break
+    QueryProcessor.execute_query(query_string)
