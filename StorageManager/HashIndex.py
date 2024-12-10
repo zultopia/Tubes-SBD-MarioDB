@@ -81,20 +81,20 @@ class Hash(object):
     @staticmethod
     def _write_hash_block(table: str, column: str, hash_value: int, new_block_id: int):
         # assumes entries fit in one block
-        block = Hash._load_hash_block(table, column, hash_value, 1)
+        block = Hash._load_hash_block(table, column, hash_value, 0)
         if {'id': new_block_id} in block:
             return
         
         block.append({'id': new_block_id})
         # assumes entries fit in one block
-        Hash._save_hash_block(table, column, hash_value, 1, block)
+        Hash._save_hash_block(table, column, hash_value, 0, block)
         print("HASH SAVED")
         return
 
     @staticmethod
     def _get_rows(table: str, column: str, value):
         results = []
-        block_id = 1
+        block_id = 0
         hash_value = Hash._hash_function(value)
         # assumes entries fit in one block
         while(os.path.exists(Hash._get_hash_block_file(table, column, hash_value, block_id))):
