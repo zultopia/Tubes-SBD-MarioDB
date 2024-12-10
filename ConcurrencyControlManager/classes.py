@@ -1,7 +1,8 @@
-# import class Row
 from datetime import datetime
 from typing import Optional, List  # kalo gaboleh dihapus aja
 import time
+
+from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
 
 class PrimaryKey:
     def __init__(self, *keys):
@@ -27,10 +28,15 @@ class PrimaryKey:
 class IDataItem:
     def get_parent(self):
         pass
+    
+class Database(IDataItem):
+    def get_parent(self):
+        return None
 
-class Table:
-    def __init__(self, table: str):
+class Table(IDataItem):
+    def __init__(self, database: Database, table: str):
         self.table = table
+        self.database = database
     
     def __eq__(self, other):
         return self.table == other.table
@@ -38,10 +44,13 @@ class Table:
     def __ne__(self, other):
         return not self.__eq__(other)
     
+    def get_database(self):
+        return self.database
+    
     def get_parent(self):
-        return None
+        return self.get_database()
 
-class Row:
+class Row(IDataItem):
     def __init__(self, table: Table, pkey: PrimaryKey, map: dict):
         self.table = table
         self.pkey = pkey
@@ -67,6 +76,39 @@ class Row:
     
     def get_parent(self):
         return self.get_table()
+
+class Cell(IDataItem):
+    def __init__(self, row: Row, pkey: PrimaryKey, attribute: str, value: any):
+        self.row = row
+        self.pkey = pkey
+        self.attribute = attribute
+        self.value = value
+    
+    def __eq__(self, other):
+        return (self.pkey == other.pkey) and (self.attribute == other.attribute) and (self.table == other.table)
+
+    def get_row(self):
+        return self.row
+    
+    def get_table(self):
+        return self.row.get_table()
+
+    def get_parent(self):
+        return self.get_row()
+
+class DataItem:
+    def __init__(self, level: str, data_item: Database | Table | Row | Cell):
+        self.level = level
+        self.data_item = data_item
+        
+    def __eq__(self, other):
+        return (self.level == other.level) and (self.data_item == other.data_item)
+    
+    def __ne__(self, other):
+        return not self.__eq__(other)
+    
+    def get_parent(self):
+        return self.data_item.get_parent()
 
 class Action:
     def __init__(self, action : str):
@@ -94,42 +136,10 @@ class Lock:
         self.row = row
         
     def __str__(self):
-        return f"=============== Lock ===============\ntype: {self.type}\ntransaction_id: {self.transaction_id}\nrow:\n{self.row}====================================\n"
+        return f"=============== Lock ===============\ntype: {self.type}\ntransaction_id: {self.transaction_id}\nrow:\n{self.row}====================================\n"    
 
-class Cell(IDataItem):
-    def __init__(self, row: Row, pkey: PrimaryKey, attribute: str, value: any):
-        self.row = row
-        self.pkey = pkey
-        self.attribute = attribute
-        self.value = value
-    
-    def __eq__(self, other):
-        return (self.pkey == other.pkey) and (self.attribute == other.attribute) and (self.table == other.table)
 
-    def get_row(self):
-        return self.row
-    
-    def get_table(self):
-        return self.row.get_table()
-
-    def get_parent(self):
-        return self.get_row()
-    
-class DataItem:
-    def __init__(self, level: str, data_item: Table | Row | Cell):
-        self.level = level
-        self.data_item = data_item
-        
-    def __eq__(self, other):
-        return (self.level == other.level) and (self.data_item == other.data_item)
-    
-    def __ne__(self, other):
-        return not self.__eq__(other)
-    
-    def get_parent(self):
-        return self.data_item.get_parent()
-
-class Transaction: 
+class TransactionAction: 
     def __init__(self, tid: int, action: Action, level: int, data_item: DataItem, old_data_item: DataItem = None): 
         self.id = tid 
         self.action = action
@@ -195,125 +205,20 @@ class WaitForGraph:
 
     def __str__(self):
         return f"{self.waitfor}"
-
-class GranularityNode:
-    # Simpul berupa data item
-    node: DataItem
-    
-    # Daftar lock yg dimiliki data item, format: set[transaction_id]
-    lock_IS: set[str]
-    lock_IX: set[str]
-    lock_S: set[str]
-    lock_SIX: str   # Hanya mungkin dimiliki satu transaction_id
-    lock_X: str     # Hanya mungkin dimiliki satu transaction_id
-    
-    # Parent dan children dari data item
-    parent: Optional['GranularityNode']
-    children: List['GranularityNode']
-    
-    
-    def __init__(self, data_item: DataItem):
-        self.node = data_item
-        self.lock_IS = set()
-        self.lock_IX = set()
-        self.lock_S = set()
-        
-    def validate_lock(self, data_item: DataItem, transaction_id: int, lock_type: str):
-        conflict_matrix = {
-            "IS": {"X"},
-            "IX": {"S", "SIX", "X"},
-            "S": {"IX", "SIX", "X"},
-            "SIX": {"IX", "S", "SIX", "X"},
-            "X": {"IS", "IX", "S", "SIX", "X"}
-        }
-        
-        valid_parent_lock_matrix = {
-            "IS": {"IX", "IS"},
-            "IX": {"IX", "SIX"},
-            "S": {"IX", "IS"},
-            "SIX": {"IX", "SIX"},
-            "X": {"IX", "SIX"}
-        }
-        
-        # Cek apakah aman (ga konflik) di node itu sendiri
-        for held_lock, holders in [
-            ("IS", self.lock_IS),
-            ("IX", self.lock_IX),
-            ("S", self.lock_S),
-            ("SIX", set(self.lock_SIX)),
-            ("X", set(self.lock_X))
-        ]:
-            if holders and lock_type in conflict_matrix[held_lock]:
-                return False, f"Conflict: The requested data item holds {held_lock} lock by another transaction."        
-        
-        
-        parent = self.parent       
-        
-        # Cek apakah aman (ga konflik) di semua parent2 nya sampe root
-        while parent:
-            parent_locks = {
-                "IS": parent.lock_IS,
-                "IX": parent.lock_IX,
-                "S": parent.lock_S,
-                "SIX": parent.lock_SIX,
-                "X": parent.lock_X
-            }
-    
-            valid = False
-            for valid_parent_lock in valid_parent_lock_matrix[lock_type]:
-                if transaction_id in parent_locks[valid_parent_lock]:
-                    valid = True
-            
-            if not valid:
-                return False, f"Conflict: Transaction {transaction_id} does not currently hold the valid parent lock at the {parent.node.level} level" 
-            
-            parent = parent.parent
-
-
-        self.lock_IS.remove(transaction_id)
-        self.lock_IX.remove(transaction_id)
-        self.lock_S.remove(transaction_id)
-        self.lock_SIX = None if self.lock_SIX == transaction_id else self.lock_SIX
-        self.lock_X = None if self.lock_X == transaction_id else self.lock_X
-        
-        locks = {
-            'IS': self.lock_IS,
-            'IX': self.lock_IX,
-            'S': self.lock_S,
-            'SIX': self.lock_SIX,
-            'X': self.lock_X
-        }
-        
-        if lock_type != 'SIX' and lock_type != 'X':
-            locks[lock_type].add(transaction_id)
-        else:
-            locks[lock_type] = transaction_id
-        
-        return Response(success=True, transaction_id=transaction_id, message=f"Lock-{lock_type} granted.")
-            
-class GranularityTree:
-    root: GranularityNode
-    
-    def __init__(self):
-        self.root = None            
-
-
-    # TODO: implementasi
-    def add_node(self, data_item: DataItem):
-        pass
-
             
 class ConcurrencyControlManager:
     def __init__(self, algorithm: str):
         self.algorithm = algorithm
         self.lock_S = {} # Map DataItem -> Set[transaction_id]
         self.lock_X = {} # Map DataItem -> transaction_id
-        self.lock_IX = {} # Map DataItem -> transaction_id
-        self.lock_IS = {} # Map DataItem -> transaction_id
+        self.lock_IX = {} # Map DataItem -> Set[transaction_id]
+        self.lock_IS = {} # Map DataItem -> Set[transaction_id]
         self.lock_SIX = {} # Map DataItem -> transaction_id
         self.wait_for_graph = WaitForGraph()
-        self.transaction_queue = {} # Map transaction_id -> List[Row]
-        self.waiting_list = [Transaction]
+        self.transaction_queue = set() # Set transaction_id
+        self.transaction_dataitem_map = {} # Map transaction_id -> List[DataItem]
+        self.waiting_list = [TransactionAction]
+        self.failure_recovery = FailureRecoveryManager()
     
     def __str__(self):
         return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"
@@ -325,16 +230,18 @@ class ConcurrencyControlManager:
     def begin_transaction(self) -> int:
         # will return transaction_id: int
         transaction_id = self.__generate_id()
-        self.transaction_queue[transaction_id] = []
+        self.transaction_dataitem_map[transaction_id] = []
         return transaction_id
 
-    def log_object(self, object: Row, transaction_id: int):
-        # implement lock on an object
-        # assign timestamp on the object
-        pass
+    def log_object(self, transactionAction: TransactionAction):
+        self.failure_recovery.write_log(transactionAction)
     
     # check if lock is valid to current lock and its ancestor
-    def check_lock_conflict(self, current, lock_type):
+    def apply_lock(self, transaction_action: TransactionAction):
+        current = transaction_action.data_item
+        lock_type = transaction_action.action
+        transaction_id = transaction_action.id
+        
         conflict_matrix = {
             "IS": {"X"},
             "IX": {"S", "SIX", "X"},
@@ -357,9 +264,14 @@ class ConcurrencyControlManager:
             validate_stack.append(current)
             current = parent
 
-        # Validate against the conflict matrix
+        # Validate against the conflict matrix            
         while validate_stack:
             current = validate_stack.pop()
+            abort = False
+            failed = False
+            
+            conflict_list = []
+            
             for held_lock, holders in [
                 ("IS", self.lock_IS.get(current, set())),
                 ("IX", self.lock_IX.get(current, set())),
@@ -367,73 +279,71 @@ class ConcurrencyControlManager:
                 ("SIX", self.lock_SIX.get(current, set())),
                 ("X", self.lock_X.get(current, set())),
             ]:
+                holders.remove(transaction_id)
                 if holders and lock_type in conflict_matrix[held_lock]:
-                    return False, f"Conflict: Current {current} holds {held_lock} lock by transaction(s) {holders}."
-
-        return True, None
+                    failed = True
+                    conflict_list.append(holders)
             
-    # Apply lock to a data item and update the ancestor
-    def apply_lock_with_hierarchy(self, data_item: DataItem, transaction_id: int, lock_type: str):
-        current = data_item
-        success = True
-        message = None
-
-        # Validate lock
-        allowed, message = self.check_lock_conflict(current, lock_type)
-        if not allowed:
-            return Response(success=False, transaction_id=transaction_id, message=message)
-
-        # Apply lock to parent
-        current = data_item.data_item
-        while current:
-            parent = None
-            if isinstance(current, Cell):
-                parent = current.get_row()
-            elif isinstance(current, Row):
-                parent = current.get_table()
-
-            # Update parent lock 
-            if parent:
-                if lock_type == "X":
-                    if parent in self.lock_IS and transaction_id in self.lock_IS[parent]:
-                        # Upgrade IS to SIX 
-                        self.lock_IS[parent].remove(transaction_id)
-                        if not self.lock_IS[parent]:
-                            del self.lock_IS[parent]
-                        self.lock_SIX.setdefault(parent, set()).add(transaction_id)
-                    elif parent not in self.lock_SIX:  
-                        self.lock_IX.setdefault(parent, set()).add(transaction_id)
-                elif lock_type == "S":
+            if failed:
+                for held_lock, holders in conflict_list:
+                    for other_transaction_id in holders:
+                        if other_transaction_id > transaction_id:
+                            abort = True
+                
+                if not abort:
+                    self.transaction_queue.append(transaction_id)
+                    self.waiting_list.append(transaction_action)
+                
+                return False, abort, f"Transaction {transaction_id} failed to get lock-{lock_type} on {transaction_action.data_item}"
+            
+            
+            if lock_type == "S":
+                if len(validate_stack) > 0:
                     self.lock_IS.setdefault(parent, set()).add(transaction_id)
-
-            current = parent
-
-        # apply lock to target
-        if lock_type == "S":
-            self.lock_S.setdefault(data_item, set()).add(transaction_id)
-        elif lock_type == "X":
-            self.lock_X[data_item] = transaction_id
-
-        return Response(success=True, transaction_id=transaction_id, message=f"Lock-{lock_type} granted.")
+                else:
+                    self.lock_S.setdefault(parent, set()).add(transaction_id)
+                    
+            else:
+                if len(validate_stack) > 0:
+                    self.lock_IX.setdefault(parent, set()).add(transaction_id)
+                elif lock_type == "X":
+                    self.lock_X.setdefault(parent, set()).add(transaction_id)
+                    self.log_object(transaction_action)
+                else:
+                    self.lock_SIX.setdefault(parent, set()).add(transaction_id)
+                    
+            self.transaction_dataitem_map[transaction_id].append({transaction_action.data_item: lock_type})
+        
+        return True, None, f"Transaction {transaction_id} successfully get lock-{lock_type} on {transaction_action.data_item}"
     
     #  Validate and apply lock
-    def validate_object(self, object: DataItem, transaction_id: int, action: str) -> Response:
+    def validate_object(self, transactionAction: TransactionAction) -> Response:
+        transaction_id = transactionAction.id
+        action = transactionAction.action
+        
+        if transactionAction.id in self.transaction_queue:
+            self.waiting_list.append(transactionAction)
+            return Response(False, transactionAction.id, f"Transaction {transaction_id} must wait for {transactionAction.action}")
+        
         action = action.lower()
-        if action not in ["read", "write"]:
-            raise ValueError(f"Invalid action type: {action}. Allowed actions are 'read' or 'write'.")
-        lock_type = 'S' if action == "read" else 'X'
+        if action not in ["read", "write", "six", "commit", "abort"]:
+            raise ValueError(f"Invalid action type: {action}. Allowed actions are 'read', 'write', 'six', 'commit', 'abort'.")
+        
+        if action in ["commit", "abort"]:
+            self.end_transaction(transactionAction.id, action)
+            return Response(True, transactionAction.id, f"Transaction {transaction_id} succesfully {action}ed")
 
-        data_item = object.data_item
-
+        lock_type = 'S' if action == "read" else 'X' if action == "write" else "SIX"
+        
         # Apply lock with hierarchical checks
-        response = self.apply_lock_with_hierarchy(data_item, transaction_id, lock_type)
-        if not response.success:
-            print(f"Failed to grant Lock-{lock_type} on {data_item} for transaction {transaction_id}: {response.message}")
-            return response
+        allowed, abort, message = self.apply_lock(transactionAction)
+        if not allowed:
+            print(f"Failed to grant Lock-{lock_type} on {transactionAction.data_item} for transaction {transaction_id}: {message}")
+            return Response(allowed, transaction_id, message)
 
         # If successful, return response
-        print(f"Lock-{lock_type} granted on {data_item} for transaction {transaction_id}")
-        return response
+        print(f"Lock-{lock_type} granted on {transactionAction.data_item} for transaction {transaction_id}")
+        return Response(allowed, transaction_id, message)
 
     # IF: transaction_id can be granted lock with type lock_type to data_item  
     # FS: transaction_id granted lock with type lock_type to  data_item
@@ -443,42 +353,45 @@ class ConcurrencyControlManager:
         else: # lock_type = "S"
             self.lock_S[data_item] = transaction_id   
     
-    def end_transaction(self, transaction_id: int):
+    def end_transaction(self, transaction_id: int, status: str):
         # Flush objects of a particular transaction after it has successfully committed/aborted
         # Terminates the transaction
-        for row in self.transaction_queue[transaction_id]:
-            if row in self.lock_X and self.lock_X[row] == transaction_id:
-                del self.lock_X[row]
-            
-            if row in self.lock_S and transaction_id in self.lock_S[row]:
-                self.lock_S[row].remove(row)
-                if self.lock_S[row] == []:
-                    del self.lock_S[row]
+        for data_item, lock_type in self.transaction_dataitem_map[transaction_id]: 
+            if (lock_type == "X"): 
+                self.lock_X[data_item].remove(transaction_id)
+            if (lock_type == "S"): 
+                self.lock_S[data_item].remove(transaction_id)
+            if (lock_type == "IX"): 
+                self.lock_IX[data_item].remove(transaction_id)
+            if (lock_type == "IS"): 
+                self.lock_IS[data_item].remove(transaction_id)
+            if (lock_type == "SIX"): 
+                self.lock_SIX[data_item].remove(transaction_id)
         
-        del self.transaction_queue[transaction_id]
+        self.transaction_queue.remove(transaction_id)
         self.wait_for_graph.deleteNode(transaction_id)
+        
+        t_action = TransactionAction(transaction_id, status, None, None, None)
+        self.log_object(t_action)
         
     def process_waiting_list(self): 
         need_check = True
+
         while (need_check): 
+            check_waiting = False
+            for tid in self.transaction_queue: 
+                if (self.wait_for_graph.waiting(tid)) :
+                    self.transaction_queue.remove(tid)
+                    check_waiting = True
+
             need_check = False
-            for transaction in self.waiting_list: 
-                if self.wait_for_graph.waiting(transaction.id): 
-                    break
+            if (check_waiting):
+                for t_process in self.waiting_list: 
+                    if t_process.id not in self.transaction_queue : 
+                        self.validate_object(t_process)
+                        need_check = True
                 
-                # TODO: adjust lock type 
-                lock_type = ""
-                if (transaction.action == "WRITE"): 
-                    lock_type = "X"
-                else : 
-                    lock_type = "S"
-
-                self.lock(transaction.data_item, transaction.id, lock_type)
-                # TODO: determine when to commit. This line might be the time that 
-                # the transaction committed. Hence, the node in waitgraph might be removed    
-            
-                self.waiting_list.remove(transaction)
-
+                    self.waiting_list.remove(t_process)
             
         
 # ccm = ConcurrencyControlManager(algorithm="Test")
