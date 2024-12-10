@@ -13,29 +13,31 @@ class FailureRecoveryManager:
     """
 
     def __init__(
-        self, log_file="./FailureRecoveryManager/log.log", checkpoint_interval=60 * 5
+        self, log_file="./FailureRecoveryManager/log.log", checkpoint_interval=5
     ):
         # Create mutex lock for saving checkpoint operation
         self._checkpoint_lock = Lock()
 
         # Maximum number of logs in memory (array length)
         self._max_size_log = 20
-
         # Log file name
         self._log_file = log_file
+        # Write-ahead logs (in-memory)
+        self._wa_logs = [
+            '102|WRITE|employees|None|[{"id": 2, "name": "Bob", "salary": 4000}]',
+            '102|WRITE|employees|[{"id": 2, "name": "Bob", "salary": 4000}]|None',
+            "102|ABORT|None",
+            '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]',
+        ]
+
+        # Maximum number of Exe buffer (array length)
+        self._max_size_buffer = 20
+        # Buffer (in-memory)
+        self._buffer = []
 
         # Write ahead checkpoint interval (in seconds)
         self._checkpoint_interval = checkpoint_interval
         self._start_checkpoint_cron_job()
-
-        # Write-ahead logs (in-memory)
-        self._wa_logs = ["102|WRITE|employees|None|[{\"id\": 2, \"name\": \"Bob\", \"salary\": 4000}]","102|WRITE|employees|[{\"id\": 2, \"name\": \"Bob\", \"salary\": 4000}]|None","102|ABORT|None","103|WRITE|employees|[{\"id\": 1, \"name\": \"Alice\", \"salary\": 5000}]|[{\"id\": 1, \"name\": \"Alice\", \"salary\": 6000}]"]
-
-        # Maximum number of Exe buffer (array length)
-        self._max_size_buffer = 20
-
-        # Buffer (in-memory)
-        self._buffer = []
 
     def get_buffer(self):
         return self._buffer()
@@ -59,24 +61,21 @@ class FailureRecoveryManager:
         # Create log entry
         def process_rows(rows):
             return ", ".join([str(item) for item in rows])
+
         log_entry = None
 
         if execution_result.status == "WRITE":
-            
             log_entry = (
                 f"{execution_result.transaction_id}|"
                 f"{execution_result.status}|"
                 f"{execution_result.table}|"
                 f"{process_rows(execution_result.data_before.data) if execution_result.data_before.data else None}|"
                 f"{process_rows(execution_result.data_after.data) if execution_result.data_after.data else None}"
-            )  
+            )
         else:
             log_entry = (
-                f"{execution_result.transaction_id}|"
-                f"{execution_result.status}"
+                f"{execution_result.transaction_id}|" f"{execution_result.status}"
             )
-            
-        
 
         # Must call save checkpoint if the write-ahead log is full
         if self.is_wa_log_full():
@@ -84,11 +83,10 @@ class FailureRecoveryManager:
 
         # Append entry to self._wa_logs
         self._wa_logs.append(log_entry)
-        
+
         # Must write wal to stable storage if transaction commited to ensure consistency
         if execution_result.status == "COMMIT":
             self._save_checkpoint()
-            
 
     def is_wa_log_full(self, spare: int = 0) -> bool:
         """
@@ -126,7 +124,7 @@ class FailureRecoveryManager:
 
         # MANAGE WH LOG
         # Check write ahead not empty
-        if len(self._wh_logs) == 0:
+        if len(self._wa_logs) == 0:
             print(f"[FRM | {str(datetime.now())}]: No logs to save.")
             return
 
@@ -137,7 +135,7 @@ class FailureRecoveryManager:
                 # So it is guarenteed that the remaining transaction id in the set is active.
                 active_transactions = set()
                 with open(self._log_file, "a") as file:
-                    for log in self._wh_logs:
+                    for log in self._wa_logs:
                         status = log.split("|")[2]
                         id = log.split("|")[0]
 
@@ -153,7 +151,7 @@ class FailureRecoveryManager:
                     )
 
                 # Clear the wh_log
-                self._wh_logs.clear()
+                self._wa_logs.clear()
                 print(f"[FRM | {str(datetime.now())}]: write ahead log saved.")
             except Exception as e:
                 print(f"[FRM | {str(datetime.now())}]: Error saving checkpoint: {e}")
@@ -248,20 +246,20 @@ class FailureRecoveryManager:
 
     def recover(self, criteria: RecoverCriteria = None):
         """
-        
+
 
         Args:
             criteria (RecoverCriteria, optional): criteria to choose what transactio need to be recover. Criteria is transaction_id. Defaults to None.
         """
         recovered_transactions = []
-        
-        #Hanya menggunakan transaction id saja sekarang
+
+        # Hanya menggunakan transaction id saja sekarang
         if criteria and criteria.transaction_id:
             is_start_found = False
-            #baca wa_logs dulu
+            # baca wa_logs dulu
             for log_line in self._wa_logs:
                 log_parts = log_line.split("|")
-                
+
                 if log_parts[0].isdigit():
                     transaction_id = int(log_parts[0])
 
@@ -307,14 +305,13 @@ class FailureRecoveryManager:
             except json.JSONDecodeError as e:
                 print(f"Error decoding JSON: {e}")
                 exit()
-                
+
             # send before and after data to storage manager to process
             print("table:", table)
-            print("send before to storage manager: ",  before_states)
-            print("send after to storage manager: ",  after_states)
+            print("send before to storage manager: ", before_states)
+            print("send after to storage manager: ", after_states)
 
-            
-            # Write recovery log    
+            # Write recovery log
             exec_result = ExecutionResult(
                 transaction_id,
                 Rows(None),
@@ -324,18 +321,18 @@ class FailureRecoveryManager:
             )
             print("write log: ", exec_result.__dict__)
             self.write_log(exec_result)
-        
+
         # Close rollback process
         abort_result = ExecutionResult(
-                criteria.transaction_id,
-                Rows(None),
-                Rows(None),
-                "ABORT",
-                table,
-            )
+            criteria.transaction_id,
+            Rows(None),
+            Rows(None),
+            "ABORT",
+            table,
+        )
         print("write log: ", exec_result.__dict__)
         self.write_log(abort_result)
-        
+
     def recover_system_crash(self):
         recovered_transactions = []
         active_transactions = set()
@@ -375,13 +372,12 @@ class FailureRecoveryManager:
                     exit()
                 # send after data to storage manager to redo process
                 print("table:", table)
-                print("send after data to storage manager: ",  after_states)
+                print("send after data to storage manager: ", after_states)
 
         # undo (rollback)
         for log_line in self._read_lines_from_end(self._log_file):
-            
             log_parts = log_line.split("|")
-            
+
             if log_parts[0] == "CHECKPOINT":
                 active_transactions = set(json.loads(log_parts[1]))
                 continue
@@ -391,22 +387,22 @@ class FailureRecoveryManager:
                 table = log_parts[2]
                 if transaction_id not in active_transactions:
                     continue
-                
+
                 if status == "START":
                     active_transactions.remove(transaction_id)
                     # Close rollback process
                     abort_result = ExecutionResult(
-                            transaction_id,
-                            Rows(None),
-                            Rows(None),
-                            "ABORT",
-                            table,
-                        )
+                        transaction_id,
+                        Rows(None),
+                        Rows(None),
+                        "ABORT",
+                        table,
+                    )
                     print("write log: ", exec_result.__dict__)
                     self.write_log(abort_result)
                     continue
-                
-                #rollback processs
+
+                # rollback processs
                 before_states = None
                 after_states = None
                 table = log_parts[2]
@@ -427,11 +423,10 @@ class FailureRecoveryManager:
 
                 # send before and after data to storage manager to process
                 print("table:", table)
-                print("send before to storage manager: ",  before_states)
-                print("send after to storage manager: ",  after_states)
+                print("send before to storage manager: ", before_states)
+                print("send after to storage manager: ", after_states)
 
-
-                # Write recovery log    
+                # Write recovery log
                 exec_result = ExecutionResult(
                     transaction_id,
                     Rows(None),
@@ -441,8 +436,6 @@ class FailureRecoveryManager:
                 )
                 print("write log: ", exec_result.__dict__)
                 self.write_log(exec_result)
-                
 
             if len(active_transactions) == 0:
                 break
-        
