@@ -1,0 +1,1 @@
+SELECT name, dept_name, course_id, semester, year FROM student JOIN takes ON id = id WHERE dept_name = 'Comp. Sci' AND semester = 'Fall' AND year = 2021;

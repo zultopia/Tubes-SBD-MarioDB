@@ -1,4 +1,5 @@
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, List
+from data import QOData
 
 T = TypeVar('T')
 U = TypeVar('U')
@@ -30,3 +31,4 @@ class Pair(Generic[T, U], Prototype):
             second = second.clone()
         
         return Pair(first, second)
+

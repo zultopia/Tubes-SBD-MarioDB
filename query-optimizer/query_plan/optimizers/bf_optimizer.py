@@ -4,12 +4,13 @@ from generator import generate_possible_plans
 from equivalence_rules import EquivalenceRules
 import random
 
-def get_cost(query: 'QueryPlan') -> int:
+# Only mock
+def get_cost(query: 'QueryPlan') -> float:
     return random.randint(0, 100)
 
 class BFOptimizer(QueryPlanOptimizer):
     def optimize(self, query: 'QueryPlan') -> 'QueryPlan':
-        best_plan = query
+        best_plan = query.clone()
         possible_plans = generate_possible_plans(query, [
             EquivalenceRules.deconstruct_conjunction, # Rule 1
             EquivalenceRules.commute_selections, # Rule 2

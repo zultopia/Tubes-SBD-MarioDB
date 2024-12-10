@@ -10,9 +10,9 @@ def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules]) -
 
 
     initial_plan = query.clone()
-    plans = {initial_plan}  # Use a set to store unique plans based on __hash__ and __eq__
+    plans = { initial_plan }
 
-    queue = deque([initial_plan])  # Initialize the queue with the cloned plan
+    queue = deque([initial_plan])
 
     while queue:
         current_plan = queue.popleft()
@@ -29,6 +29,8 @@ def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules]) -
 
             for rule in rules:
                 transformed_nodes = rule(current_node)
+                print(f" - Rule {rule.__name__} applied to node id: {current_node.id}")
+                
 
                 # Check if a transformation occurred
                 if len(transformed_nodes) > 1 or (len(transformed_nodes) == 1 and transformed_nodes[0].id != current_node.id):

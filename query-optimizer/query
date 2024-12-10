@@ -1,1 +1,0 @@
-select * from b natural join c natural join d;

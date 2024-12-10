@@ -137,18 +137,33 @@ MOCK_DATA = {
 
 class QOData:
     '''
-    Still a mock class for now
+    Singleton class for managing query optimization data
     '''
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(QOData, cls).__new__(cls)
+            cls._instance.data = MOCK_DATA  # Initialize the data attribute
+        return cls._instance
 
-    def __init__(self) -> None:
-        self.data = MOCK_DATA
+    def __init__(self):
+        """
+        Initialize method is empty since initialization is handled in __new__
+        This prevents re-initialization when getting the instance multiple times
+        """
+        pass
+    
+    @classmethod
+    def get_instance(cls) -> 'QOData':
+        """Get the singleton instance of QOData"""
+        return cls()
 
     def get_n(self, relation: str) -> int:
         """Get the number of tuples in the relation."""
-        ret =  self.data.get(relation, {}).get("n", 0)
+        ret = self.data.get(relation, {}).get("n", 0)
         if (not ret):
             raise ValueError("Relation not found")
-    
         return ret
 
     def get_index(self, attribute: str, relation: str) -> Union[Literal["hash", "btree"], None]:
@@ -165,7 +180,6 @@ class QOData:
         if (not ret):
             raise ValueError("Relation or attribute not found")
         return ret
-
     
     def get_b(self, relation: str) -> int:
         """Get the number of blocks in the relation."""
@@ -187,3 +201,19 @@ class QOData:
         if (not ret):
             raise ValueError("Relation not found")
         return ret
+
+    def get_all_relations(self):
+        """Get all relations in the data."""
+        return list(self.data.keys())
+
+    def get_all_attributes(self, relation: str):
+        """Get all attributes in the relation."""
+        return list(self.data.get(relation, {}).get("attributes", {}).keys())
+    
+    def has_relation(self, relation: str) -> bool:
+        """Check if the relation is in the data."""
+        return relation in self.data
+    
+    def has_attribute(self, attribute: str, relation: str) -> bool:
+        """Check if the attribute is in the relation."""
+        return attribute in self.get_all_attributes(relation)

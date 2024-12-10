@@ -51,9 +51,12 @@ if (current == 'gana'):
     print(tree)
     query_plan = from_parse_tree(tree)
     query_plan.print()
-    print(tree)
 
-    plans = generate_possible_plans(query_plan, [EquivalenceRules.distributeSelection])
+    plans = generate_possible_plans(query_plan, [
+        EquivalenceRules.push_projections_into_join,
+        EquivalenceRules.deconstruct_conjunction
+                                                 
+                                                 ])
     print("\n\n\nGenerated plans:" + str(len(plans)))
     LIMIT_5 = min(len(plans), 32)
     for plan in plans[:LIMIT_5]:

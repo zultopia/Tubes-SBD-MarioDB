@@ -7,7 +7,6 @@ from .nodes.table_node import TableNode
 from .nodes.join_nodes import JoinNode, ConditionalJoinNode, NaturalJoinNode
 from .nodes.sorting_node import SortingNode
 from utils import Pair, Prototype
-from copy import deepcopy
 
 
 class QueryPlan(Prototype):
@@ -82,4 +81,4 @@ class QueryPlan(Prototype):
         return self.serialize() == other.serialize()
 
     def __hash__(self):
-        return hash(self.serialize())  # Hash based on unique serialization
+        return hash(self.serialize()) 
