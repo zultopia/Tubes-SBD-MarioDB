@@ -8,8 +8,9 @@ from collections import deque
 
 def generate_possible_plans(query: 'QueryPlan') -> List['QueryPlan']:
     # Include only the deconstruct_conjunction rule
-    rules = [EquivalenceRules.deconstruct_conjunction, 
-            #  EquivalenceRules.commute_selections
+    rules = [
+        EquivalenceRules.deconstruct_conjunction, 
+             EquivalenceRules.commute_selections
              ]
 
     initial_plan = query.clone()
@@ -61,9 +62,6 @@ def generate_possible_plans(query: 'QueryPlan') -> List['QueryPlan']:
                     transformed_this_node = True
                     break
 
-            if transformed_this_node:
-                # Node changed, don't process its children now
-                continue
 
             # Add children to the nodes_to_process queue
             if isinstance(current_node, ProjectNode) and current_node.child:

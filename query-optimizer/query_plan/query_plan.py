@@ -2,7 +2,7 @@
 from typing import Optional
 from .base import QueryNode
 from .nodes.project_node import ProjectNode
-from .nodes.selection_node import SelectionNode, SelectionCondition, UnionSelectionNode
+from .nodes.selection_node import SelectionNode, UnionSelectionNode
 from .nodes.table_node import TableNode
 from .nodes.join_nodes import JoinNode, ConditionalJoinNode, NaturalJoinNode
 from .nodes.sorting_node import SortingNode

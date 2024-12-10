@@ -2,14 +2,15 @@ from typing import List, Dict, Optional
 from utils import Pair
 from query_plan.query_plan import QueryPlan
 from query_plan.base import QueryNode
-from query_plan.nodes.join_nodes import JoinCondition, ConditionalJoinNode, NaturalJoinNode
+from query_plan.nodes.join_nodes import ConditionalJoinNode, NaturalJoinNode
 from query_plan.nodes.sorting_node import SortingNode
 from query_plan.nodes.project_node import ProjectNode
 from query_plan.nodes.table_node import TableNode
-from query_plan.nodes.selection_node import SelectionNode, SelectionCondition, UnionSelectionNode
-from query_plan.enums import JoinAlgorithm, SelectionOperation
+from query_plan.nodes.selection_node import SelectionNode, UnionSelectionNode
+from query_plan.enums import JoinAlgorithm, Operator
 from parse_tree import ParseTree, Node
 from lexer import Token 
+from query_plan.shared import Condition
 
 
 def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
@@ -130,15 +131,15 @@ def process_table_term(table_term_tree: ParseTree) -> QueryNode:
 
 def process_conditional_join(join_tree: ParseTree) -> ConditionalJoinNode:
     """Process conditional join and create ConditionalJoinNode."""
-    conditions: List[JoinCondition] = []
+    conditions: List[Condition] = []
     condition_tree = join_tree.childs[3]  
     
-    def process_condition_term(cond_term: ParseTree) -> Optional[JoinCondition]:
+    def process_condition_term(cond_term: ParseTree) -> Optional[Condition]:
         if len(cond_term.childs) >= 3:
             left = extract_field_value(cond_term.childs[0])
             operator = cond_term.childs[1].childs[0].root.value
             right = extract_field_value(cond_term.childs[2])
-            return JoinCondition(left, right, operator)  
+            return Condition(left, right, operator)  
         return None
 
     def extract_field_value(field_tree: ParseTree) -> str:
@@ -172,25 +173,25 @@ def process_conditional_join(join_tree: ParseTree) -> ConditionalJoinNode:
 
 def process_where_clause(condition_tree: ParseTree) -> QueryNode:
     """Process WHERE clause and create either SelectionNode or UnionSelectionNode."""
-    def convert_operator(op_token: Token) -> SelectionOperation:
-        """Convert Token to SelectionOperation."""
+    def convert_operator(op_token: Token) -> Operator:
+        """Convert Token to Operator."""
         token_to_op = {
-            Token.GREATER: SelectionOperation.GREATER,
-            Token.GREATER_EQ: SelectionOperation.GREATER_EQ,
-            Token.LESS: SelectionOperation.LESS,
-            Token.LESS_EQ: SelectionOperation.LESS_EQ,
-            Token.EQ: SelectionOperation.EQ,
-            Token.NEQ: SelectionOperation.NEQ
+            Token.GREATER: Operator.GREATER,
+            Token.GREATER_EQ: Operator.GREATER_EQ,
+            Token.LESS: Operator.LESS,
+            Token.LESS_EQ: Operator.LESS_EQ,
+            Token.EQ: Operator.EQ,
+            Token.NEQ: Operator.NEQ
         }
-        return token_to_op.get(op_token, SelectionOperation.EQ)
+        return token_to_op.get(op_token, Operator.EQ)
 
-    def extract_condition_term(cond_term: ParseTree) -> Optional[SelectionCondition]:
+    def extract_condition_term(cond_term: ParseTree) -> Optional[Condition]:
         if len(cond_term.childs) == 3:
             left = extract_operand(cond_term.childs[0])
             op_token = cond_term.childs[1].childs[0].root.token_type
             op = convert_operator(op_token)
             right = extract_operand(cond_term.childs[2])
-            return SelectionCondition(left, right, op)
+            return Condition(left, right, op)
         return None
     
     def extract_operand(tree: ParseTree) -> str:

@@ -1,21 +1,12 @@
 from typing import List, Dict
 from ..base import QueryNode
-from ..enums import SelectionOperation, NodeType
-from copy import deepcopy
-import uuid
+from ..enums import NodeType
+from ..shared import Condition
 
 
-class SelectionCondition: 
-    def __init__(self, left_operand: str, right_operand: str, operator: SelectionOperation):
-        self.left_operand = left_operand
-        self.right_operand = right_operand
-        self.operator = operator
-
-    def __str__(self) -> str:
-        return f"{self.left_operand} {self.operator.value} {self.right_operand}"
 
 class SelectionNode(QueryNode):
-    def __init__(self, conditions: List[SelectionCondition]):
+    def __init__(self, conditions: List[Condition]):
         super().__init__(NodeType.SELECTION)
         self.conditions = conditions
         self.child = None  # Single child node
@@ -25,7 +16,7 @@ class SelectionNode(QueryNode):
         self.child = child
 
     def clone(self) -> 'SelectionNode':
-        cloned_conditions = [SelectionCondition(c.left_operand, c.right_operand, c.operator) for c in self.conditions]
+        cloned_conditions = [Condition(c.left_operand, c.right_operand, c.operator) for c in self.conditions]
         cloned_node = SelectionNode(cloned_conditions)
         cloned_node.id = self.id
 
@@ -41,6 +32,26 @@ class SelectionNode(QueryNode):
 
     def __str__(self) -> str:
         return f"SELECT {', '.join([str(c) for c in self.conditions])}"
+
+    def __eq__(self, other):
+        if not super().__eq__(other):
+            return False
+        if len(self.conditions) != len(other.conditions):
+            return False
+        for c1, c2 in zip(self.conditions, other.conditions):
+            if c1.left_operand != c2.left_operand or c1.operator != c2.operator or c1.right_operand != c2.right_operand:
+                return False
+        if (self.child is None) != (other.child is None):
+            return False
+        if self.child and other.child and self.child != other.child:
+            return False
+        return True
+
+    def __hash__(self):
+        conditions_tuple = tuple((c.left_operand, c.operator, c.right_operand) for c in self.conditions)
+        child_hash = hash(self.child) if self.child else 0
+        return hash((self.node_type, conditions_tuple, child_hash))
+    
 
 class UnionSelectionNode(QueryNode):
     def __init__(self, children: List[SelectionNode]):

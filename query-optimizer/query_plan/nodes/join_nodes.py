@@ -2,14 +2,7 @@ from typing import List, Literal, Dict
 from ..base import QueryNode
 from ..enums import NodeType, JoinAlgorithm
 from utils import Pair
-import uuid
-
-class JoinCondition:
-    def __init__(self, left_attr: str, right_attr: str, 
-                 operator: Literal['>', '>=', '<', '<=', '=']):
-        self.left_attr = left_attr
-        self.right_attr = right_attr
-        self.operator = operator
+from ..shared import Condition
 
 class JoinNode(QueryNode):
     def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP):
@@ -44,13 +37,13 @@ class JoinNode(QueryNode):
 
 
 class ConditionalJoinNode(JoinNode):
-    def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP, conditions: List[JoinCondition] = None):
+    def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP, conditions: List[Condition] = None):
         super().__init__(algorithm)
         self.node_type = NodeType.JOIN
         self.conditions = conditions if conditions is not None else []
 
     def clone(self) -> 'ConditionalJoinNode':
-        cloned_conditions = [JoinCondition(c.left_attr, c.right_attr, c.operator) for c in self.conditions]
+        cloned_conditions = [Condition(c.left_attr, c.right_attr, c.operator) for c in self.conditions]
         cloned_children = None
         
         

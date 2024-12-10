@@ -1,1 +1,1 @@
-select a from b where a = b and b = c;
+select a from b where a = b and b = c and c = d and d = e and e = f and f = g;

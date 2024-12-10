@@ -1,12 +1,12 @@
 from query_plan.base import QueryNode
-from query_plan.nodes.selection_node import SelectionNode,SelectionCondition
-from query_plan.nodes.join_nodes import ConditionalJoinNode,NaturalJoinNode, JoinCondition
+from query_plan.nodes.selection_node import SelectionNode
+from query_plan.nodes.join_nodes import ConditionalJoinNode,NaturalJoinNode
 from query_plan.nodes.table_node import TableNode
 from query_plan.nodes.project_node import ProjectNode
 from query_plan.enums import NodeType
 from utils import Pair
 from typing import List
-import uuid
+from query_plan.shared import Condition
 
 class EquivalenceRules:
 
@@ -23,7 +23,7 @@ class EquivalenceRules:
         selection_node = node
         conditions = selection_node.conditions
         if len(conditions) <= 1:
-            # No decomposition possible if only one or zero conditions
+            # No decomposition if only one or zero conditions
             return [node]
 
         original_child = selection_node.child.clone() if selection_node.child else None
@@ -36,13 +36,12 @@ class EquivalenceRules:
             no_split_node.set_child(original_child.clone())
         all_variants.append(no_split_node)
 
-        # Variants 2...: All possible splits
-        # For each split point i, split conditions into left and right groups
-        for i in range(1, len(conditions)):
-            left_conditions = conditions[:i]
-            right_conditions = conditions[i:]
+        # Now, for each condition, make it the left node, and the rest as the right node
+        for i in range(len(conditions)):
+            left_condition = [conditions[i]]
+            right_conditions = conditions[:i] + conditions[i+1:]
 
-            left_node = SelectionNode(left_conditions)
+            left_node = SelectionNode(left_condition)
             right_node = SelectionNode(right_conditions)
 
             # The right node gets the original child subtree
@@ -131,7 +130,7 @@ class EquivalenceRules:
                 combinedNode = node.children
                 newConditions = []
                 for condition in node.conditions:
-                    newCondition = JoinCondition(
+                    newCondition = Condition(
                         condition.left_operand,
                         condition.right_operand,
                         condition.operator
@@ -157,8 +156,8 @@ class EquivalenceRules:
 # test functions 
 
 def test_combineJoinCondition():
-    selection_condition = SelectionCondition("a.id", "b.id", "=")
-    join_condition = JoinCondition("c", "d", "=")
+    selection_condition = Condition("a.id", "b.id", "=")
+    join_condition = Condition("c", "d", "=")
     selection_node = SelectionNode([selection_condition])
     join_node = ConditionalJoinNode(conditions=[join_condition])
     selection_node.children = join_node
@@ -175,7 +174,7 @@ def test_combineJoinCondition():
 def test_switchChildrenJoin():
     child1 = TableNode("a")
     child2 = TableNode("b")
-    join_condition = JoinCondition("c", "d", "=")
+    join_condition = Condition("c", "d", "=")
     join_node = ConditionalJoinNode(conditions=[join_condition])
     join_node.children = Pair(child1, child2)
     EquivalenceRules.switchChildrenJoin(join_node)

@@ -13,7 +13,7 @@ class JoinAlgorithm(Enum):
     MERGE = "merge"
     HASH = "hash"
 
-class SelectionOperation(Enum):
+class Operator(Enum):
     GREATER = '>'
     GREATER_EQ = '>='
     LESS = '<'
