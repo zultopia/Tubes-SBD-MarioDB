@@ -48,13 +48,15 @@ if (current == 'gana'):
     query_string = input('Please enter your query: ')
     tree = get_parse_tree(query_string)
     query_plan = from_parse_tree(tree)
-    #query_plan.print()
-    query_plan.apply_rules_and_print()
+    query_plan.print()
     #print(tree)
 
     plans = generate_possible_plans(query_plan)
-    for plan in plans:
+    print("\n\n\nGenerated plans:" + str(len(plans)))
+    LIMIT_5 = min(len(plans), 5)
+    for plan in plans[:LIMIT_5]:
         plan.print()
+        
     # bf = BFOptimizer()
     # plans = bf.generate_possible_plans(query_plan)
     # for plan in plans:

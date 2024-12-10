@@ -6,6 +6,7 @@ from query_plan.nodes.project_node import ProjectNode
 from query_plan.enums import NodeType
 from utils import Pair
 from typing import List
+import uuid
 
 class EquivalenceRules:
 
@@ -16,28 +17,34 @@ class EquivalenceRules:
     '''
     @staticmethod
     def deconstruct_conjunction(node: QueryNode) -> List[QueryNode]:
-        if (not isinstance(node, SelectionNode)):
+        if not isinstance(node, SelectionNode):
             return [node]
         
-        if (len(node.conditions) == 1):
+        if len(node.conditions) <= 1:
             return [node]
         
         ret = []
-        for condition in node.conditions:
+        for i, condition in enumerate(node.conditions):
+            # Create a new SelectionNode with a single condition
             parent = SelectionNode([condition])
-
-            # conditions other than the current condition
-            children_conditions = [c for c in node.conditions if c != condition] 
-
-            # create a new node with the remaining conditions
-            child = SelectionNode(children_conditions) 
-
-            # set the child node to the parent node
-            parent.set_child(child)
-
-            # add the parent node to the return list
+            parent.id = str(uuid.uuid4())  # Assign a new unique ID
+            
+            # Conditions other than the current condition
+            remaining_conditions = node.conditions[:i] + node.conditions[i+1:]
+            
+            if remaining_conditions:
+                # Create a child SelectionNode with the remaining conditions
+                child = SelectionNode(remaining_conditions)
+                child.id = str(uuid.uuid4())  # Assign a new unique ID
+                
+                # Recursively deconstruct the remaining conditions
+                child_deconstructed = EquivalenceRules.deconstruct_conjunction(child)
+                
+                # Assuming only one deconstruction for the child
+                parent.set_child(child_deconstructed[0])
+            
             ret.append(parent)
-
+        
         return ret
     
     @staticmethod
@@ -85,107 +92,61 @@ class EquivalenceRules:
     assumption: a ConditionalJoinNode which has no condition is a cartesian product
     kinda cheated on this one by making parent a parameter, sebaiknya ada atribut parent di base.py
     '''
-    # revised
     @staticmethod
-    def combineJoinCondition(node: QueryNode) -> List[QueryNode]:
-        """
-        RULE 4: Combine join conditions into ConditionalJoinNode.
-        """
-        if not isinstance(node, SelectionNode) or not isinstance(node.child, ConditionalJoinNode):
-            return [node]
-        combinedNode = node.child
-        newConditions = [
-            JoinCondition(
-                condition.left_operand,
-                condition.right_operand,
-                condition.operator
-            )
-            for condition in node.conditions
-        ]
-        combinedNode.conditions.extend(newConditions)
-        return [combinedNode]
-
-    #original, method style
-    # @staticmethod
-    # def combineJoinCondition(parent:QueryNode,node: QueryNode) -> None:
-    #     if(isinstance(node.children,QueryNode))and(isinstance(node,SelectionNode)):
-    #         if(isinstance(node.children,ConditionalJoinNode)):
-    #             combinedNode = node.children
-    #             newConditions = []
-    #             for condition in node.conditions:
-    #                 newCondition = JoinCondition(
-    #                     condition.left_operand,
-    #                     condition.right_operand,
-    #                     condition.operator
-    #                 )
-    #                 newConditions.append(newCondition) 
-    #             combinedNode.conditions.extend(newConditions)
-    #         if parent:
-    #             parent.children = combinedNode
-    #         else: #if in root
-    #             node = None
+    def combineJoinCondition(parent:QueryNode,node: QueryNode) -> None:
+        if(isinstance(node.children,QueryNode))and(isinstance(node,SelectionNode)):
+            if(isinstance(node.children,ConditionalJoinNode)):
+                combinedNode = node.children
+                newConditions = []
+                for condition in node.conditions:
+                    newCondition = JoinCondition(
+                        condition.left_operand,
+                        condition.right_operand,
+                        condition.operator
+                    )
+                    newConditions.append(newCondition) 
+                combinedNode.conditions.extend(newConditions)
+            if parent:
+                parent.children = combinedNode
+            else: #if in root
+                node = None
             
 
     '''
     RULE 5
     switches the children of natural and theta joins
     '''
-    #revised
     @staticmethod
-    def switchChildrenJoin(node: QueryNode) -> List[QueryNode]:
-        if not isinstance(node, (ConditionalJoinNode, NaturalJoinNode)):
-            return [node]
-        node.switchChildren()
-        return [node]
-    
-    #original, method style
-    # @staticmethod
-    # def switchChildrenJoin(node: QueryNode) -> None:
-    #     if (isinstance(node,ConditionalJoinNode)or isinstance(node,NaturalJoinNode)):
-    #         node.switchChildren()
+    def switchChildrenJoin(node: QueryNode) -> None:
+        if (isinstance(node,ConditionalJoinNode)or isinstance(node,NaturalJoinNode)):
+            node.switchChildren()
         
 
 # test functions 
 
 def test_combineJoinCondition():
-    # Create a selection condition and join condition
     selection_condition = SelectionCondition("a.id", "b.id", "=")
     join_condition = JoinCondition("c", "d", "=")
-
-    # Create a SelectionNode and ConditionalJoinNode
     selection_node = SelectionNode([selection_condition])
     join_node = ConditionalJoinNode(conditions=[join_condition])
-    selection_node.set_child(join_node)  # Set join_node as the child of selection_node
-
-    # Apply the rule
-    result = EquivalenceRules.combineJoinCondition(selection_node)
-
-    # Verify the results
-    assert len(result) == 1  # Only one transformed node
-    transformed_node = result[0]
-    assert isinstance(transformed_node, ConditionalJoinNode)  # Should now be a ConditionalJoinNode
-    assert len(transformed_node.conditions) == 2  # Original + new condition
-    assert transformed_node.conditions[1].left_attr == "a.id"
-    assert transformed_node.conditions[1].right_attr== "b.id"
-    print("test_combineJoinCondition: Success")
+    selection_node.children = join_node
+    parent_node = SelectionNode([])
+    parent_node.children = selection_node
+    EquivalenceRules.combineJoinCondition(parent_node, selection_node)
+    assert isinstance(parent_node.children, ConditionalJoinNode)  # Should now point to the join node
+    assert len(parent_node.children.conditions) == 2  # One condition added
+    assert parent_node.children.conditions[1].left_attr == "a.id"
+    assert parent_node.children.conditions[1].right_attr == "b.id"
+    print("Success")
 
 
 def test_switchChildrenJoin():
     child1 = TableNode("a")
     child2 = TableNode("b")
     join_condition = JoinCondition("c", "d", "=")
-
-    # Create a ConditionalJoinNode
     join_node = ConditionalJoinNode(conditions=[join_condition])
-    join_node.children = Pair(child1, child2)  # Set the initial children
-
-    # Apply the rule
-    result = EquivalenceRules.switchChildrenJoin(join_node)
-
-    # Verify the results
-    assert len(result) == 1  # Only one transformed node
-    transformed_node = result[0]
-    assert isinstance(transformed_node, ConditionalJoinNode)  # Should still be a join node
-    assert transformed_node.children.first == child2  # Children should be swapped
-    assert transformed_node.children.second == child1
-    print("test_switchChildrenJoin: Success")
+    join_node.children = Pair(child1, child2)
+    EquivalenceRules.switchChildrenJoin(join_node)
+    assert join_node.children.first == child2  # Check if children are swapped
+    assert join_node.children.second == child1
+    print("Success")
