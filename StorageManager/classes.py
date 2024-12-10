@@ -135,10 +135,10 @@ class Statistic:
         self.V_a_r = V_a_r
 
 class StorageManager:
-    DATA_FILE = "data.dat"
+    DATA_FILE = "data.dat/"
     LOG_FILE = "log.dat"
-    DATA_DIR = "data_blocks"
-    HASH_DIR = "hash" # DATA_DIR/HASH_DIR/{table}_{column}_{hash}_{block_id}
+    DATA_DIR = "data_blocks/"
+    HASH_DIR = "hash/" # DATA_DIR/HASH_DIR/{table}_{column}_{hash}_{block_id}
     BLOCK_SIZE = 4096  # bytes
 
     def __init__(self):

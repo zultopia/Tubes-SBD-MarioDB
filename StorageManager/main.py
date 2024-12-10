@@ -2,7 +2,7 @@ from StorageManager.classes import StorageManager, DataRetrieval, DataWrite, Dat
 
 if __name__ == "__main__":
     manager = StorageManager()
-    print("Initial Data:", manager.data)
+    # print("Initial Data:", manager.data)
 
     # Write Example
     write_action = DataWrite(
@@ -13,7 +13,8 @@ if __name__ == "__main__":
     )
     manager.write_block(write_action)
     manager.log_action("write", write_action.table, write_action.new_values, write_action.columns)
-    print("Data After Write:", manager.data)
+    # data = manager.read_block(DataRetrieval("Student", ["StudentID", "FullName", "GPA"], [], "", ""))
+    # print("Data After Write:", data)
 
     # Read Example
     read_action = DataRetrieval(
@@ -36,7 +37,7 @@ if __name__ == "__main__":
     removed = manager.delete_block(delete_action)
     manager.log_action("write", delete_action.table, {"deleted_rows": removed})
     print("Removed Rows:", removed)
-    print("Data After Delete:", manager.data)
+    # print("Data After Delete:", manager.data)
 
     # Checking Logs
     print("\nAction Logs:")
