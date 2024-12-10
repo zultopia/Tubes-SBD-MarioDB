@@ -312,7 +312,7 @@ class ConcurrencyControlManager:
         self.lock_IS = {} # Map DataItem -> transaction_id
         self.lock_SIX = {} # Map DataItem -> transaction_id
         self.wait_for_graph = WaitForGraph()
-        self.transaction_queue = {} # Map transaction_id -> List[Row]
+        self.transaction_queue = set()
         self.waiting_list = [Transaction]
     
     def __str__(self):
@@ -325,7 +325,6 @@ class ConcurrencyControlManager:
     def begin_transaction(self) -> int:
         # will return transaction_id: int
         transaction_id = self.__generate_id()
-        self.transaction_queue[transaction_id] = []
         return transaction_id
 
     def log_object(self, object: Row, transaction_id: int):
@@ -334,7 +333,7 @@ class ConcurrencyControlManager:
         pass
     
     # check if lock is valid to current lock and its ancestor
-    def check_lock_conflict(self, current, lock_type):
+    def check_lock_conflict(self, current, lock_type, tid):
         conflict_matrix = {
             "IS": {"X"},
             "IX": {"S", "SIX", "X"},
@@ -357,7 +356,7 @@ class ConcurrencyControlManager:
             validate_stack.append(current)
             current = parent
 
-        # Validate against the conflict matrix
+        # Validate against the conflict matrix            
         while validate_stack:
             current = validate_stack.pop()
             for held_lock, holders in [
@@ -367,8 +366,10 @@ class ConcurrencyControlManager:
                 ("SIX", self.lock_SIX.get(current, set())),
                 ("X", self.lock_X.get(current, set())),
             ]:
-                if holders and lock_type in conflict_matrix[held_lock]:
-                    return False, f"Conflict: Current {current} holds {held_lock} lock by transaction(s) {holders}."
+                if holders  and lock_type in conflict_matrix[held_lock]:
+                    if (tid not in holders):
+                        
+                        return False, f"Conflict: Current {current} holds {held_lock} lock by transaction(s) {holders}."
 
         return True, None
             
@@ -379,7 +380,7 @@ class ConcurrencyControlManager:
         message = None
 
         # Validate lock
-        allowed, message = self.check_lock_conflict(current, lock_type)
+        allowed, message = self.check_lock_conflict(current, lock_type, transaction_id)
         if not allowed:
             return Response(success=False, transaction_id=transaction_id, message=message)
 
@@ -395,14 +396,7 @@ class ConcurrencyControlManager:
             # Update parent lock 
             if parent:
                 if lock_type == "X":
-                    if parent in self.lock_IS and transaction_id in self.lock_IS[parent]:
-                        # Upgrade IS to SIX 
-                        self.lock_IS[parent].remove(transaction_id)
-                        if not self.lock_IS[parent]:
-                            del self.lock_IS[parent]
-                        self.lock_SIX.setdefault(parent, set()).add(transaction_id)
-                    elif parent not in self.lock_SIX:  
-                        self.lock_IX.setdefault(parent, set()).add(transaction_id)
+                    self.lock_IX.setdefault(parent, set()).add(transaction_id)
                 elif lock_type == "S":
                     self.lock_IS.setdefault(parent, set()).add(transaction_id)
 
@@ -421,7 +415,7 @@ class ConcurrencyControlManager:
         action = action.lower()
         if action not in ["read", "write"]:
             raise ValueError(f"Invalid action type: {action}. Allowed actions are 'read' or 'write'.")
-        lock_type = 'S' if action == "read" else 'X'
+        lock_type = 'S' if action == "read" else 'X' if action == "write" else 'SIX'
 
         data_item = object.data_item
 
@@ -446,39 +440,39 @@ class ConcurrencyControlManager:
     def end_transaction(self, transaction_id: int):
         # Flush objects of a particular transaction after it has successfully committed/aborted
         # Terminates the transaction
-        for row in self.transaction_queue[transaction_id]:
-            if row in self.lock_X and self.lock_X[row] == transaction_id:
-                del self.lock_X[row]
-            
-            if row in self.lock_S and transaction_id in self.lock_S[row]:
-                self.lock_S[row].remove(row)
-                if self.lock_S[row] == []:
-                    del self.lock_S[row]
+        for data_item, lock_type in transaction_dataitem_map[transaction_id]: 
+            if (lock_type == "X"): 
+                self.lock_X[data_item].remove(transaction_id)
+            if (lock_type == "S"): 
+                self.lock_S[data_item].remove(transaction_id)
+            if (lock_type == "IX"): 
+                self.lock_IX[data_item].remove(transaction_id)
+            if (lock_type == "IS"): 
+                self.lock_IS[data_item].remove(transaction_id)
+            if (lock_type == "SIX"): 
+                self.lock_SIX[data_item].remove(transaction_id)
         
-        del self.transaction_queue[transaction_id]
+        self.transaction_queue.remove(transaction_id)
         self.wait_for_graph.deleteNode(transaction_id)
         
     def process_waiting_list(self): 
         need_check = True
+
         while (need_check): 
+            check_waiting = False
+            for tid in self.transaction_queue: 
+                if (self.wait_for_graph.waiting(tid)) :
+                    self.transaction_queue.remove(tid)
+                    check_waiting = True
+
             need_check = False
-            for transaction in self.waiting_list: 
-                if self.wait_for_graph.waiting(transaction.id): 
-                    break
+            if (check_waiting):
+                for t_process in self.waiting_list: 
+                    if t_process.id not in self.transaction_queue : 
+                        self.validate_object(t_process)
+                        need_check = True
                 
-                # TODO: adjust lock type 
-                lock_type = ""
-                if (transaction.action == "WRITE"): 
-                    lock_type = "X"
-                else : 
-                    lock_type = "S"
-
-                self.lock(transaction.data_item, transaction.id, lock_type)
-                # TODO: determine when to commit. This line might be the time that 
-                # the transaction committed. Hence, the node in waitgraph might be removed    
-            
-                self.waiting_list.remove(transaction)
-
+                    self.waiting_list.remove(t_process)
             
         
 # ccm = ConcurrencyControlManager(algorithm="Test")
