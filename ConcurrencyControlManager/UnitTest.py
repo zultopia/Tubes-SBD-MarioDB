@@ -1,4 +1,8 @@
 import unittest
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from ConcurrencyControlManager.classes import ConcurrencyControlManager, PrimaryKey, Row, Table, Cell, DataItem, Action, Response, WaitForGraph
 
 class TestConcurrencyControlManager(unittest.TestCase):
