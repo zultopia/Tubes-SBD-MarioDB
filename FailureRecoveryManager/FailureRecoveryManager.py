@@ -1,8 +1,10 @@
 import json
 from datetime import datetime
 from threading import Lock, Timer
+from typing import Union
 
 from FailureRecoveryManager.ExecutionResult import ExecutionResult
+from FailureRecoveryManager.LRUCache import LRUCache
 from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
 from FailureRecoveryManager.Rows import Rows
 
@@ -15,9 +17,9 @@ class FailureRecoveryManager:
     def __init__(
         self, log_file="./FailureRecoveryManager/log.log", checkpoint_interval=5
     ):
-        # Create mutex lock for saving checkpoint operation
-        self._lock = Lock()
-
+        """
+        WRITE AHEAD LOG
+        """
         # Maximum number of logs in memory (array length)
         self._max_size_log = 20
         # Log file name
@@ -29,35 +31,98 @@ class FailureRecoveryManager:
             "102|ABORT",
             '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]',
         ]
+        # Write-ahead log mutex
+        self._wa_log_lock = Lock()
 
-        # Maximum number of Exe buffer (array length)
-        self._max_size_buffer = 20
-        # Buffer (in-memory)
-        self._buffer = []
+        """
+        BUFFER
+        Stores a LRU Cache using a dictionary with a key as `<table_name>:<block_id>` and value as the block data.
+        Easily implemented using doubly linked list and dictionary.
+        """
+        # Buffer max size
+        self._max_size_buffer = 100  # (in number of blocks)
+        # Buffer instance
+        self._buffer = LRUCache(self._max_size_buffer)
+        # Buffer mutex
+        self._buffer_lock = Lock()
 
-        # Write ahead checkpoint interval (in seconds)
+        """
+        SAVE CHECKPOINT CRON JOB
+        """
         self._checkpoint_interval = checkpoint_interval
         self.timer = None
         self._start_checkpoint_cron_job()
-    
+
     def __del__(self):
         print("Destroy Failure Recovery Manager...")
         self._stop_checkpoint_cron_job()
 
-    def get_buffer(self):
-        return self._buffer()
+    def get_buffer(self, table_name: str, block_id: int) -> Union[any, None]:
+        """
+        Get a block from the buffer cache
 
-    def set_buffer(self, buffer):
-        self._buffer = buffer
+        Args:
+            table_name (str): The name of the table
+            block_id (int): The block ID
 
-    def add_buffer(self, data):
-        self._buffer.append(data)
+        Returns:
+            any: The block data
+        """
 
-    def clear_buffer(self):
-        self._buffer.clear()
+        with self._buffer_lock:
+            cache_key = f"{table_name}:{block_id}"
+            return self._buffer.get(cache_key)
 
-    def remove_buffer(self, data):
-        self._buffer.remove(data)
+    def put_buffer(self, table_name: str, block_id: int, block_data: any) -> None:
+        """
+        Put a block to the buffer cache
+
+        Args:
+            table_name (str): The name of the table
+            block_id (int): The block ID
+            block_data (any): The block data
+
+        Returns:
+            void
+        """
+        with self._buffer_lock:
+            cache_key = f"{table_name}:{block_id}"
+            self._buffer.put(cache_key, block_data)
+            print(
+                f"[FRM | {str(datetime.now())}]: Block {block_id} of table {table_name} added to buffer."
+            )
+
+    def delete_buffer(self, table_name: str, block_id: int) -> bool:
+        """
+        Delete a block from the buffer cache
+
+        Args:
+            table_name (str): The name of the table
+            block_id (int): The block ID
+
+        Returns:
+            void
+        """
+        with self._buffer_lock:
+            cache_key = f"{table_name}:{block_id}"
+            result = self._buffer.delete(cache_key)
+            if result:
+                print(
+                    f"[FRM | {str(datetime.now())}]: Block {block_id} of table {table_name} deleted from buffer."
+                )
+            else:
+                print(
+                    f"[FRM | {str(datetime.now())}]: Block {block_id} of table {table_name} not found in buffer."
+                )
+            return result
+
+    def clear_buffer(self) -> None:
+        """
+        Clear all the entries in the buffer cache
+        """
+        with self._buffer_lock:
+            self._buffer.clear()
+            print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
 
     def write_log(self, execution_result: ExecutionResult) -> None:
         # This method accepts execution result object as input and appends
@@ -83,19 +148,18 @@ class FailureRecoveryManager:
             )
 
         # Must write wal to stable storage if the write-ahead log is full
-        self._lock.acquire()
+        self._wa_log_lock.acquire()
         if self.is_wa_log_full():
-            self._lock.release()
+            self._wa_log_lock.release()
             # self._save_checkpoint()
             self._flush_wal()
-        self._lock.release()
-        
-            
+        self._wa_log_lock.release()
+
         # Append entry to self._wa_logs
-        self._lock.acquire()
+        self._wa_log_lock.acquire()
         self._wa_logs.append(log_entry)
-        self._lock.release()
-        
+        self._wa_log_lock.release()
+
         # Must write wal to stable storage if transaction commited or aborted to ensure consistency
         if execution_result.status == "COMMIT" or execution_result.status == "ABORT":
             # self._save_checkpoint()
@@ -136,7 +200,7 @@ class FailureRecoveryManager:
         # Send buffer to storage manager
         print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
 
-        self._lock.acquire()
+        self._wa_log_lock.acquire()
         # MANAGE WA LOG
         # Check write ahead not empty
         if len(self._wa_logs) == 0:
@@ -157,17 +221,14 @@ class FailureRecoveryManager:
                     else:
                         active_transactions.discard(id)
                     file.write(log + "\n")
-                file.write(
-                    f"CHECKPOINT|{json.dumps(list(active_transactions))}\n"
-                )
+                file.write(f"CHECKPOINT|{json.dumps(list(active_transactions))}\n")
             # Clear the wh_log
             self._wa_logs.clear()
             print(f"[FRM | {str(datetime.now())}]: write ahead log saved.")
         except Exception as e:
             print(f"[FRM | {str(datetime.now())}]: Error saving checkpoint: {e}")
         finally:
-            self._lock.release()
-            
+            self._wa_log_lock.release()
 
     def _start_checkpoint_cron_job(self) -> None:
         """
@@ -204,35 +265,14 @@ class FailureRecoveryManager:
             self.timer.cancel()
             self.timer = None
 
-    def is_buffer_full(self, spare: int = 0) -> bool:
-        """
-        This method checks if the buffer is full
-        Note: this can be changed if unit for max_size is change to memory size (KB, MB, ect)
-
-        Args:
-            spare (int): The number of extra logs that can be added to the buffer before it is considered full. Default is 0.
-
-        Returns:
-            bool: True if the buffer is full (with the spare value), False otherwise.
-        """
-
-        return len(self._buffer) >= self._max_size_buffer - spare
-
-    def _manage_buffer():
-        """
-        Handles the buffer if it reaches its limit
-        """
-        
     def _flush_wal(self):
         with open(self._log_file, "a") as file:
-            self._lock.acquire()
-            
+            self._wa_log_lock.acquire()
+
             for line in self._wa_logs:
                 file.write(line + "\n")
-            
-            self._lock.release()
-            
-        
+
+            self._wa_log_lock.release()
 
     def _read_lines_from_end(self, file_path, chunk_size=1024):
         """
@@ -277,11 +317,11 @@ class FailureRecoveryManager:
         """
 
         # Hanya menggunakan transaction id saja sekarang
-        
+
         recovered_transactions = []
         is_start_found = False
         # baca wa_logs dulu
-        self._lock.acquire()
+        self._wa_log_lock.acquire()
         for log_line in self._wa_logs:
             log_parts = log_line.strip().split("|")
             if log_parts[0].isdigit():
@@ -302,9 +342,8 @@ class FailureRecoveryManager:
                             is_start_found = True
                             break
                         recovered_transactions.append(log_line)
-        self._lock.release()
-        
-        
+        self._wa_log_lock.release()
+
         # undo (rollback)
         table = ""
         for curr in recovered_transactions:
@@ -354,9 +393,12 @@ class FailureRecoveryManager:
 
     def recover_system_crash(self):
         """
-        This function is used to perform recovery in the event of a system crash. The recovery process will start from the last recorded CHECKPOINT in the log file. For transactions that have already been completed (COMMIT or ABORT), the transaction will be redone, while for transactions that are incomplete, a rollback (UNDO) will be performed.
+        This function is used to perform recovery in the event of a system crash.
+        The recovery process will start from the last recorded CHECKPOINT in the log file.
+        For transactions that have already been completed (COMMIT or ABORT), the transaction will be redone,
+        while for transactions that are incomplete,a rollback (UNDO) will be performed.
         """
-        
+
         recovered_transactions = []
         active_transactions = set()
         for log_line in self._read_lines_from_end(self._log_file):
@@ -399,7 +441,7 @@ class FailureRecoveryManager:
                 print("table:", table)
                 print("send before data to storage manager: ", before_states)
                 print("send after data to storage manager: ", after_states)
-                
+
         # undo (rollback)
         for log_line in self._read_lines_from_end(self._log_file):
             log_parts = log_line.strip().split("|")
