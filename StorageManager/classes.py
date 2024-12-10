@@ -6,6 +6,7 @@ from typing import List, Union, Dict, Tuple
 from StorageManager.HashIndex import Hash
 from .BPlusTree import BPlusTree
 from ConcurrencyControlManager.classes import PrimaryKey
+from FailureRecoveryManager import FailureRecoveryManager
 
 class Student:
     def __init__(self, id:int, name:str, dept_name:str, tot_cred:int):
@@ -146,11 +147,11 @@ class StorageManager:
     HASH_DIR = "hash/" # DATA_DIR/HASH_DIR/{table}_{column}_{hash}_{block_id}
     BLOCK_SIZE = 4096  # bytes
 
-    def __init__(self):
+    def __init__(self, frm: FailureRecoveryManager):
         print("INITIATING")
         os.makedirs(self.DATA_DIR, exist_ok=True)
         os.makedirs(os.path.join(self.DATA_DIR, self.HASH_DIR), exist_ok=True)
-        self.data = self._load_data()
+        self.frm = frm
         self.indexes = {}
         self.bplusindexes: Dict[object, Tuple[str, BPlusTree]] = {}
         self.logs = self._load_logs()
@@ -208,12 +209,13 @@ class StorageManager:
         conditions = data_write.conditions
         blocks = sorted(int(file.split('_')[-1].split('.')[0]) for file in os.listdir(self.DATA_DIR) if file.startswith(table))
         if not data_write.conditions:
-                # add operation
+            # add operation
             for block_id in blocks:
                 block = self._load_block(table, block_id)
                 if len(block) < self.BLOCK_SIZE:
                     block.append(dict(zip(columns, new_values)))
                     self._save_block(table, block_id, block)
+                    self.frm.put(table, block_id, block)
                     self.log_action("write", table, {"block_id": block_id, "data": new_values})
                     return 1
 
@@ -221,10 +223,11 @@ class StorageManager:
             new_block_id = max(blocks, default=-1) + 1
             new_block = [dict(zip(columns, new_values))]
             self._save_block(table, new_block_id, new_block)
+            self.frm.put(table, new_block_id, new_block)
             self.log_action("write", table, {"block_id": new_block_id, "data": new_values})
             return 1
         # UPDATE 
-        numUpdated = 0
+        num_updated = 0
         for block_id in blocks:
             block = self._load_block(table, block_id)
             new_block = []
@@ -234,11 +237,12 @@ class StorageManager:
                     for column, new_value in zip(columns, new_values):
                         new_row[column] = new_value
                     new_block.append(new_row)
-                    numUpdated += 1
+                    num_updated += 1
                 else:
                     new_block.append(row)
             self._save_block(table, block_id, new_block)
-        return numUpdated
+            self.frm.put(table, block_id, new_block)
+        return num_updated
     
     def read_block(self, data_retrieval: DataRetrieval):
         table = data_retrieval.table
@@ -249,7 +253,9 @@ class StorageManager:
         for file in os.listdir(self.DATA_DIR):
             if file.startswith(table):
                 block_id = int(file.split('_')[-1].split('.')[0])
-                block = self._load_block(table, block_id)
+                block = self.frm.get(table, block_id)
+                if not block:
+                    block = self._load_block(table, block_id)
                 for row in block:
                     if self._evaluate_conditions(row, conditions):
                         results.append({col: row[col] for col in columns})
@@ -267,6 +273,7 @@ class StorageManager:
                 new_block = [row for row in block if not self._evaluate_conditions(row, conditions)]
                 total_deleted += len(block) - len(new_block)
                 self._save_block(table, block_id, new_block)
+                self.frm.put(table, block_id, new_block)
         return total_deleted
 
     def set_index(self, table: str, column: str, index_type: str):
