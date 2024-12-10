@@ -19,31 +19,94 @@ class SQLGrammar:
             raise SyntaxError(f"Expected {expected_token}, found {self.current_token()}")
 
     def Query(self) -> ParseTree:
-        """Parse Query -> SELECT SelectList FROM FromList (WHERE Condition) (ORDER_BY Field (DESC | ASC)) (LIMIT NUMBER) SEMICOLON."""
+        """Parse Query -> UPDATE TABLE (AS TABLE) SET SetList (WHERE Condition) SEMICOLON | SELECT SelectList FROM FromList (WHERE Condition) (ORDER_BY Field (DESC | ASC)) (LIMIT NUMBER) SEMICOLON"""
+
         tree = ParseTree()
         tree.root = "Query"
-        self.match(tree, Token.SELECT)
-        tree.add_child(self.SelectList())
-        self.match(tree, Token.FROM)
-        tree.add_child(self.FromList())
 
-        if self.current_token() and self.current_token()[0] == Token.WHERE:
-            self.match(tree, Token.WHERE)
-            tree.add_child(self.Condition())
+        if self.current_token()[0] == Token.SELECT:
+            self.match(tree, Token.SELECT)
+            tree.add_child(self.SelectList())
+            self.match(tree, Token.FROM)
+            tree.add_child(self.FromList())
 
-        if self.current_token() and self.current_token()[0] == Token.ORDER_BY:
-            self.match(tree, Token.ORDER_BY)
-            tree.add_child(self.Field())
-            if self.current_token() and self.current_token()[0] == Token.ASC:
-                self.match(tree, Token.ASC)
-            elif self.current_token() and self.current_token()[0] == Token.DESC:
-                self.match(tree, Token.DESC)
+            if self.current_token() and self.current_token()[0] == Token.WHERE:
+                self.match(tree, Token.WHERE)
+                tree.add_child(self.Condition())
 
-        if self.current_token() and self.current_token()[0] == Token.LIMIT:
-            self.match(tree, Token.LIMIT)
+            if self.current_token() and self.current_token()[0] == Token.ORDER_BY:
+                self.match(tree, Token.ORDER_BY)
+                tree.add_child(self.Field())
+                if self.current_token() and self.current_token()[0] == Token.ASC:
+                    self.match(tree, Token.ASC)
+                elif self.current_token() and self.current_token()[0] == Token.DESC:
+                    self.match(tree, Token.DESC)
+
+            if self.current_token() and self.current_token()[0] == Token.LIMIT:
+                self.match(tree, Token.LIMIT)
+                self.match(tree, Token.NUMBER)
+            self.match(tree, Token.SEMICOLON)
+        elif self.current_token()[0] == Token.UPDATE:
+            self.match(tree, Token.UPDATE)
+            
+            self.match(tree, Token.TABLE)
+            if self.current_token() and self.current_token()[0] == Token.AS:
+                self.match(tree, Token.AS)
+                self.match(tree, Token.TABLE)
+            self.match(tree, Token.SET)
+            tree.add_child(self.SetList())
+            if self.current_token() and self.current_token()[0] == Token.WHERE:
+                self.match(tree, Token.WHERE)
+                tree.add_child(self.Condition())
+            self.match(tree, Token.SEMICOLON)
+
+        else:
+            SyntaxError(f"Expected select or update query, found {self.current_token()[0]}")
+
+            
+        return tree
+
+    def SetList(self) -> ParseTree:
+        """Parse SetList -> SetTerm SetListTail"""
+        tree = ParseTree()
+        tree.root = "SetList"
+
+        tree.add_child(self.SetTerm())
+        tree.add_child(self.SetListTail())
+        return tree
+    
+    def SetListTail(self) -> ParseTree | None:
+        """Parse SetListTail -> COMMA SetTerm SetListTail | e"""
+        tree = ParseTree()
+        tree.root = "SetListTail"
+        if self.current_token() and self.current_token()[0] == Token.COMMA:
+            self.match(tree, Token.COMMA)
+            tree.add_child(self.SetTerm())
+            tree.add_child(self.SetListTail())
+            return tree
+        else:
+            return None
+    
+    def SetTerm(self) -> ParseTree:
+        """Parse SetTerm -> [Field | NUMBER | STRING] EQ [Field | NUMBER | STRING]"""
+        tree = ParseTree()
+        tree.root = "SetTerm"
+
+        if self.current_token()[0] == Token.NUMBER:
             self.match(tree, Token.NUMBER)
+        elif self.current_token()[0] == Token.STRING:
+            self.match(tree, Token.STRING)
+        else:
+            tree.add_child(self.Field())
 
-        self.match(tree, Token.SEMICOLON)
+        self.match(tree, Token.EQ)
+        
+        if self.current_token()[0] == Token.NUMBER:
+            self.match(tree, Token.NUMBER)
+        elif self.current_token()[0] == Token.STRING:
+            self.match(tree, Token.STRING)
+        else:
+            tree.add_child(self.Field())
         return tree
 
     # Select List
@@ -66,10 +129,10 @@ class SQLGrammar:
     def SelectList(self) -> ParseTree:
         """Parse SelectList -> Field SelectListTail | *"""
         tree = ParseTree()
+        tree.root = "SelectList"
         if self.current_token() and self.current_token()[0] == Token.ASTERISK:
             self.match(tree, Token.ASTERISK)
         else:
-            tree.root = "SelectList"
             tree.add_child(self.Field())
             tree.add_child(self.SelectListTail())
         return tree

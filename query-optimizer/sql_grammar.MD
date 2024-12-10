@@ -1,6 +1,14 @@
 # Query
 
-Query -> SELECT SelectList FROM FromList (WHERE Condition) (ORDER_BY Field (DESC | ASC)) (LIMIT NUMBER) SEMICOLON
+
+
+Query -> UPDATE TABLE (AS TABLE) SET SetList (WHERE Condition) SEMICOLON | SELECT SelectList FROM FromList (WHERE Condition) (ORDER_BY Field (DESC | ASC)) (LIMIT NUMBER) SEMICOLON
+
+# Update Set list
+
+SetList -> SetTerm SetListTail
+SetListTail -> COMMA SetTerm SetListTail | e
+SetTerm -> [Field | NUMBER | STRING] EQ [Field | NUMBER | STRING]
 
 
 # Select list
