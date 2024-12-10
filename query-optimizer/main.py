@@ -5,6 +5,7 @@ from query_optimizer import get_parse_tree
 from from_parse_tree import from_parse_tree
 from query_plan.optimizers.bf_optimizer import BFOptimizer
 from generator import generate_possible_plans
+from equivalence_rules import EquivalenceRules
 
 
 
@@ -51,7 +52,7 @@ if (current == 'gana'):
     query_plan.print()
     #print(tree)
 
-    plans = generate_possible_plans(query_plan)
+    plans = generate_possible_plans(query_plan, [EquivalenceRules.deconstruct_conjunction])
     print("\n\n\nGenerated plans:" + str(len(plans)))
     LIMIT_5 = min(len(plans), 32)
     for plan in plans[:LIMIT_5]:

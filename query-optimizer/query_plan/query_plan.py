@@ -79,7 +79,7 @@ class QueryPlan(Prototype):
     def __eq__(self, other):
         if not isinstance(other, QueryPlan):
             return False
-        return self.serialize() == other.serialize()  # Equality based on serialization
+        return self.serialize() == other.serialize()
 
     def __hash__(self):
         return hash(self.serialize())  # Hash based on unique serialization

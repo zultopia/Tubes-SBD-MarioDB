@@ -3,9 +3,7 @@ from .optimizer import QueryPlanOptimizer
 
 class BFOptimizer(QueryPlanOptimizer):
     def optimize(self, query: 'QueryPlan') -> 'QueryPlan':
-        reachable_plans = self.__generate_possible_plans(query)
-        return self._find_best_plan(reachable_plans)
-    
+        pass
 
     
     def _find_best_plan(self, plans: List['QueryPlan']) -> 'QueryPlan':

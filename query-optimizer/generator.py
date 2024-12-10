@@ -6,12 +6,8 @@ from query_plan.query_plan import (
 from typing import List
 from collections import deque
 
-def generate_possible_plans(query: 'QueryPlan') -> List['QueryPlan']:
-    # Include only the deconstruct_conjunction rule
-    rules = [
-        EquivalenceRules.deconstruct_conjunction, 
-             EquivalenceRules.commute_selections
-             ]
+def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules]) -> List['QueryPlan']:
+
 
     initial_plan = query.clone()
     plans = {initial_plan}  # Use a set to store unique plans based on __hash__ and __eq__
@@ -27,7 +23,7 @@ def generate_possible_plans(query: 'QueryPlan') -> List['QueryPlan']:
 
         while nodes_to_process:
             current_node = nodes_to_process.popleft()
-            print(f"Applying rules to node: {current_node} with id: {current_node.id}")
+            # print(f"Applying rules to node: {current_node} with id: {current_node.id}")
 
             transformed_this_node = False
 
@@ -36,7 +32,7 @@ def generate_possible_plans(query: 'QueryPlan') -> List['QueryPlan']:
 
                 # Check if a transformation occurred
                 if len(transformed_nodes) > 1 or (len(transformed_nodes) == 1 and transformed_nodes[0].id != current_node.id):
-                    print(f"Transformation applied on node id: {current_node.id}")
+                    # print(f"Transformation applied on node id: {current_node.id}")
                     for transformed_node in transformed_nodes:
                         print(f" - Generated transformed node with id: {transformed_node.id}")
                         # Clone the current plan to create a new plan
@@ -47,12 +43,13 @@ def generate_possible_plans(query: 'QueryPlan') -> List['QueryPlan']:
                             # maybe this node *is* actually the root node
                             if current_node.id == new_plan.root.id:
                                 new_plan.root = transformed_node
-                                print(f" - Replaced root node with id: {transformed_node.id}")
+                                # print(f" - Replaced root node with id: {transformed_node.id}")
                             else:
                                 print(f" - Failed to replace node id: {current_node.id}")
                                 continue
                         else:
-                            print(f" - Replaced node id: {current_node.id} with id: {transformed_node.id}")
+                            # print(f" - Replaced node id: {current_node.id} with id: {transformed_node.id}")
+                            pass
 
                         # Avoid adding duplicate plans using the set
                         if new_plan not in plans:
@@ -79,10 +76,6 @@ def generate_possible_plans(query: 'QueryPlan') -> List['QueryPlan']:
 
     # Convert the set back to a list
     unique_plans = list(plans)
-    print(f"\nGenerated plans:{len(unique_plans)}")
-    for plan in unique_plans:
-        print("\nQuery Plan:")
-        print(plan)
     return unique_plans
 
 
