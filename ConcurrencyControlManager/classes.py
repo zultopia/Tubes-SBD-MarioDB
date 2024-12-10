@@ -34,9 +34,8 @@ class Database(IDataItem):
         return None
 
 class Table(IDataItem):
-    def __init__(self, database: Database, table: str):
+    def __init__(self, table: str):
         self.table = table
-        self.database = database
     
     def __eq__(self, other):
         return self.table == other.table
@@ -44,12 +43,6 @@ class Table(IDataItem):
     def __ne__(self, other):
         return not self.__eq__(other)
     
-    def get_database(self):
-        return self.database
-    
-    def get_parent(self):
-        return self.get_database()
-
 class Row(IDataItem):
     def __init__(self, table: Table, pkey: PrimaryKey, map: dict):
         self.table = table
@@ -97,7 +90,7 @@ class Cell(IDataItem):
         return self.get_row()
 
 class DataItem:
-    def __init__(self, level: str, data_item: Database | Table | Row | Cell):
+    def __init__(self, level: str, data_item):
         self.level = level
         self.data_item = data_item
         
@@ -140,7 +133,7 @@ class Lock:
 
 
 class TransactionAction: 
-    def __init__(self, tid: int, action: Action, level: int, data_item: DataItem, old_data_item: DataItem = None): 
+    def __init__(self, tid: int, action: Action, level: str, data_item: DataItem, old_data_item: DataItem = None): 
         self.id = tid 
         self.action = action
         self.level  = level
@@ -234,7 +227,8 @@ class ConcurrencyControlManager:
         return transaction_id
 
     def log_object(self, transactionAction: TransactionAction):
-        self.failure_recovery.write_log(transactionAction)
+        # self.failure_recovery.write_log(transactionAction)
+        pass
     
     # check if lock is valid to current lock and its ancestor
     def apply_lock(self, transaction_action: TransactionAction):
@@ -279,7 +273,9 @@ class ConcurrencyControlManager:
                 ("SIX", self.lock_SIX.get(current, set())),
                 ("X", self.lock_X.get(current, set())),
             ]:
-                holders.remove(transaction_id)
+                if transaction_id in holders: 
+                    holders.remove(transaction_id)
+
                 if holders and lock_type in conflict_matrix[held_lock]:
                     failed = True
                     conflict_list.append(holders)
@@ -294,6 +290,8 @@ class ConcurrencyControlManager:
                     self.transaction_queue.append(transaction_id)
                     self.waiting_list.append(transaction_action)
                 
+                # while (not self.wait_for_graph.waiting(transaction_action)): 
+                #     TODO: threading
                 return False, abort, f"Transaction {transaction_id} failed to get lock-{lock_type} on {transaction_action.data_item}"
             
             
@@ -344,14 +342,6 @@ class ConcurrencyControlManager:
         # If successful, return response
         print(f"Lock-{lock_type} granted on {transactionAction.data_item} for transaction {transaction_id}")
         return Response(allowed, transaction_id, message)
-
-    # IF: transaction_id can be granted lock with type lock_type to data_item  
-    # FS: transaction_id granted lock with type lock_type to  data_item
-    def lock(self, data_item, transaction_id: int, lock_type: str): 
-        if (lock_type == "X"): 
-            self.lock_X[data_item] = transaction_id 
-        else: # lock_type = "S"
-            self.lock_S[data_item] = transaction_id   
     
     def end_transaction(self, transaction_id: int, status: str):
         # Flush objects of a particular transaction after it has successfully committed/aborted
