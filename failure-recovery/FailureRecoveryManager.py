@@ -4,13 +4,12 @@ from ExecutionResult import ExecutionResult
 from datetime import datetime
 
 class FailureRecoveryManager:
-    def __init__(self, log_file="log.log", wal_log_file = "wal.log"):
+    def __init__(self, log_file="log.log"):
         self._max_size_log = 20 #sesuaikan lagi
         self._max_size_buffer = 20 #sesuaikan lagi
         self._log_file = log_file
         self._wh_logs = ["103|2024-11-21T12:02:45.321Z|IN_PROGRESS|UPDATE employees SET salary = 6000 WHERE id = 1;|Before: {'id': 1, 'name': 'Alice', 'salary': 5000}|After: {'id': 1, 'name': 'Alice', 'salary': 6000}", "CHECKPOINT|2024-11-21T12:03:00.000Z|[103]"]
         self._buffer = []
-        self._wal_log_file = wal_log_file 
         
     def get_buffer(self):
         return self._buffer()
