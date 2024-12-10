@@ -26,7 +26,7 @@ class FailureRecoveryManager:
         self._start_checkpoint_cron_job()
 
         # Write-ahead logs (in-memory)
-        self._wh_logs = ["102|2024-11-21T12:02:05.678Z|IN_PROGRESS|INSERT INTO employees (id, name, salary) VALUES (2, 'Bob', 4000);|Before: None|After: [{\"id\": 2, \"name\": \"Bob\", \"salary\": 4000}]","102|2024-11-21T12:02:20.123Z|ROLLBACK|DELETE FROM employees WHERE id = 2;|Before: None|After: None","102|2024-11-21T12:02:15.789Z|ABORTED|TRANSACTION END|[{}]","103|2024-11-21T12:02:45.321Z|IN_PROGRESS|UPDATE employees SET salary = 6000 WHERE id = 1;|Before: [{\"id\": 1, \"name\": \"Alice\", \"salary\": 5000}]|After: [{\"id\": 1, \"name\": \"Alice\", \"salary\": 6000}]"]
+        self._wa_logs = ["102|WRITE|employees|None|[{\"id\": 2, \"name\": \"Bob\", \"salary\": 4000}]","102|WRITE|employees|[{\"id\": 2, \"name\": \"Bob\", \"salary\": 4000}]|None","102|ABORT|None","103|WRITE|employees|[{\"id\": 1, \"name\": \"Alice\", \"salary\": 5000}]|[{\"id\": 1, \"name\": \"Alice\", \"salary\": 6000}]"]
 
         # Maximum number of Exe buffer (array length)
         self._max_size_buffer = 20
@@ -56,25 +56,38 @@ class FailureRecoveryManager:
         # Create log entry
         def process_rows(rows):
             return ", ".join([str(item) for item in rows])
+        log_entry = None
 
-        log_entry = (
-            f"{execution_result.transaction_id}|"
-            f"{execution_result.timestamp}|"
-            f"{execution_result.status}|"
-            f"{execution_result.message}|"
-            f"{execution_result.query}|"
-            f"Before: {process_rows(execution_result.data_before.data) if execution_result.data_before.data else None}|"
-            f"After: {process_rows(execution_result.data_after.data) if execution_result.data_after.data else None}"
-        )  # execution_result.message ga kepake (?)
+        if execution_result.status == "WRITE":
+            
+            log_entry = (
+                f"{execution_result.transaction_id}|"
+                f"{execution_result.status}|"
+                f"{execution_result.table}|"
+                f"{process_rows(execution_result.data_before.data) if execution_result.data_before.data else None}|"
+                f"{process_rows(execution_result.data_after.data) if execution_result.data_after.data else None}"
+            )  
+        else:
+            log_entry = (
+                f"{execution_result.transaction_id}|"
+                f"{execution_result.status}"
+            )
+            
+        
 
         # Must call save checkpoint if the write-ahead log is full
-        if self.is_wh_log_full():
+        if self.is_wa_log_full():
             self._save_checkpoint()
 
-        # Append entry to self._wh_logs
-        self._wh_logs.append(log_entry)
+        # Append entry to self._wa_logs
+        self._wa_logs.append(log_entry)
+        
+        # Must write wal to stable storage if transaction commited to ensure consistency
+        if execution_result.status == "COMMIT":
+            self._save_checkpoint()
+            
 
-    def is_wh_log_full(self, spare: int = 0) -> bool:
+    def is_wa_log_full(self, spare: int = 0) -> bool:
         """
         This method checks if the write-ahead log is full
         Note: this can be changed if unit for max_size is change to memory size (KB, MB, ect)
@@ -86,33 +99,33 @@ class FailureRecoveryManager:
             bool: True if the write-ahead log is full (with the spare value), False otherwise.
         """
 
-        return len(self._wh_logs) >= self._max_size_log - spare
+        return len(self._wa_logs) >= self._max_size_log - spare
 
     def _save_checkpoint(self) -> None:
         """
         I.S. The write ahead log is initialized and not empty.
         F.S. The write ahead log is saved in the log.log and saved.
 
-        For saving the wh_logs in the log.log files in every 5 minutes interval OR when the in memory write ahead log reaches its limit.
+        For saving the wa_logs in the log.log files in every 5 minutes interval OR when the in memory write ahead log reaches its limit.
 
-        Note that write_log method always adds the wh_log 1 element on each call and the limit is determined by the number of elements in the wh_log,
+        Note that write_log method always adds the wa_log 1 element on each call and the limit is determined by the number of elements in the wa_log,
         As a result, it is impossible to have a write log that is not savable in the log.log file.
         """
 
         print("[FRM]: Saving checkpoint..." + str(datetime.now()))
         # Check write ahead not empty
-        if len(self._wh_logs) == 0:
+        if len(self._wa_logs) == 0:
             print("[FRM]: No logs to save.")
             return
 
-        # Save the wh_log to the log.log file (append to the end of the file)
+        # Save the wa_log to the log.log file (append to the end of the file)
         active_transactions = set()
         with open(self._log_file, "a") as file:
-            for log in self._wh_logs:
+            for log in self._wa_logs:
                 status = log.split("|")[2]
                 id = log.split("|")[0]
 
-                if status != "COMMITTED" and status != "ABORTED":
+                if status != "COMMIT" and status != "ABORT":
                     active_transactions.add(id)
                 else:
                     active_transactions.discard(id)
@@ -123,8 +136,8 @@ class FailureRecoveryManager:
                 f"CHECKPOINT|{datetime.now().isoformat()}|{json.dumps(list(active_transactions))}\n"
             )
 
-        # Clear the wh_log
-        self._wh_logs.clear()
+        # Clear the wa_log
+        self._wa_logs.clear()
         print("[FRM]: Checkpoint saved.")
 
     def _start_checkpoint_cron_job(self) -> None:
@@ -221,122 +234,54 @@ class FailureRecoveryManager:
 
     def recover(self, criteria: RecoverCriteria = None):
         """
-        This method is used to perform recovery on the database. The recovery process will apply to all transactions that meet the specified criteria. A transaction is considered to meet the criteria if its transaction_id or timestamp is greater than or equal to the given criteria.
         
-        For transactions that have already been completed (COMMITTED or ABORTED), the recovery will involve re-executing the queries. For transactions that are still pending, the recovery will involve performing a rollback, and the final status will be marked as aborted.
 
         Args:
-            criteria (RecoverCriteria, optional): criteria to choose what transactio need to be recover. Criteria can be transaction_id or timestamp. Defaults to None.
+            criteria (RecoverCriteria, optional): criteria to choose what transactio need to be recover. Criteria is transaction_id. Defaults to None.
         """
         recovered_transactions = []
-        active_transactions = set()
-        if criteria and criteria.timestamp:
-            checkpoint_found = False
-            # baca whl
-            for log_line in self._wh_logs:
+        
+        #Hanya menggunakan transaction id saja sekarang
+        if criteria and criteria.transaction_id:
+            is_start_found = False
+            #baca wa_logs dulu
+            for log_line in self._wa_logs:
                 log_parts = log_line.split("|")
-
-                if log_parts[0] == "CHECKPOINT":
-                    active_transactions = set(json.loads(log_parts[2]))
-                    checkpoint_found = True
-                    break
-                elif log_parts[0].isdigit():
-                    timestamp = log_parts[1]
-                    date_timestamp = datetime.fromisoformat(timestamp)
-                    date_criteria_timestamp = datetime.fromisoformat(criteria.timestamp)
-
-                    if date_timestamp < date_criteria_timestamp:
-                        break
-
-                    recovered_transactions.insert(0, log_line)
-
-            # baca log file
-            if not checkpoint_found:
-                for log_line in self._read_lines_from_end(self._log_file):
-                    log_parts = log_line.split("|")
-
-                    if log_parts[0] == "CHECKPOINT":
-                        active_transactions = set(json.loads(log_parts[2]))
-                        break
-                    elif log_parts[0].isdigit():
-                        timestamp = log_parts[1]
-                        date_timestamp = datetime.fromisoformat(timestamp)
-                        date_criteria_timestamp = datetime.fromisoformat(
-                            criteria.timestamp
-                        )
-
-                        if date_timestamp < date_criteria_timestamp:
-                            break
-
-                        recovered_transactions.insert(0, log_line)
-
-        elif criteria and criteria.transaction_id:
-            checkpoint_found = False
-            for log_line in self._wh_logs:
-                log_parts = log_line.split("|")
-
-                if log_parts[0] == "CHECKPOINT":
-                    active_transactions = set(json.loads(log_parts[2]))
-                    checkpoint_found = True
-
-                    break
-
-                elif log_parts[0].isdigit():
+                
+                if log_parts[0].isdigit():
                     transaction_id = int(log_parts[0])
 
-                    if transaction_id < criteria.transaction_id:
-                        break
-
-                    recovered_transactions.insert(0, log_line)
+                    if transaction_id == criteria.transaction_id:
+                        if log_parts[1] == "START":
+                            is_start_found = True
+                            break
+                        recovered_transactions.push(log_line)
 
             # baca log file
-            if not checkpoint_found:
+            if not is_start_found:
                 for log_line in self._read_lines_from_end(self._log_file):
                     log_parts = log_line.split("|")
 
-                    if log_parts[0] == "CHECKPOINT":
-                        active_transactions = set(json.loads(log_parts[2]))
-                        break
-
-                    elif log_parts[0].isdigit():
+                    if log_parts[0].isdigit():
                         transaction_id = int(log_parts[0])
 
-                        if transaction_id < criteria.transaction_id:
-                            break
+                        if transaction_id == criteria.transaction_id:
+                            if log_parts[1] == "START":
+                                is_start_found = True
+                                break
+                            recovered_transactions.push(log_line)
 
-                        recovered_transactions.insert(0, log_line)
-
-        # redo
-        print("recover tx: ", recovered_transactions)
-        for recovered_transaction in recovered_transactions:
-            log_parts = recovered_transaction.split("|")
-            transaction_id = int(log_parts[0])
-            status = log_parts[2]
-
-            if status == "COMMITTED":
-                active_transactions.discard(transaction_id)
-            elif status == "ABORTED":
-                active_transactions.discard(transaction_id)
-            elif status == "START":
-                active_transactions.add(transaction_id)
-            elif status == "IN_PROGRESS" or status == "ROLLBACK":
-                # memanggil query processor untuk menjalankan ulang query (redo)
-                print("send query: ", transaction_id, " ", log_parts[3])
-
-        print("active tx: ", active_transactions)
-
-        # undo
-        log_active_transaction = list(filter(lambda x: int(x.split("|")[0]) in active_transactions, recovered_transactions))
-        log_active_transaction = sorted(log_active_transaction, key=lambda x: datetime.fromisoformat(x.split("|")[1]))
-        
-        # make rollback query
-        for curr in log_active_transaction[::-1]:
-            transaction_id = int(curr.split("|")[0])
+        # undo (rollback)
+        table = ""
+        for curr in recovered_transactions:
             log_parts = curr.split("|")
-            sql_operation = log_parts[3]
+            transaction_id = int(log_parts[0])
+            before_states = None
+            after_states = None
+            table = log_parts[2]
             try:
-                before_states_raw = log_parts[4].split("Before: ")[1].strip()
-                after_states_raw = log_parts[5].split("After: ")[1].strip()
+                before_states_raw = log_parts[2].strip()
+                after_states_raw = log_parts[3].strip()
                 if before_states_raw == "None":
                     before_states = None
                 else:
@@ -345,79 +290,38 @@ class FailureRecoveryManager:
                     after_states = None
                 else:
                     after_states = json.loads(after_states_raw)
-            except IndexError:
-                print("Error: Missing 'Before' or 'After' in log_parts.")
-                exit()
             except json.JSONDecodeError as e:
                 print(f"Error decoding JSON: {e}")
                 exit()
-            rollback_queries = []
-            if sql_operation.startswith("INSERT INTO"):
-                table = sql_operation.split(" ")[2]
-                for after_state in after_states:
-                    where_clause = " AND ".join(
-                        [f"{k} = {repr(v)}" for k, v in after_state.items()]
-                    )
-                    rollback_query = f"DELETE FROM {table} WHERE {where_clause};"
-                    rollback_queries.append((transaction_id, rollback_query))
-            elif sql_operation.startswith("DELETE FROM"):
-                table = sql_operation.split(" ")[2]
-                for before_state in before_states:
-                    columns = ", ".join(before_state.keys())
-                    values = ", ".join([repr(v) for v in before_state.values()])
-                    rollback_query = (
-                        f"INSERT INTO {table} ({columns}) VALUES ({values});"
-                    )
-                    rollback_queries.append((transaction_id, rollback_query))
-            elif sql_operation.startswith("UPDATE"):
-                table = sql_operation.split(" ")[1]
-                for before_state, after_state in zip(before_states, after_states):
-                    set_clause = ", ".join(
-                        [f"{k} = {repr(v)}" for k, v in before_state.items()]
-                    )
-                    where_clause = " AND ".join(
-                        [f"{k} = {repr(v)}" for k, v in after_state.items()]
-                    )
-                    rollback_query = (
-                        f"UPDATE {table} SET {set_clause} WHERE {where_clause};"
-                    )
-                    rollback_queries.append((transaction_id, rollback_query))
-        print("rollback query: ", rollback_queries)
-        
-        # execute rollback query
-        for tx_id, rb_query in rollback_queries:
-            print("query rollback: ", rb_query)
+                
+            # send before and after data to storage manager to process
+            print("table:", table)
+            print("send before to storage manager: ",  before_states)
+            print("send after to storage manager: ",  after_states)
+
             
-            #panggil query procesor to process rollback query
-            res = None
-            
+            # Write recovery log    
             exec_result = ExecutionResult(
-                tx_id,
-                datetime.now().isoformat(),
-                "TRANSACTION ROLLBACK",
+                transaction_id,
                 Rows(None),
-                Rows(res),
-                "ROLLBACK",
-                rb_query,
+                Rows(before_states),
+                "WRITE",
+                table,
             )
             print("write log: ", exec_result.__dict__)
             self.write_log(exec_result)
         
-        #close undo process give abort status
-        for tx_id in active_transactions:
-            exec_result = ExecutionResult(
-                tx_id,
-                datetime.now().isoformat(),
-                "TRANSACTION END",
+        # Close rollback process
+        abort_result = ExecutionResult(
+                criteria.transaction_id,
                 Rows(None),
                 Rows(None),
-                "ABORTED",
-                None,
+                "ABORT",
+                table,
             )
-            print("write log: ", exec_result.__dict__)
-
-            self.write_log(exec_result)
-
+        print("write log: ", exec_result.__dict__)
+        self.write_log(abort_result)
+        
     def recover_system_crash(self):
         recovered_transactions = []
         active_transactions = set()
@@ -426,7 +330,7 @@ class FailureRecoveryManager:
             log_parts = log_line.split("|")
 
             if log_parts[0] == "CHECKPOINT":
-                active_transactions = set(json.loads(log_parts[2]))
+                active_transactions = set(json.loads(log_parts[1]))
                 break
             elif log_parts[0].isdigit():
                 recovered_transactions.insert(0, log_line)
@@ -435,107 +339,96 @@ class FailureRecoveryManager:
         for recovered_transaction in recovered_transactions:
             log_parts = recovered_transaction.split("|")
             transaction_id = int(log_parts[0])
-            status = log_parts[2]
+            status = log_parts[1]
 
-            if status == "COMMITTED":
-                active_transactions.discard(transaction_id)
-            elif status == "ABORTED":
-                active_transactions.discard(transaction_id)
+            if status == "COMMIT":
+                active_transactions.remove(transaction_id)
+            elif status == "ABORT":
+                active_transactions.remove(transaction_id)
             elif status == "START":
                 active_transactions.add(transaction_id)
-            elif status == "IN_PROGRESS" or status == "ROLLBACK":
-                # memanggil query processor untuk menjalankan ulang query (redo)
-                pass
+            elif status == "WRITE":
+                after_states = None
+                table = log_parts[2]
+                try:
+                    after_states_raw = log_parts[3].strip()
+                    if after_states_raw == "None":
+                        after_states = None
+                    else:
+                        after_states = json.loads(after_states_raw)
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding JSON: {e}")
+                    exit()
+                # send after data to storage manager to redo process
+                print("table:", table)
+                print("send after data to storage manager: ",  after_states)
 
-        # undo
-        log_active_transaction = list(filter(lambda x: int(x.split("|")[0]) in active_transactions, recovered_transactions))
-        log_active_transaction = sorted(log_active_transaction, key=lambda x: datetime.fromisoformat(x.split("|")[1]))
-        
-        # make rollback query
-        for curr in log_active_transaction[::-1]:
-            transaction_id = int(curr.split("|")[0])
-            log_parts = curr.split("|")
-            sql_operation = log_parts[3]
-            try:
-                before_states_raw = log_parts[4].split("Before: ")[1].strip()
-                after_states_raw = log_parts[5].split("After: ")[1].strip()
-                if before_states_raw == "None":
-                    before_states = None
-                else:
-                    before_states = json.loads(before_states_raw)
-                if after_states_raw == "None":
-                    after_states = None
-                else:
-                    after_states = json.loads(after_states_raw)
-            except IndexError:
-                print("Error: Missing 'Before' or 'After' in log_parts.")
-                exit()
-            except json.JSONDecodeError as e:
-                print(f"Error decoding JSON: {e}")
-                exit()
-            rollback_queries = []
-            if sql_operation.startswith("INSERT INTO"):
-                table = sql_operation.split(" ")[2]
-                for after_state in after_states:
-                    where_clause = " AND ".join(
-                        [f"{k} = {repr(v)}" for k, v in after_state.items()]
-                    )
-                    rollback_query = f"DELETE FROM {table} WHERE {where_clause};"
-                    rollback_queries.append((transaction_id, rollback_query))
-            elif sql_operation.startswith("DELETE FROM"):
-                table = sql_operation.split(" ")[2]
-                for before_state in before_states:
-                    columns = ", ".join(before_state.keys())
-                    values = ", ".join([repr(v) for v in before_state.values()])
-                    rollback_query = (
-                        f"INSERT INTO {table} ({columns}) VALUES ({values});"
-                    )
-                    rollback_queries.append((transaction_id, rollback_query))
-            elif sql_operation.startswith("UPDATE"):
-                table = sql_operation.split(" ")[1]
-                for before_state, after_state in zip(before_states, after_states):
-                    set_clause = ", ".join(
-                        [f"{k} = {repr(v)}" for k, v in before_state.items()]
-                    )
-                    where_clause = " AND ".join(
-                        [f"{k} = {repr(v)}" for k, v in after_state.items()]
-                    )
-                    rollback_query = (
-                        f"UPDATE {table} SET {set_clause} WHERE {where_clause};"
-                    )
-                    rollback_queries.append((transaction_id, rollback_query))
-        print("rollback query: ", rollback_queries)
-        
-        # execute rollback query
-        for tx_id, rb_query in rollback_queries:
-            print("query rollback: ", rb_query)
+        # undo (rollback)
+        for log_line in self._read_lines_from_end(self._log_file):
             
-            #panggil query procesor to process rollback query
-            res = None
+            log_parts = log_line.split("|")
             
-            exec_result = ExecutionResult(
-                tx_id,
-                datetime.now().isoformat(),
-                "TRANSACTION ROLLBACK",
-                Rows(None),
-                Rows(res),
-                "ROLLBACK",
-                rb_query,
-            )
-            print("write log: ", exec_result.__dict__)
-            self.write_log(exec_result)
-        
-        #close undo process give abort status
-        for tx_id in active_transactions:
-            exec_result = ExecutionResult(
-                tx_id,
-                datetime.now().isoformat(),
-                "TRANSACTION END",
-                Rows(None),
-                Rows(None),
-                "ABORTED",
-                None,
-            )
-            print("write log: ", exec_result.__dict__)
+            if log_parts[0] == "CHECKPOINT":
+                active_transactions = set(json.loads(log_parts[1]))
+                continue
+            elif log_parts[0].isdigit():
+                transaction_id = int(log_parts[0])
+                status = log_parts[1]
+                table = log_parts[2]
+                if transaction_id not in active_transactions:
+                    continue
+                
+                if status == "START":
+                    active_transactions.remove(transaction_id)
+                    # Close rollback process
+                    abort_result = ExecutionResult(
+                            transaction_id,
+                            Rows(None),
+                            Rows(None),
+                            "ABORT",
+                            table,
+                        )
+                    print("write log: ", exec_result.__dict__)
+                    self.write_log(abort_result)
+                    continue
+                
+                #rollback processs
+                before_states = None
+                after_states = None
+                table = log_parts[2]
+                try:
+                    before_states_raw = log_parts[2].strip()
+                    after_states_raw = log_parts[3].strip()
+                    if before_states_raw == "None":
+                        before_states = None
+                    else:
+                        before_states = json.loads(before_states_raw)
+                    if after_states_raw == "None":
+                        after_states = None
+                    else:
+                        after_states = json.loads(after_states_raw)
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding JSON: {e}")
+                    exit()
 
-            self.write_log(exec_result)
+                # send before and after data to storage manager to process
+                print("table:", table)
+                print("send before to storage manager: ",  before_states)
+                print("send after to storage manager: ",  after_states)
+
+
+                # Write recovery log    
+                exec_result = ExecutionResult(
+                    transaction_id,
+                    Rows(None),
+                    Rows(before_states),
+                    "WRITE",
+                    table,
+                )
+                print("write log: ", exec_result.__dict__)
+                self.write_log(exec_result)
+                
+
+            if len(active_transactions) == 0:
+                break;
+        
