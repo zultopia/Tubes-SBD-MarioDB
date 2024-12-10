@@ -17,35 +17,46 @@ class EquivalenceRules:
     '''
     @staticmethod
     def deconstruct_conjunction(node: QueryNode) -> List[QueryNode]:
-        if not isinstance(node, SelectionNode):
+        if node.node_type != NodeType.SELECTION:
             return [node]
-        
-        if len(node.conditions) <= 1:
+
+        selection_node = node
+        conditions = selection_node.conditions
+        if len(conditions) <= 1:
+            # No decomposition possible if only one or zero conditions
             return [node]
-        
-        ret = []
-        for i, condition in enumerate(node.conditions):
-            # Create a new SelectionNode with a single condition
-            parent = SelectionNode([condition])
-            parent.id = str(uuid.uuid4())  # Assign a new unique ID
-            
-            # Conditions other than the current condition
-            remaining_conditions = node.conditions[:i] + node.conditions[i+1:]
-            
-            if remaining_conditions:
-                # Create a child SelectionNode with the remaining conditions
-                child = SelectionNode(remaining_conditions)
-                child.id = str(uuid.uuid4())  # Assign a new unique ID
-                
-                # Recursively deconstruct the remaining conditions
-                child_deconstructed = EquivalenceRules.deconstruct_conjunction(child)
-                
-                # Assuming only one deconstruction for the child
-                parent.set_child(child_deconstructed[0])
-            
-            ret.append(parent)
-        
-        return ret
+
+        original_child = selection_node.child.clone() if selection_node.child else None
+
+        all_variants = []
+
+        # Variant 1: No decomposition
+        no_split_node = SelectionNode(conditions)
+        if original_child:
+            no_split_node.set_child(original_child.clone())
+        all_variants.append(no_split_node)
+
+        # Variants 2...: All possible splits
+        # For each split point i, split conditions into left and right groups
+        for i in range(1, len(conditions)):
+            left_conditions = conditions[:i]
+            right_conditions = conditions[i:]
+
+            left_node = SelectionNode(left_conditions)
+            right_node = SelectionNode(right_conditions)
+
+            # The right node gets the original child subtree
+            if original_child:
+                right_node.set_child(original_child.clone())
+
+            # Chain them: left_node -> right_node
+            left_node.set_child(right_node)
+            all_variants.append(left_node)
+
+        return all_variants
+
+
+
     
     @staticmethod
     def commute_selections(node: QueryNode) -> List[QueryNode]:

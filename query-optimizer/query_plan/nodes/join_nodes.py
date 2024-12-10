@@ -2,6 +2,7 @@ from typing import List, Literal, Dict
 from ..base import QueryNode
 from ..enums import NodeType, JoinAlgorithm
 from utils import Pair
+import uuid
 
 class JoinCondition:
     def __init__(self, left_attr: str, right_attr: str, 
@@ -24,7 +25,7 @@ class JoinNode(QueryNode):
         if self.children:
             cloned_children = Pair(self.children.first.clone(), self.children.second.clone())
         cloned_node = JoinNode(self.algorithm)
-        cloned_node.id = self.id
+        cloned_node.id = str(uuid.uuid4())
         cloned_node.set_children(cloned_children)
         return cloned_node
 
@@ -56,7 +57,7 @@ class ConditionalJoinNode(JoinNode):
         if self.children:
             cloned_children = Pair(self.children.first.clone(), self.children.second.clone())
         cloned_node = ConditionalJoinNode(self.algorithm, cloned_conditions)
-        cloned_node.id = self.id
+        cloned_node.id = str(uuid.uuid4())
         cloned_node.set_children(cloned_children)
 
         return cloned_node
@@ -85,7 +86,7 @@ class NaturalJoinNode(JoinNode):
         if self.children:
             cloned_children = Pair(self.children.first.clone(), self.children.second.clone())
         cloned_node = NaturalJoinNode(self.algorithm)
-        cloned_node.id = self.id
+        cloned_node.id = str(uuid.uuid4)
         cloned_node.set_children(cloned_children)
         return cloned_node
 

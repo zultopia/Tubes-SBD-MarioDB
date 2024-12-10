@@ -1,6 +1,7 @@
 from typing import Dict
 from ..base import QueryNode
 from ..enums import NodeType
+import uuid
 
 class TableNode(QueryNode):
     def __init__(self, table_name: str, alias: str | None = None):
@@ -12,7 +13,7 @@ class TableNode(QueryNode):
 
     def clone(self) -> 'TableNode':
         cloned_node = TableNode(self.table_name, self.alias)
-        cloned_node.id = self.id
+        cloned_node.id = str(uuid.uuid4)
         if self.child:
             cloned_node.set_child(self.child.clone())
         return cloned_node

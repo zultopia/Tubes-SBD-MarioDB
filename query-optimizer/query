@@ -1,5 +1,1 @@
-SELECT a
-FROM (
-    SELECT d
-    FROM b;
-) AS sub;
+select a from b where a = b and b = c;
