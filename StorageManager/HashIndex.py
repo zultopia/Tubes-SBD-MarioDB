@@ -4,8 +4,8 @@ from typing import Any, Dict, List
 
 class Hash(object):
     MAX_BUCKET = 10000
-    DATA_DIR = 'data_blocks/'
-    HASH_DIR = 'hash/'
+    DATA_DIR = "data_blocks/"
+    HASH_DIR = "hash/"
     
     """
     Bawah ini copasan StorageManager
@@ -28,7 +28,7 @@ class Hash(object):
         block = Hash._load_block(table, block_id)
         for row in block:
             if Hash._hash_function(row[column]) == hash_value:
-                results.append({col: row[col] for col in row.keys})
+                results.append({col: row[col] for col in row.keys()})
         return results
     
     """
@@ -73,8 +73,8 @@ class Hash(object):
         return []
     
     @staticmethod
-    def _save_hash_block(table: str, block_id: int, block_data: List[Dict]):
-        block_file = Hash._get_hash_block_file(table, block_id)
+    def _save_hash_block(table: str, column: str, hash_value: int, block_id: int, block_data: List[Dict]):
+        block_file = Hash._get_hash_block_file(table, column, hash_value, block_id)
         with open(block_file, "wb") as file:
             pickle.dump(block_data, file)
     
@@ -87,7 +87,8 @@ class Hash(object):
         
         block.append({'id': new_block_id})
         # assumes entries fit in one block
-        Hash._save_hash_block(table, 1, block)
+        Hash._save_hash_block(table, column, hash_value, 1, block)
+        print("HASH SAVED")
         return
 
     @staticmethod
@@ -106,6 +107,7 @@ class Hash(object):
     @staticmethod
     def _write_row(table: str, column: str, new_block_id: int, value):
         hash_value = Hash._hash_function(value)
+        print("HASH", hash_value)
         Hash._write_hash_block(table, column, hash_value, new_block_id)
 
     

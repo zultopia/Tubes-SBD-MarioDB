@@ -249,35 +249,40 @@ class StorageManager:
         if index_type != "hash" and index_type != "B+":
             raise ValueError("Index yang digunakan adalah hash index.")
         
-        if table not in self.data:
-            raise ValueError(f"Table {table} tidak ditemukan.")
-        
         if index_type == "hash":
-            # Membuat indeks berbasis hash
-            self.indexes[(table, column)] = {}
-            for row in self.data[table]:
-                key = row[column]
-                if key not in self.indexes[(table, column)]:
-                    self.indexes[(table, column)][key] = []
-                self.indexes[(table, column)][key].append(row)
+            exist = False
+            for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
+                if file.startswith(f"{table}_{column}_hash"):
+                    exist = True
+                    break
+            if exist:
+                raise ValueError(f"Hash index already exists at {table}.{column}")
+            for file in os.listdir(self.DATA_DIR):
+                if file.startswith(f"{table}"):
+                    block_id = int(file.split('_')[-1].split('.')[0])
+                    block = self._load_block(table, block_id)
+                    for row in block:
+                        self.write_block_with_hash(table, column, row[column], block_id)
             print(f"Hash index dibuat pada {table}.{column}")
         else:
+            raise NotImplementedError("B+ Not Implemented")
+            """
             if table in self.bplusindexes.keys:
                 raise ValueError(f"Table {table} sudah memiliki index B+ Tree di kolom {self.bplusindexes[table][0]}.")
             self.bplusindexes[table] = (column, BPlusTree(8))
             for row in self.data[table]:
                 key = row[column]
                 self.bplusindexes[table][1].insert(key, row)
+            """
             
     def read_block_with_hash(self, table: str, column: str, value):
         # Gunain indeks kalo ada
         return Hash._get_rows(table, column, value)
     
     
-    def write_block_with_hash(self, data_write: DataWrite, new_block_id: int):
-        table = data_write.table
-        columns = data_write.columns
-        dict_new_values = dict(zip(columns, data_write.columns))
+    def write_block_with_hash(self, table: str, column: str, value, new_block_id: int):
+        Hash._write_row(table, column, new_block_id, value)
+        """
         for column in columns:
             hash_exist = False
             for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
@@ -286,8 +291,7 @@ class StorageManager:
                     break
             if not hash_exist:
                 continue
-            Hash._write_row(table, column, new_block_id, dict_new_values[column])
-        
+        """
     """
     def read_range_with_bplus(self, table: str, column: str, min, max):
         index_key = table

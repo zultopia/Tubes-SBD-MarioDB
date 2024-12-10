@@ -38,7 +38,10 @@ if __name__ == "__main__":
     manager.log_action("write", delete_action.table, {"deleted_rows": removed})
     print("Removed Rows:", removed)
     # print("Data After Delete:", manager.data)
-
+    manager.set_index("Student", "FullName", "hash")
+    
+    data = manager.read_block_with_hash("Student", "FullName", "Eve")
+    print("Data", data)
     # Checking Logs
     print("\nAction Logs:")
     for log_entry in manager.action_logs:
