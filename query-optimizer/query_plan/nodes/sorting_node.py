@@ -18,7 +18,8 @@ class SortingNode(QueryNode):
         cloned_attributes = self.attributes.copy()
         cloned_child = self.child.clone() if self.child else None
         cloned_node = SortingNode(cloned_attributes, self.ascending)
-        cloned_node.id = str(uuid.uuid4)
+        cloned_node.id = self.id
+
         if cloned_child:
             cloned_node.set_child(cloned_child)
         return cloned_node

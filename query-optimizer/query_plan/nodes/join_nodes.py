@@ -25,7 +25,7 @@ class JoinNode(QueryNode):
         if self.children:
             cloned_children = Pair(self.children.first.clone(), self.children.second.clone())
         cloned_node = JoinNode(self.algorithm)
-        cloned_node.id = str(uuid.uuid4())
+        cloned_node.id = self.id
         cloned_node.set_children(cloned_children)
         return cloned_node
 
@@ -57,7 +57,8 @@ class ConditionalJoinNode(JoinNode):
         if self.children:
             cloned_children = Pair(self.children.first.clone(), self.children.second.clone())
         cloned_node = ConditionalJoinNode(self.algorithm, cloned_conditions)
-        cloned_node.id = str(uuid.uuid4())
+        cloned_node.id = self.id
+
         cloned_node.set_children(cloned_children)
 
         return cloned_node
@@ -84,9 +85,11 @@ class NaturalJoinNode(JoinNode):
     def clone(self) -> 'NaturalJoinNode':
         cloned_children = None
         if self.children:
+
             cloned_children = Pair(self.children.first.clone(), self.children.second.clone())
         cloned_node = NaturalJoinNode(self.algorithm)
-        cloned_node.id = str(uuid.uuid4)
+        cloned_node.id = self.id
+
         cloned_node.set_children(cloned_children)
         return cloned_node
 

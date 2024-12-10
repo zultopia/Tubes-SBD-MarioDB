@@ -27,7 +27,8 @@ class SelectionNode(QueryNode):
     def clone(self) -> 'SelectionNode':
         cloned_conditions = [SelectionCondition(c.left_operand, c.right_operand, c.operator) for c in self.conditions]
         cloned_node = SelectionNode(cloned_conditions)
-        cloned_node.id = str(uuid.uuid4)
+        cloned_node.id = self.id
+
         if self.child:
             cloned_node.set_child(self.child.clone())
         return cloned_node
@@ -54,7 +55,8 @@ class UnionSelectionNode(QueryNode):
     def clone(self) -> 'UnionSelectionNode':
         cloned_children = [child.clone() for child in self.children]
         cloned_node = UnionSelectionNode(cloned_children)
-        cloned_node.id = str(uuid.uuid4)
+        cloned_node.id = self.id
+
         return cloned_node
 
     def estimate_cost(self, statistics: Dict) -> float:

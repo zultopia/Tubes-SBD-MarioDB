@@ -39,3 +39,19 @@ class QueryNode(ABC, Prototype):
     @abstractmethod
     def clone(self):
         pass
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        if not isinstance(other, QueryNode):
+            return False
+        if self.node_type != other.node_type:
+            return False
+        # Compare children and node-specific attributes in subclasses
+        return True
+
+    def __hash__(self):
+        # Combine node_type, children, and other attributes into a hash
+        # For children, you might do something like:
+        # hash_value = hash((self.node_type, tuple_of_children_hashes, tuple_of_node_specific_attributes))
+        return hash(self.node_type)  # Extend this in subclasses

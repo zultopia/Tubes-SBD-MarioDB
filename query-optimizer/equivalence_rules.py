@@ -62,21 +62,42 @@ class EquivalenceRules:
     def commute_selections(node: QueryNode) -> List[QueryNode]:
         """
         RULE 2: Selection operations are commutative
+        If node is a SelectionNode and its child is also a SelectionNode, we can swap their conditions.
         """
-        if not isinstance(node, SelectionNode) or not node.child or not isinstance(node.child, SelectionNode):
+        if not (isinstance(node, SelectionNode) and 
+                node.child and 
+                isinstance(node.child, SelectionNode)):
             return [node]
-        
-        # Create new node with swapped conditions
-        new_parent = SelectionNode(node.child.conditions)
-        new_child = SelectionNode(node.conditions)
-        
-        # Preserve the original child's child
-        if node.child.child:
-            new_child.set_child(node.child.child)
-        
-        new_parent.set_child(new_child)
-        return [new_parent]
 
+        # node: SELECT conditions1
+        # node.child: SELECT conditions2
+        # We want to commute them to:
+        # new_parent: SELECT conditions2
+        #    └─ new_child: SELECT conditions1
+        #         └─ node.child.child (if any)
+
+        # Extract conditions
+        top_conditions = node.child.conditions
+        bottom_conditions = node.conditions
+
+        # Clone subtree of node.child.child if it exists
+        subtree = node.child.child.clone() if node.child.child else None
+
+        # Create new parent (top) selection node
+        new_parent = SelectionNode(top_conditions)
+
+        # Create new child (bottom) selection node
+        new_child = SelectionNode(bottom_conditions)
+
+        # Attach the subtree under new_child
+        if subtree:
+            new_child.set_child(subtree)
+
+        # Attach new_child under new_parent
+        new_parent.set_child(new_child)
+
+        return [new_parent]
+    
     @staticmethod
     def collapse_projections(node: QueryNode) -> List[QueryNode]:
         """

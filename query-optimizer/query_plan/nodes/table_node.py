@@ -13,7 +13,8 @@ class TableNode(QueryNode):
 
     def clone(self) -> 'TableNode':
         cloned_node = TableNode(self.table_name, self.alias)
-        cloned_node.id = str(uuid.uuid4)
+        cloned_node.id = self.id
+
         if self.child:
             cloned_node.set_child(self.child.clone())
         return cloned_node

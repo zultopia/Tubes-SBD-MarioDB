@@ -8,7 +8,9 @@ from collections import deque
 
 def generate_possible_plans(query: 'QueryPlan') -> List['QueryPlan']:
     # Include only the deconstruct_conjunction rule
-    rules = [EquivalenceRules.deconstruct_conjunction]
+    rules = [EquivalenceRules.deconstruct_conjunction, 
+            #  EquivalenceRules.commute_selections
+             ]
 
     initial_plan = query.clone()
     plans = {initial_plan}  # Use a set to store unique plans based on __hash__ and __eq__
