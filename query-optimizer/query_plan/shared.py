@@ -8,3 +8,4 @@ class Condition:
 
     def __str__(self) -> str:
         return f"{self.left_operand} {self.operator.value} {self.right_operand}"
+    

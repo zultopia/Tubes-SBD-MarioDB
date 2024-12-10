@@ -7,6 +7,8 @@ from query_plan.enums import NodeType
 from utils import Pair
 from typing import List
 from query_plan.shared import Condition
+from data import QOData
+from query_plan.enums import JoinAlgorithm
 
 class EquivalenceRules:
 
@@ -114,7 +116,7 @@ class EquivalenceRules:
             return [node]
         
         # Create new node with original projection but connected to deepest child
-        new_node = ProjectNode(node.attributes)
+        new_node = node.clone()
         new_node.set_child(current.child)
         return [new_node]
 
@@ -199,6 +201,99 @@ class EquivalenceRules:
 
         # Return the transformations or the original node if no transformation was applied
         return ret or [node.clone()] # kalau ret itu kosong aka falsy, maka akan dikirim [node]
+    
+    @staticmethod
+    def distributeSelection(node: QueryNode) -> List[QueryNode]:
+        """
+        RULE 7: Selection operation can be distributed.
+        - Distributes selection conditions across joins where applicable.
+        """
+        def checkRelevance(c: Condition, _node: QueryNode) -> bool:
+            leftOperand = c.left_operand
+            attr = leftOperand
+            table = ''
+
+            # Split the operand into table and attribute if applicable
+            if '.' in leftOperand:
+                table, attr = leftOperand.split(".")
+
+            # Check relevance for ProjectNode
+            if isinstance(_node, ProjectNode):
+                for attribute in _node.attributes:
+                    if attr == attribute:
+                        return True
+
+            # Check relevance for TableNode
+            elif isinstance(_node, TableNode):
+                tempData = QOData()
+                actualTable = tempData.data.get(_node.table_name)
+                if actualTable:
+                    attributes = actualTable["attributes"]
+                    if attr in attributes:
+                        return True
+
+            # Check relevance for nodes with children (e.g., JoinNode, ConditionalJoinNode, etc.)
+            elif hasattr(_node, 'children') and isinstance(_node.children, Pair):
+                # Recursively check both children in the Pair
+                if checkRelevance(c, _node.children.first) or checkRelevance(c, _node.children.second):
+                    return True
+
+            # Check relevance for a single child node
+            elif hasattr(_node, 'child') and _node.child:
+                return checkRelevance(c, _node.child)
+
+            # If no match is found in the subtree, return False
+            return False
+
+        if not isinstance(node, SelectionNode) or not isinstance(node.child, (ConditionalJoinNode, NaturalJoinNode)):
+            return [node]
+
+        join_node = node.child
+        if not isinstance(join_node.children, Pair) or not join_node.children.first or not join_node.children.second:
+            return [node]
+        left_child = join_node.children.first
+        right_child = join_node.children.second
+
+        # Split conditions based on relevance to left or right child
+        left_conditions = []
+        right_conditions = []
+        for condition in node.conditions:
+            if checkRelevance(condition,left_child):
+                
+                left_conditions.append(condition)
+            elif checkRelevance(condition,right_child):
+                # Check if condition applies to right_child
+                right_conditions.append(condition)
+
+        # If no conditions can be distributed, return the original node
+        if not left_conditions and not right_conditions:
+            return [node]
+        # Create new selection nodes for left and right children if applicable
+        if left_conditions:
+            left_selection = SelectionNode(left_conditions)
+            left_selection.set_child(left_child.clone())
+        else:
+            left_selection = left_child.clone()  # If no conditions apply, just clone the child
+        if right_conditions:
+            right_selection = SelectionNode(right_conditions)
+            right_selection.set_child(right_child.clone())
+        else:
+            right_selection = right_child.clone()  # If no conditions apply, just clone the child
+        # Create a new join node with the modified children
+        if isinstance(join_node, ConditionalJoinNode):
+            new_join = ConditionalJoinNode(
+                algorithm=join_node.algorithm,
+                conditions=join_node.conditions if hasattr(join_node, 'conditions') else None
+            )
+        elif isinstance(join_node, NaturalJoinNode):
+            new_join = NaturalJoinNode(
+                algorithm=join_node.algorithm
+            )
+        new_join.set_children(Pair(left_selection, right_selection))
+        #new_join.algorithm = JoinAlgorithm.NESTED_LOOP
+        # Return the transformed join node
+        return [new_join]
+
         
 
 # test functions 
