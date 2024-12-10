@@ -1,6 +1,6 @@
 # Query Processor sangatlah mantap
 # Import komponen yang lain dulu
-from typing import List, Union, Dict, Optional, Tuple
+from typing import List, Union, Dict, Optional
 
 # Storage Manager
 from StorageManager.classes import StorageManager, DataRetrieval, DataWrite, DataDeletion, Condition
@@ -42,14 +42,7 @@ class QueryProcessor:
     def execute_query(self, query_string: str) -> ExecutionResult:
         query_tree: ParseTree = get_parse_tree(query_string)
         # cek child pertama untuk menentukan jenis query (lengkapnya cek komentar dari fungsi di bawah ini)
-        schema = check_first_child(query_tree)
-        # inisialisasi dictionary untuk menyimpan alias tabel
-        alias = {}
-        # tambahkan nama tabel ke dalam skema dari node FromList
-        handle_FROM(schema, alias, query_tree)
-        # Testing
-        print("schema =", schema, "\n")
-        print("alias =", alias, "\n")
+        check_first_child(query_tree)
         print(query_tree)
         # query_plan belum jadi, sementara proses query tree dulu, lagipula nanti query plan juga bentuknya objek query tree, tapi teroptimasi
 
@@ -59,24 +52,24 @@ def check_first_child(query_tree: ParseTree):
     first_child_node = query_tree.childs[0]
     # jika child pertama merupakan token SELECT
     if (isinstance(first_child_node.root, Node)) and (first_child_node.root.token_type in {Token.SELECT}):
-        # panggil fungsi handle_SELECT
-        return(handle_SELECT(query_tree))
+        # panggil fungsi execute_SELECT
+        execute_SELECT(query_tree)
     elif (isinstance(first_child_node.root, Node)) and (first_child_node.root.token_type) in (Token.UPDATE):
-        # panggil fungsi handle_UPDATE
-        return(handle_UPDATE(query_tree))
+        # panggil fungsi execute_UPDATE
+        execute_UPDATE(query_tree)
 
 # menambahkan atribut yang di-SELECT ke dalam schema dari node SelectListTail
-def add_schema_from_SelectListTail(SelectListTail_node: ParseTree, schema: Dict[str, Dict[str, List[Tuple[str, Union[str, int]]]]]):
+def add_schema_from_SelectListTail(SelectListTail_node: ParseTree, schema: Dict[str, List[str]]) -> Dict[str, List[str]]:
     # child kedua dari node SelectListTail adalah node Field
     field_node = SelectListTail_node.childs[1]
     # jika atribut hanya disebutkan namanya (contoh: SELECT id)
     if len(field_node.childs) == 1:
-        # child pertama dari node Field adalah atribut yang di-SELECT, tambahkan ke columns dengan key UNKNOWN karena nama tabel belum diketahui
-        add_to_schema(schema, "UNKNOWN", field_node.childs[0].root.value)
+        # child pertama dari node Field adalah atribut pertama yang di-SELECT, tambahkan ke columns dengan key UNKNOWN karena nama tabel belum diketahui
+        add_to_dictionary(schema, "UNKNOWN", field_node.childs[0].root.value)
     # jika menggunakan alias (contoh: SELECT t.id FROM table AS t)
     else:
         # child pertama dari node Field adalah alias tabel, child kedua adalah ., child ketiga adalah atributnya
-        add_to_schema(schema, field_node.childs[0].root.value, field_node.childs[2].root.value)
+        add_to_dictionary(schema, field_node.childs[0].root.value, field_node.childs[2].root.value)
     # jika tidak atribut lagi selanjutnya, kembalikan schema
     if (len(SelectListTail_node.childs) == 2):
         return schema
@@ -84,18 +77,18 @@ def add_schema_from_SelectListTail(SelectListTail_node: ParseTree, schema: Dict[
     else:
         return add_schema_from_SelectListTail(SelectListTail_node.childs[2], schema)
 
-# menambahkan tabel dan atribut yang di-SELECT ke sebuah dictionary yang menyimpan skema
-def add_to_schema(schema: Dict[str, Dict[str, List[Tuple[str, Union[str, int]]]]], table: str, column: str):
-    # jika tabel belum ada dalam schema
-    if table not in schema:
-        schema[table] = {}
-    # jika kolom belum ada dalam schema
-    if column not in schema[table]:
-        schema[table][column] = []
+# menambahkan key dan value ke sebuah dictionary
+def add_to_dictionary(dictionary: Union[Dict[str, List[str]] | Dict[str, List[Condition]]], key: str, value: Union[str | Condition]):
+    # jika key sudah ada di dalam dictionary
+    if key in dictionary:
+        dictionary[key].append(value)
+    # jika belum ada
+    else:
+        dictionary[key] = [value]
 
 # menempatkan nama asli tabel (beserta alias jika ada) dalam klausa FROM dalam dictionary schema
 # alias perlu disimpan karena klausa berikutnya (WHERE, ORDER BY, dll) mungkin menggunakan alias
-def handle_FROM(schema: Dict[str, Dict[str, List[Tuple[str, Union[str, int]]]]], alias: Dict[str, str], query_tree: ParseTree):
+def execute_FROM(schema: Dict[str, List[str]], alias: Dict[str, str], query_tree: ParseTree):
     # tabel pertama dalam klausa FROM
     FromList_node = query_tree.childs[3]
     # nama tabel pertama disimpan dalam node TableTerm
@@ -117,14 +110,10 @@ def handle_FROM(schema: Dict[str, Dict[str, List[Tuple[str, Union[str, int]]]]],
     # tabel-tabel dalam bentuk JOIN
     elif (len(FromList_node.childs[0].childs) == 2):
         add_table_from_TableResultTail(schema, alias, FromList_node.childs[0].childs[1])
-    # jika ada klausa WHERE
-    if (len(query_tree.childs) >= 5) and (query_tree.childs[5].root == "Condition"):
-        # panggil fungsi handle_WHERE
-        handle_WHERE(schema, alias, query_tree)
 
 # menempatkan nama asli tabel (beserta alias jika ada) untuk tabel selain tabel pertama ke dalam schema
 # jika menggunakan bentuk comma separated
-def add_table_from_FromListTail(schema: Dict[str, Dict[str, List[Tuple[str, Union[str, int]]]]], alias: Dict[str, str], FromListTail_node: ParseTree):
+def add_table_from_FromListTail(schema: Dict[str, List[str]], alias: Dict[str, str], FromListTail_node: ParseTree):
     # nama tabel disimpan dalam node TableTerm
     TableTerm_node = FromListTail_node.childs[1].childs[0]
     # jika menggunakan alias, langsung menggunakan nama asli tabel
@@ -138,7 +127,7 @@ def add_table_from_FromListTail(schema: Dict[str, Dict[str, List[Tuple[str, Unio
 
 # menempatkan nama asli tabel (beserta alias jika ada) untuk tabel selain tabel pertama ke dalam schema
 # jika menggunakan bentuk JOIN
-def add_table_from_TableResultTail(schema: Dict[str, Dict[str, List[Tuple[str, Union[str, int]]]]], alias: Dict[str, str], TableResultTail_node: ParseTree):
+def add_table_from_TableResultTail(schema: Dict[str, List[str]], alias: Dict[str, str], TableResultTail_node: ParseTree):
     # nama tabel disimpan dalam node TableTerm
     TableTerm_node = TableResultTail_node.childs[2]
     if len(TableTerm_node.childs) == 3:
@@ -150,92 +139,98 @@ def add_table_from_TableResultTail(schema: Dict[str, Dict[str, List[Tuple[str, U
         add_table_from_FromListTail(schema, alias, TableResultTail_node.childs[3])
 
 # handle query SELECT, menerima input node query tree
-def handle_SELECT(query_tree: ParseTree):
+def execute_SELECT(query_tree: ParseTree):
     # child kedua dari query tree adalah node SelectList
     SelectList_node = query_tree.childs[1]
     # child pertama dari node SelectList adalah node Field
     field_node = SelectList_node.childs[0]
-    # inisialisasi Dict[str, Dict[str, List[Tuple[str, Union[str, int]]]]] untuk menyimpan atribut apa saja yang di-SELECT
+    # inisialisasi Dict[str, List[str]] untuk menyimpan atribut apa saja yang di-SELECT
     retrieval_schema = {}
 
     # jika atribut hanya disebutkan namanya (contoh: SELECT id)
     if len(field_node.childs) == 1:
         # child pertama dari node Field adalah atribut pertama yang di-SELECT, tambahkan ke columns dengan key UNKNOWN karena nama tabel belum diketahui
-        add_to_schema(retrieval_schema, "UNKNOWN", field_node.childs[0].root.value)
+        add_to_dictionary(retrieval_schema, "UNKNOWN", field_node.childs[0].root.value)
     # jika menggunakan alias (contoh: SELECT t.id FROM table AS t)
     else:
         # child pertama dari node Field adalah alias tabel, child kedua adalah ., child ketiga adalah atributnya
-        add_to_schema(retrieval_schema, field_node.childs[0].root.value, field_node.childs[2].root.value)
-    # kalau atribut yang di-SELECT cuma 1
-    if len(SelectList_node.childs) == 1:
-        return retrieval_schema
+        add_to_dictionary(retrieval_schema, field_node.childs[0].root.value, field_node.childs[2].root.value)
     # kalau atribut yang di-SELECT lebih dari 1
-    else:
-        return add_schema_from_SelectListTail(SelectList_node.childs[1], retrieval_schema)
+    if len(SelectList_node.childs) > 1:
+        retrieval_schema = add_schema_from_SelectListTail(SelectList_node.childs[1], retrieval_schema)
+    # inisialisasi dictionary untuk menyimpan alias tabel
+    alias = {}
+    # dictionary untuk menyimpan kondisi setiap tabel
+    conditions: Dict[str, List[Condition]] = {}
+    # tambahkan nama tabel ke dalam skema dari node FromList
+    execute_FROM(retrieval_schema, alias, query_tree)
+    # Testing (DELETE LATER)
+    print("schema =", retrieval_schema, "\n")
+    print("alias =", alias, "\n")
+    # jika ada klausa berikutnya
+    if len(query_tree.childs) >= 6:
+        # jika ada klausa WHERE
+            if query_tree.childs[5].root == "Condition":
+                execute_WHERE(retrieval_schema, alias, conditions, query_tree)
+                for table, conditions in conditions.items():
+                    print(f"Table: {table}")
+                    for condition in conditions:
+                        print(f"  - {condition.column} {condition.operation} {condition.operand}")
 
-# TODO (menunggu kelompok storage manager): 
-# handle query WHERE, menerima input node query tree
-def handle_WHERE(schema: Dict[str, Dict[str, List[Tuple[str, Union[str, int]]]]], alias: Dict[str, str], query_tree: ParseTree):
-    # node Condition merupakan child ke-6 dari query tree
+def add_condition_from_AndConditionTail(schema: Dict[str, List[str]], alias: Dict[str, str], conditions: Dict[str, List[Condition]], AndConditionTail_node: ParseTree):
+    ConditionTerm_node = AndConditionTail_node.childs[1]
+    Field_node = ConditionTerm_node.childs[0]
+    # jika tidak menggunakan alias
+    if len(Field_node.childs) == 1:
+        table = next[iter(conditions)]
+        column = Field_node.childs[0].root.value
+    # jika menggunakan alias
+    else:
+        table_alias = Field_node.childs[0].root.value
+        table = alias[table_alias]
+        column = Field_node.childs[2].root.value
+    operation = ConditionTerm_node.childs[1].childs[0].root.value
+    operand = ConditionTerm_node.childs[2].root.value
+    # tambahkan kondisi ke dictionary
+    add_to_dictionary(conditions, table, Condition(column, operation, operand))
+    # jika ada kondisi lain
+    if len(AndConditionTail_node.childs) == 3:
+        AndConditionTail_node = AndConditionTail_node.childs[2]
+        add_condition_from_AndConditionTail(schema, alias, conditions, AndConditionTail_node)
+
+def execute_WHERE(schema: Dict[str, List[str]], alias: Dict[str, str], conditions: Dict[str, List[Condition]], query_tree: ParseTree) -> Dict[str, List[Condition]]:
     Condition_node = query_tree.childs[5]
-    # node yang menyimpan atribut adalah node Field
-    ConditionTerm_node = Condition_node.childs[0].childs[0]
+    AndCondition_node = Condition_node.childs[0]
+    ConditionTerm_node = AndCondition_node.childs[0]
     Field_node = ConditionTerm_node.childs[0]
     # jika tidak menggunakan alias
     if len(Field_node.childs) == 1:
-        # langsung tambahkan ke kolom dari tabel satu-satunya dalam schema
-        table = next(iter(schema))
+        table = next[iter(conditions)]
         column = Field_node.childs[0].root.value
     # jika menggunakan alias
     else:
-        # tambahkan ke kolom dari tabel dalam schema, lihat nama asli tabel menurut alias yang digunakan dari dictionary alias
-        alias = Field_node.childs[0].root.value
-        table = schema[alias]
+        table_alias = Field_node.childs[0].root.value
+        table = alias[table_alias]
         column = Field_node.childs[2].root.value
-    # tambahkan operator dan operand dalam schema
-    ComparisonOperator_node = ConditionTerm_node.childs[1]
-    operation = ComparisonOperator_node.childs[0].root.value
+    operation = ConditionTerm_node.childs[1].childs[0].root.value
     operand = ConditionTerm_node.childs[2].root.value
-    schema[table][column].append((operation, operand))
-    # jika kondisi lebih dari 1
-    if len(Condition_node.childs) == 2:
-        ConditionTail_node = Condition_node.childs[1]
-        add_condition_from_ConditionTail(schema, alias, ConditionTail_node)
-
-# menambahkan kondisi dari node ConditionTail
-def add_condition_from_ConditionTail(schema: Dict[str, Dict[str, List[Tuple[str, Union[str, int]]]]], alias: Dict[str, str], ConditionTail_node: ParseTree):
-    ConditionTerm_node = ConditionTail_node.childs[1].childs[0]
-    Field_node = ConditionTerm_node.childs[0]
-    # jika tidak menggunakan alias
-    if len(Field_node.childs) == 1:
-        # langsung tambahkan ke kolom dari tabel satu-satunya dalam schema
-        table = next(iter(schema))
-        column = Field_node.childs[0].root.value
-    # jika menggunakan alias
-    else:
-        # tambahkan ke kolom dari tabel dalam schema, lihat nama asli tabel menurut alias yang digunakan dari dictionary alias
-        alias = Field_node.childs[0].root.value
-        table = schema[alias]
-        column = Field_node.childs[2].root.value
-    # tambahkan operator dan operand dalam schema
-    ComparisonOperator_node = ConditionTerm_node.childs[1]
-    operation = ComparisonOperator_node.childs[0].root.value
-    operand = ConditionTerm_node.childs[2].root.value
-    schema[table][column].append((operation, operand))
-    # jika kondisi lebih dari 1
-    if len(ConditionTail_node.childs) == 2:
-        new_ConditionTail_node = ConditionTail_node.childs[2]
-        add_condition_from_ConditionTail(schema, alias, new_ConditionTail_node)
+    # tambahkan kondisi ke dictionary
+    add_to_dictionary(conditions, table, Condition(column, operation, operand))
+    # jika ada kondisi lain
+    if len(AndCondition_node.childs) == 2:
+        AndConditionTail_node = AndCondition_node.childs[1]
+        add_condition_from_AndConditionTail(schema, alias, conditions, AndConditionTail_node)
+    return conditions
 
 # TODO (sekarang)
 # fungsi untuk ORDER BY dan LIMIT
 
 # TODO (menunggu kelompok query optimizer)
 # handle query UPDATE, menerima input node query tree
-def handle_UPDATE(query_tree: ParseTree):
+def execute_UPDATE(query_tree: ParseTree):
     pass
 
 # TODO (menunggu kelompok query optimizer)
 # handle query BEGIN TRANSACTION, menerima input query tree
-def handle_BEGIN_TRANSCATION(query_tree: ParseTree):
+def execute_BEGIN_TRANSCATION(query_tree: ParseTree):
     pass
