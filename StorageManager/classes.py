@@ -2,6 +2,8 @@ import os
 import pickle
 import math
 from typing import List, Union, Dict, Tuple
+
+from StorageManager.HashIndex import Hash
 from .BPlusTree import BPlusTree
 from ConcurrencyControlManager.classes import PrimaryKey
 
@@ -105,7 +107,6 @@ class DataRetrieval:
         self.columns = columns
         self.conditions = conditions
         self.search_type = search_type
-        self.level = level
         self.attribute = attribute # Defaultnya akan None kecuali level = "cell"
 
 class DataWrite:
@@ -136,8 +137,14 @@ class Statistic:
 class StorageManager:
     DATA_FILE = "data.dat"
     LOG_FILE = "log.dat"
+    DATA_DIR = "data_blocks"
+    HASH_DIR = "hash" # DATA_DIR/HASH_DIR/{table}_{column}_{hash}_{block_id}
+    BLOCK_SIZE = 4096  # bytes
 
     def __init__(self):
+        print("INITIATING")
+        os.makedirs(self.DATA_DIR, exist_ok=True)
+        os.makedirs(os.path.join(self.DATA_DIR, self.HASH_DIR), exist_ok=True)
         self.data = self._load_data()
         self.indexes = {}
         self.bplusindexes: Dict[object, Tuple[str, BPlusTree]] = {}
@@ -163,6 +170,21 @@ class StorageManager:
     def _save_logs(self):
         with open(self.LOG_FILE, "wb") as file:
             pickle.dump(self.logs, file)
+            
+    def _get_block_file(self, table: str, block_id: int) -> str:
+        return os.path.join(self.DATA_DIR, f"{table}_block_{block_id}.blk")
+
+    def _load_block(self, table: str, block_id: int) -> List[Dict]:
+        block_file = self._get_block_file(table, block_id)
+        if os.path.exists(block_file):
+            with open(block_file, "rb") as file:
+                return pickle.load(file)
+        return []
+
+    def _save_block(self, table: str, block_id: int, block_data: List[Dict]):
+        block_file = self._get_block_file(table, block_id)
+        with open(block_file, "wb") as file:
+            pickle.dump(block_data, file)
     
     def log_action(self, action, table, data, columns=None):
         log_entry = {
@@ -174,51 +196,54 @@ class StorageManager:
             log_entry["columns"] = columns
         self.action_logs.append(log_entry)
 
-
-    def read_block(self, data_retrieval: DataRetrieval):
-        table = self.data.get(data_retrieval.table, [])
-        result = []
-        for row in table:
-            if all(self._evaluate_condition(row, cond) for cond in data_retrieval.conditions):
-                result.append({col: row[col] for col in data_retrieval.columns})
-
-        # Log aksi read
-        self.log_action("read", data_retrieval.table, {"columns": data_retrieval.columns, "conditions": data_retrieval.conditions})
-        return result
-
     def write_block(self, data_write: DataWrite):
-        table = self.data.setdefault(data_write.table, [])
-        affected_rows = 0
-        old_new_values = []
-        
-        if data_write.conditions:
-            for row in table:
-                if all(self._evaluate_condition(row, cond) for cond in data_write.conditions):
-                    old_row = {col: row[col] for col in data_write.columns}  # Nilai sebelum perubahan
-                    for col, val in zip(data_write.columns, data_write.new_values):
-                        row[col] = val
-                    new_row = {col: row[col] for col in data_write.columns}  # Nilai setelah perubahan
-                    old_new_values.append({"old": old_row, "new": new_row})
-                    affected_rows += 1
-        else:
-            new_row = {col: val for col, val in zip(data_write.columns, data_write.new_values)}
-            table.append(new_row)
-            old_new_values.append({"old": None, "new": new_row})
-            affected_rows += 1
+        table = data_write.table
+        columns = data_write.columns
+        new_values = data_write.new_values
+        blocks = sorted(int(file.split('_')[-1].split('.')[0]) for file in os.listdir(self.DATA_DIR) if file.startswith(table))
 
-        self._save_data()
-        self.log_action("write", data_write.table, {"affected_rows": affected_rows, "old_new_values": old_new_values})
-        return affected_rows
+        for block_id in blocks:
+            block = self._load_block(table, block_id)
+            if len(block) < self.BLOCK_SIZE:
+                block.append(dict(zip(columns, new_values)))
+                self._save_block(table, block_id, block)
+                self.log_action("write", table, {"block_id": block_id, "data": new_values})
+                return
 
+        # If no space, create a new block
+        new_block_id = max(blocks, default=-1) + 1
+        new_block = [dict(zip(columns, new_values))]
+        self._save_block(table, new_block_id, new_block)
+        self.log_action("write", table, {"block_id": new_block_id, "data": new_values})
+    
+    def read_block(self, data_retrieval: DataRetrieval):
+        table = data_retrieval.table
+        columns = data_retrieval.columns
+        conditions = data_retrieval.conditions
+        results = []
+
+        for file in os.listdir(self.DATA_DIR):
+            if file.startswith(table):
+                block_id = int(file.split('_')[-1].split('.')[0])
+                block = self._load_block(table, block_id)
+                for row in block:
+                    if all(self._evaluate_condition(row, cond) for cond in conditions):
+                        results.append({col: row[col] for col in columns})
+        return results
+    
     def delete_block(self, data_deletion: DataDeletion):
-        table = self.data.get(data_deletion.table, [])
-        initial_size = len(table)
-        rows_to_remove = [row for row in table if all(self._evaluate_condition(row, cond) for cond in data_deletion.conditions)]
-        self.data[data_deletion.table] = [row for row in table if row not in rows_to_remove]
-        self._save_data()
+        table = data_deletion.table
+        conditions = data_deletion.conditions
+        total_deleted = 0
 
-        self.log_action("delete", data_deletion.table, {"deleted_rows": rows_to_remove})
-        return initial_size - len(table)
+        for file in os.listdir(self.DATA_DIR):
+            if file.startswith(table):
+                block_id = int(file.split('_')[-1].split('.')[0])
+                block = self._load_block(table, block_id)
+                new_block = [row for row in block if not all(self._evaluate_condition(row, cond) for cond in conditions)]
+                total_deleted += len(block) - len(new_block)
+                self._save_block(table, block_id, new_block)
+        return total_deleted
 
     def set_index(self, table: str, column: str, index_type: str):
         if index_type != "hash" and index_type != "B+":
@@ -246,12 +271,24 @@ class StorageManager:
             
     def read_block_with_hash(self, table: str, column: str, value):
         # Gunain indeks kalo ada
-        index_key = (table, column)
-        if index_key in self.indexes.keys:
-            return self.indexes[index_key].get(value, [])
-        else:
-            raise ValueError(f"Indeks tidak ditemukan untuk {table}.{column}.")
+        return Hash._get_rows(table, column, value)
+    
+    
+    def write_block_with_hash(self, data_write: DataWrite, new_block_id: int):
+        table = data_write.table
+        columns = data_write.columns
+        dict_new_values = dict(zip(columns, data_write.columns))
+        for column in columns:
+            hash_exist = False
+            for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
+                if file.startswith(f"{table}_{column}_hash"):
+                    hash_exist = True
+                    break
+            if not hash_exist:
+                continue
+            Hash._write_row(table, column, new_block_id, dict_new_values[column])
         
+    """
     def read_range_with_bplus(self, table: str, column: str, min, max):
         index_key = table
         if index_key not in self.bplusindexes.keys or self.bplusindexes[index_key][0] != column:
@@ -266,6 +303,7 @@ class StorageManager:
         if query_result is None:
             raise ValueError(f"Key {value} tidak ditemukan di {table}.{column}")
         return query_result
+    """
         
     def get_stats(self):
         stats = {}
