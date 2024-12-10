@@ -34,6 +34,7 @@ class Hash(object):
     """
     Di bawah ini fungsi hash
     TODO: DELETE OPERATION
+    UPDATE: DELETE OPERATION DONE 
     """
     
     @staticmethod
@@ -90,6 +91,23 @@ class Hash(object):
         Hash._save_hash_block(table, column, hash_value, 0, block)
         print("HASH SAVED")
         return
+    
+    @staticmethod
+    def _delete_hash_block(table: str, column: str, hash_value: int, old_block_id: int):
+        # assumes entries fit in one block
+        block = Hash._load_hash_block(table, column, hash_value, 0)
+        new_block = []
+        for row in block:
+            if row['id'] != old_block_id:
+                new_block.append(row)
+        # assumes entries fit in one block
+        if not new_block and hash_value != 0:
+            if os.path.exists(Hash._get_hash_block_file(table, column, hash_value, old_block_id)):
+                os.remove(Hash._get_hash_block_file(table, column, hash_value, old_block_id))
+        else:
+            Hash._save_hash_block(table, column, hash_value, 0, new_block)
+        print("HASH UPDATED")
+        return
 
     @staticmethod
     def _get_rows(table: str, column: str, value):
@@ -108,8 +126,18 @@ class Hash(object):
     def _write_row(table: str, column: str, new_block_id: int, value):
         hash_value = Hash._hash_function(value)
         print("HASH", hash_value)
-        Hash._write_hash_block(table, column, hash_value, new_block_id)
+        Hash._write_hash_block(table, column, hash_value, new_block_id)\
+            
+    @staticmethod
+    def _delete_row(table: str, column: str, old_block_id: int, value):
+        hash_value = Hash._hash_function(value)
+        print("HASH", hash_value)
+        Hash._delete_hash_block(table, column, hash_value, old_block_id)
 
+    @staticmethod
+    def _initiate_block(table: str, column: str):
+        Hash._save_hash_block(table, column, 0, 0, [])
+        
     
     
     

@@ -6,7 +6,7 @@ from typing import List, Union, Dict, Tuple
 from StorageManager.HashIndex import Hash
 from .BPlusTree import BPlusTree
 from ConcurrencyControlManager.classes import PrimaryKey
-from FailureRecoveryManager import FailureRecoveryManager
+from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
 
 class Student:
     def __init__(self, id:int, name:str, dept_name:str, tot_cred:int):
@@ -207,41 +207,51 @@ class StorageManager:
         columns = data_write.columns
         new_values = data_write.new_values
         conditions = data_write.conditions
+        dict_new_values = dict(zip(columns, new_values))
         blocks = sorted(int(file.split('_')[-1].split('.')[0]) for file in os.listdir(self.DATA_DIR) if file.startswith(table))
         if not data_write.conditions:
             # add operation
             for block_id in blocks:
-                block = self._load_block(table, block_id)
+                block = self.frm.get_buffer(table, block_id)
+                if not block:
+                    block = self._load_block(table, block_id)
                 if len(block) < self.BLOCK_SIZE:
-                    block.append(dict(zip(columns, new_values)))
+                    block.append(dict_new_values)
                     self._save_block(table, block_id, block)
-                    self.frm.put(table, block_id, block)
+                    self.frm.put_buffer(table, block_id, block)
+                    self.update_all_column_with_hash(table, columns, dict_new_values, block_id)
                     self.log_action("write", table, {"block_id": block_id, "data": new_values})
                     return 1
 
             # If no space, create a new block
             new_block_id = max(blocks, default=-1) + 1
-            new_block = [dict(zip(columns, new_values))]
+            new_block = [dict_new_values]
             self._save_block(table, new_block_id, new_block)
-            self.frm.put(table, new_block_id, new_block)
+            self.frm.put_buffer(table, new_block_id, new_block)
+            self.update_all_column_with_hash(table, columns, dict_new_values, new_block_id)
             self.log_action("write", table, {"block_id": new_block_id, "data": new_values})
             return 1
         # UPDATE 
         num_updated = 0
         for block_id in blocks:
-            block = self._load_block(table, block_id)
+            block = self.frm.get_buffer(table, block_id)
+            if not block:
+                block = self._load_block(table, block_id)
             new_block = []
             for row in block:
                 if self._evaluate_conditions(row, conditions):
                     new_row = row
-                    for column, new_value in zip(columns, new_values):
+                    for column, new_value in dict_new_values.items():
+                        self.delete_all_column_with_hash(table, [column], {column: row[column]}, block_id)
                         new_row[column] = new_value
+                        self.update_all_column_with_hash(table, [column], {column: new_row[column]}, block_id)
                     new_block.append(new_row)
                     num_updated += 1
                 else:
                     new_block.append(row)
             self._save_block(table, block_id, new_block)
-            self.frm.put(table, block_id, new_block)
+            self.frm.put_buffer(table, block_id, new_block)
+
         return num_updated
     
     def read_block(self, data_retrieval: DataRetrieval):
@@ -253,7 +263,7 @@ class StorageManager:
         for file in os.listdir(self.DATA_DIR):
             if file.startswith(table):
                 block_id = int(file.split('_')[-1].split('.')[0])
-                block = self.frm.get(table, block_id)
+                block = self.frm.get_buffer(table, block_id)
                 if not block:
                     block = self._load_block(table, block_id)
                 for row in block:
@@ -261,6 +271,9 @@ class StorageManager:
                         results.append({col: row[col] for col in columns})
         return results
     
+    """
+    TODO: DELETE FROM HASH
+    """
     def delete_block(self, data_deletion: DataDeletion):
         table = data_deletion.table
         conditions = data_deletion.conditions
@@ -269,11 +282,13 @@ class StorageManager:
         for file in os.listdir(self.DATA_DIR):
             if file.startswith(table):
                 block_id = int(file.split('_')[-1].split('.')[0])
-                block = self._load_block(table, block_id)
+                block = self.frm.get_buffer(table, block_id)
+                if not block:
+                    block = self._load_block(table, block_id)
                 new_block = [row for row in block if not self._evaluate_conditions(row, conditions)]
                 total_deleted += len(block) - len(new_block)
                 self._save_block(table, block_id, new_block)
-                self.frm.put(table, block_id, new_block)
+                self.frm.put_buffer(table, block_id, new_block)
         return total_deleted
 
     def set_index(self, table: str, column: str, index_type: str):
@@ -287,7 +302,9 @@ class StorageManager:
                     exist = True
                     break
             if exist:
-                raise ValueError(f"Hash index already exists at {table}.{column}")
+                print(f"Hash index already exists at {table}.{column}")
+                return
+            Hash._initiate_block(table, column)
             for file in os.listdir(self.DATA_DIR):
                 if file.startswith(f"{table}"):
                     block_id = int(file.split('_')[-1].split('.')[0])
@@ -305,16 +322,9 @@ class StorageManager:
                 key = row[column]
                 self.bplusindexes[table][1].insert(key, row)
             """
-            
-    def read_block_with_hash(self, table: str, column: str, value):
-        # Gunain indeks kalo ada
-        return Hash._get_rows(table, column, value)
     
-    
-    def write_block_with_hash(self, table: str, column: str, value, new_block_id: int):
-        Hash._write_row(table, column, new_block_id, value)
-        """
-        for column in columns:
+    def delete_all_column_with_hash(self, table: str, changed_columns: List[str], old_values: Dict, old_block_id: int):
+        for column in changed_columns:
             hash_exist = False
             for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
                 if file.startswith(f"{table}_{column}_hash"):
@@ -322,7 +332,28 @@ class StorageManager:
                     break
             if not hash_exist:
                 continue
-        """
+            Hash._delete_row(table, column, old_block_id, old_values[column])
+    
+    def update_all_column_with_hash(self, table: str, changed_columns: List[str], new_values: Dict, new_block_id: int):
+        for column in changed_columns:
+            hash_exist = False
+            for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
+                if file.startswith(f"{table}_{column}_hash"):
+                    hash_exist = True
+                    break
+            if not hash_exist:
+                continue
+            Hash._write_row(table, column, new_block_id, new_values[column])
+                   
+    
+    def read_block_with_hash(self, table: str, column: str, value):
+        # Gunain indeks kalo ada
+        return Hash._get_rows(table, column, value)
+    
+    
+    def write_block_with_hash(self, table: str, column: str, value, new_block_id: int):
+        Hash._write_row(table, column, new_block_id, value)
+        
     """
     def read_range_with_bplus(self, table: str, column: str, min, max):
         index_key = table
@@ -342,13 +373,40 @@ class StorageManager:
         
     def get_stats(self):
         stats = {}
-        for table_name, table in self.data.items():
-            n_r = len(table)
-            l_r = len(table[0]) if table else 0
-            f_r = math.floor(4096 / l_r) if l_r else 0  # Assume block size = 4096 bytes
-            b_r = math.ceil(n_r / f_r) if f_r else 0
-            V_a_r = {col: len(set(row[col] for row in table)) for col in table[0]} if table else {}
-            stats[table_name] = Statistic(n_r, b_r, l_r, f_r, V_a_r)
+        for file in os.listdir(self.DATA_DIR):
+            if file.endswith(".blk"):
+                parts = file.split("_block_")
+                table_name = parts[0]
+                block_id = int(parts[1].split(".")[0])
+                block = self._load_block(table_name, block_id)
+                if table_name not in stats:
+                    stats[table_name] = {
+                        "n_r": 0, 
+                        "b_r": 0,  
+                        "l_r": 0,  
+                        "f_r": 0,  
+                        "V_a_r": {} 
+                    }
+                stats[table_name]["n_r"] += len(block)
+                stats[table_name]["b_r"] += 1
+                if block:
+                    row_length = len(block[0])
+                    stats[table_name]["l_r"] = row_length
+                    for col in block[0].keys():
+                        if col not in stats[table_name]["V_a_r"]:
+                            stats[table_name]["V_a_r"][col] = set()
+                        stats[table_name]["V_a_r"][col].update(row[col] for row in block)
+        for table_name, table_stats in stats.items():
+            if table_stats["l_r"] > 0:
+                table_stats["f_r"] = math.floor(self.BLOCK_SIZE / table_stats["l_r"])
+            table_stats["V_a_r"] = {col: len(values) for col, values in table_stats["V_a_r"].items()}
+            stats[table_name] = Statistic(
+                n_r=table_stats["n_r"],
+                b_r=table_stats["b_r"],
+                l_r=table_stats["l_r"],
+                f_r=table_stats["f_r"],
+                V_a_r=table_stats["V_a_r"]
+            )
         return stats
     
     def _evaluate_condition(self, row: Dict, condition: Condition):
