@@ -1,7 +1,6 @@
 from typing import Dict
 from ..base import QueryNode
 from ..enums import NodeType
-import uuid
 
 class TableNode(QueryNode):
     def __init__(self, table_name: str, alias: str | None = None):

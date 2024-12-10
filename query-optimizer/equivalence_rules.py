@@ -185,7 +185,7 @@ class EquivalenceRules:
                     new_node = parent.__class__(parent.conditions if hasattr(parent, 'conditions') else None)
                     new_node.set_children(associated_inner, grandchild_right)
                 return new_node
-            return parent.clone()  # Return original parent if no transformation applies
+            return parent.clone()  
 
         # Handle (left ⋈ middle) ⋈ right
         if isinstance(left_child, (NaturalJoinNode, ConditionalJoinNode)):
