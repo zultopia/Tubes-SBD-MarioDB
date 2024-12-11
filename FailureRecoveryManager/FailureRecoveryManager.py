@@ -7,7 +7,7 @@ from FailureRecoveryManager.ExecutionResult import ExecutionResult
 from FailureRecoveryManager.LRUCache import LRUCache
 from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
 from FailureRecoveryManager.Rows import Rows
-from StorageManager.classes import StorageManager, DataRetrieval, DataWrite, DataDeletion, Condition
+from StorageManager.classes import StorageManager, DataWrite, DataDeletion, Condition
 
 
 class FailureRecoveryManager:
@@ -99,6 +99,9 @@ class FailureRecoveryManager:
         with self._buffer_lock:
             cache_key = f"{table_name}:{block_id}"
             self._buffer.put(cache_key, block_data)
+            # print(
+            #     f"[FRM | {str(datetime.now())}]: Block {block_id} of table {table_name} added to buffer."
+            # )
             # print(
             #     f"[FRM | {str(datetime.now())}]: Block {block_id} of table {table_name} added to buffer."
             # )
@@ -382,6 +385,7 @@ class FailureRecoveryManager:
                 # print(f"Error decoding JSON: {e}")
                 exit()
             # send before and after data to storage manager to process
+            
             # print("table:", table)
             # print("send before to storage manager: ", before_states)
             # print("send after to storage manager: ", after_states)
@@ -396,7 +400,6 @@ class FailureRecoveryManager:
                         pass
                     else:
                         # print(f"[FRM | {str(datetime.now())}]: failed write block for rollback query.")
-                        pass
                         exit()
                         
             # delete case
@@ -529,7 +532,6 @@ class FailureRecoveryManager:
                             pass
                         else:
                             # print(f"[FRM | {str(datetime.now())}]: failed delete block for rollback query.")
-                            pass
                             exit()
                             
                 # udpdate case

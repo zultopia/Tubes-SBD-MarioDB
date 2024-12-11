@@ -19,6 +19,12 @@ class PrimaryKey:
 
     def __ne__(self, other):
         return not self.__eq__(other)
+    
+    def __hash__(self):
+        concatted_keys = ""
+        for key in self.keys:
+            concatted_keys += str(key)
+        return hash(concatted_keys)
 
     def __str__(self):
         return (
@@ -37,10 +43,12 @@ class Table(IDataItem):
     def __init__(self, table: str):
         self.table = table
     
-    def __eq__(self, other: 'Table'):
-        return self.table == other.table
+    def __eq__(self, other):
+        if isinstance(other, Table):
+            return self.table == other.table
+        return False
 
-    def __ne__(self, other: 'Table'):
+    def __ne__(self, other):
         return not self.__eq__(other)
 
     def __hash__(self):
@@ -62,7 +70,9 @@ class Row(IDataItem):
         raise KeyError(f"Key '{key}' not found")
     
     def __eq__(self, other):
-        return (self.pkey == other.pkey) and (self.table == other.table)
+        if isinstance(other, Row):
+            return (self.pkey == other.pkey) and (self.table == other.table)
+        return False
     
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -88,7 +98,9 @@ class Cell(IDataItem):
         self.value = value
     
     def __eq__(self, other):
-        return (self.pkey == other.pkey) and (self.attribute == other.attribute) and (self.table == other.table)
+        if isinstance(other, Cell):
+            return (self.pkey == other.pkey) and (self.attribute == other.attribute) and (self.table == other.table)
+        return False
 
     def __hash__(self):
         return hash(self.table + self.pkey.__str__() + self.attribute)
@@ -108,7 +120,9 @@ class DataItem:
         self.data_item = data_item
         
     def __eq__(self, other):
-        return (self.level == other.level) and (self.data_item == other.data_item)
+        if isinstance(other, DataItem):
+            return (self.level == other.level) and (self.data_item == other.data_item)
+        return False
     
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -127,8 +141,9 @@ class Action:
         return f"=== Action ===\naction: {self.action}\n==============\n"
         
 class Response:
-    def __init__(self, allowed: bool, transaction_id: int, message: str = ""):
+    def __init__(self, allowed: bool, status: str, transaction_id: int, message: str = ""):
         self.allowed = allowed
+        self.status = status
         self.transaction_id = transaction_id
         self.message = message
         
@@ -397,7 +412,7 @@ class ConcurrencyControlManager:
                         print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
                         self.lock_X.setdefault(current, set()).add(transaction_id)
                 
-            self.log_object(transaction_action)        
+            self.log_object(transaction_action)     
             self.transaction_dataitem_map[transaction_id][transaction_action.data_item] = lock_type
         
         return True, None, f"Transaction {transaction_id} successfully get lock-{lock_type} on {transaction_action.data_item}"
