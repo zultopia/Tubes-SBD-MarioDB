@@ -1,3 +1,5 @@
+# from_parse_tree.py
+
 from typing import List, Dict, Optional, Tuple
 from utils import Pair
 from query_plan.query_plan import QueryPlan
@@ -12,7 +14,11 @@ from query_plan.enums import JoinAlgorithm, Operator
 from parse_tree import ParseTree, Node
 from lexer import Token 
 from query_plan.shared import Condition
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
     if not isinstance(parse_tree.root, str) or parse_tree.root != "Query":
@@ -41,7 +47,19 @@ def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
 
             if where_index is not None:
                 condition_node = process_where_clause(parse_tree.childs[where_index + 1])
-                condition_node.set_child(table_node)
+
+                # **Handle SelectionNode and UnionSelectionNode separately**
+                if isinstance(condition_node, SelectionNode):
+                    # For SelectionNode, set a single child
+                    condition_node.set_child(table_node)
+                elif isinstance(condition_node, UnionSelectionNode):
+                    # For UnionSelectionNode, set children for each SelectionNode
+                    # Assuming all selection nodes share the same child (table_node)
+                    condition_node.set_child_to_all(table_node)
+                else:
+                    raise TypeError("condition_node must be either SelectionNode or UnionSelectionNode")
+
+                # Update table_node to be the condition_node
                 table_node = condition_node
 
             # Attach the table_node to the project_node
@@ -57,8 +75,6 @@ def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
             return process_update_query(parse_tree)
 
     raise ValueError(f"Unsupported query type: {first_token}")
-
-
 
 def process_select_list(select_list_tree: ParseTree) -> ProjectNode:
     """Process SELECT list and create ProjectNode."""
@@ -126,8 +142,6 @@ def process_from_list(from_list_tree: ParseTree) -> QueryNode:
     
     return table_node
 
-
-
 def process_table_result(table_result_tree: ParseTree) -> QueryNode:
     """Process table result (handles JOINs)."""
     if not table_result_tree.childs:
@@ -136,7 +150,7 @@ def process_table_result(table_result_tree: ParseTree) -> QueryNode:
     # Process the initial TableTerm
     current_node = process_table_term(table_result_tree.childs[0])
 
-    print("checkpoint 1: Processed initial TableTerm")
+    logger.debug("checkpoint 1: Processed initial TableTerm")
 
     # Check if there is a TableResultTail
     if len(table_result_tree.childs) > 1 and table_result_tree.childs[1].root == "TableResultTail":
@@ -146,13 +160,13 @@ def process_table_result(table_result_tree: ParseTree) -> QueryNode:
             if not table_result_tail.childs:
                 break  # No further processing needed
 
-            print("checkpoint 2: Processing TableResultTail")
+            logger.debug("checkpoint 2: Processing TableResultTail")
             first_child = table_result_tail.childs[0]
             if not isinstance(first_child.root, Node):
                 raise SyntaxError("Invalid structure in TableResultTail")
 
             if first_child.root.token_type == Token.JOIN:
-                print("Processing JOIN")
+                logger.debug("Processing JOIN")
                 # Handle explicit JOINs
                 join_node = process_conditional_join(table_result_tail)
                 right_node = process_table_term(table_result_tail.childs[1])
@@ -163,7 +177,7 @@ def process_table_result(table_result_tree: ParseTree) -> QueryNode:
                 table_result_tail = table_result_tail.childs[4] if len(table_result_tail.childs) > 4 else None
 
             elif first_child.root.token_type == Token.NATURAL:
-                print("Processing NATURAL JOIN")
+                logger.debug("Processing NATURAL JOIN")
                 # Handle NATURAL JOINs
                 join_node = NaturalJoinNode(JoinAlgorithm.NESTED_LOOP)
                 right_node = process_table_term(table_result_tail.childs[2])
@@ -177,11 +191,6 @@ def process_table_result(table_result_tree: ParseTree) -> QueryNode:
                 raise SyntaxError(f"Unexpected token in TableResultTail: {first_child.root.token_type}")
 
     return current_node
-
-
-
-
-
 
 def process_table_term(table_term_tree: ParseTree) -> QueryNode:
     if not table_term_tree.childs:
@@ -262,7 +271,7 @@ def process_where_clause(condition_tree: ParseTree) -> QueryNode:
             right = extract_operand(cond_term.childs[2])
             return Condition(left, right, op)
         return None
-    
+
     def extract_operand(tree: ParseTree) -> str:
         if isinstance(tree, ParseTree):
             if tree.root == "Field":
@@ -271,7 +280,7 @@ def process_where_clause(condition_tree: ParseTree) -> QueryNode:
                 if tree.root.token_type in [Token.NUMBER, Token.STRING]:
                     return str(tree.root.value)
         return str(tree)
-    
+
     def extract_field_name(field_tree: ParseTree) -> str:
         if len(field_tree.childs) == 1:
             return field_tree.childs[0].root.value
@@ -364,6 +373,22 @@ def process_update_query(parse_tree: ParseTree) -> QueryPlan:
     
     updates.append(process_set_term(set_list.childs[0]))  # First SetTerm
     
+    # Handle additional SetTerms in SetListTail
+    set_list_tail = set_list.childs[1] if len(set_list.childs) > 1 else None
+    while set_list_tail:
+        # SetListTail structure: COMMA, SetTerm, SetListTail
+        comma_node = set_list_tail.childs[0]
+        if not (isinstance(comma_node.root, Node) and comma_node.root.token_type == Token.COMMA):
+            raise SyntaxError(f"Expected COMMA in SetListTail, found {comma_node.root}")
+        
+        # Process the next SetTerm
+        next_set_term = set_list_tail.childs[1]
+        next_set = process_set_term(next_set_term)
+        updates.append(next_set)
+        
+        # Move to the next SetListTail
+        set_list_tail = set_list_tail.childs[2] if len(set_list_tail.childs) > 2 else None
+    
     # Create UpdateNode
     update_node = UpdateNode(updates)
     
@@ -377,8 +402,20 @@ def process_update_query(parse_tree: ParseTree) -> QueryPlan:
     
     if where_index is not None:
         condition_node = process_where_clause(parse_tree.childs[where_index + 1])
-        condition_node.set_child(current_node)
+        
+        # **Handle SelectionNode and UnionSelectionNode separately**
+        if isinstance(condition_node, SelectionNode):
+            condition_node.set_child(current_node)
+        elif isinstance(condition_node, UnionSelectionNode):
+            # For UnionSelectionNode, set children for each SelectionNode
+            # Assuming all selection nodes share the same child (current_node)
+            condition_node.set_child_to_all(current_node)
+        else:
+            raise TypeError("condition_node must be either SelectionNode or UnionSelectionNode")
+        
+        # Update current_node to be the condition_node
         current_node = condition_node
     
+    # Attach the current_node to the update_node
     update_node.set_child(current_node)
     return QueryPlan(update_node)
