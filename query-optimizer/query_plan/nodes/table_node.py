@@ -1,4 +1,6 @@
 from typing import Dict
+
+from data import QOData
 from ..base import QueryNode
 from ..enums import NodeType
 
@@ -20,6 +22,14 @@ class TableNode(QueryNode):
 
     def set_child(self, child: QueryNode):
         self.child = child
+
+    def estimate_size(self, statistics: Dict):
+        attributes = statistics[self.table_name]['attributes']
+        self.attributes =  [(self.id + '.' + attr_name, self.table_name) for attr_name, attr_info in attributes.items()]
+        self.n = QOData().get_n(self.table_name)
+        self.b = QOData().get_b(self.table_name)
+
+
 
     def estimate_cost(self, statistics: Dict) -> float:
         return self._calculate_operation_cost(statistics)

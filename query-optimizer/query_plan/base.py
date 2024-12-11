@@ -1,6 +1,6 @@
 # base.py
 from abc import ABC, abstractmethod
-from typing import Dict, Union, List
+from typing import Dict, Tuple, Union, List
 from utils import Pair, Prototype
 from .enums import NodeType
 import uuid
@@ -9,6 +9,12 @@ class QueryNode(ABC, Prototype):
     node_type: NodeType
     children: Union['QueryNode', Pair['QueryNode', 'QueryNode'], None, List['QueryNode']]
     id: str
+
+    table_name: str | None # str if it directly refers to a table, None if it is the result of the operations
+    attributes: List[Pair[str, str]] # The list of attributes and original table name. The format of each attribute name is id.attributename.
+    n: int # The exact number of tuples for tables or the approximated number of tuples for the result of the operations.
+    b: int # The blocking factor (the number of records that fit inside a block)
+
 
     def __init__(self, node_type: NodeType):
         self.node_type = node_type
@@ -23,6 +29,14 @@ class QueryNode(ABC, Prototype):
 
     def hasOneChild(self) -> bool:
         return self.children is not None and isinstance(self.children, QueryNode)
+
+    @abstractmethod
+    def estimate_size(self, statistics: Dict):
+        pass
+
+    @abstractmethod
+    def estimate_io(self, statistics: Dict):
+        pass
 
     @abstractmethod
     def estimate_cost(self, statistics: Dict) -> float:

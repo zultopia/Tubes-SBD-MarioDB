@@ -1,4 +1,6 @@
 from typing import List, Dict
+
+from data import QOData
 from ..base import QueryNode
 from ..enums import NodeType, Operator
 from ..shared import Condition
@@ -30,6 +32,31 @@ class SelectionNode(QueryNode):
         if self.child:
             cloned_node.set_child(self.child.clone())
         return cloned_node
+
+    def estimate_size(self, statistics: Dict):
+        if not self.child:
+            return
+        self.child.estimate_size()
+
+        # Todo: Ganti ID Kl perlu (?)
+        self.attributes = self.child.attributes
+        self.n = self.child.n
+        for condition in self.conditions:
+            # Belum handle kasus left & right operandnya ada dot
+            # Belum handle kasus atribut tidak ada di tabelnya
+            # Belum handle kasus attribute < attribute (kyknya ga perlu krn eksotik)
+            # Belum handle kasus NEQ (kyknya ga perlu) asumsi aja negligable karena dia tidak spesifik
+
+            if condition.operator == Operator.EQ:
+                self.n *= min(1 / QOData().get_V(condition.left_attribute, condition.left_table_name), 1 / QOData().get_V(condition.right_attribute, condition.right_table_name)) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
+            if condition.operator in [Operator.LESS, Operator.LESS_EQ]:
+                self.n *= (float(condition.right_operand) - QOData().get_min(condition.left_attribute, condition.left_table_name)) / (QOData().get_max(condition.left_attribute, condition.left_table_name) - QOData().get_min(condition.left_attribute, condition.left_table_name))
+            if condition.operator in [Operator.GREATER,Operator.GREATER_EQ]:
+                self.n *= (QOData().get_max(condition.left_attribute, condition.left_table_name) - float(condition.right_operand) ) / (QOData().get_max(condition.left_attribute, condition.left_table_name) - QOData().get_min(condition.left_attribute, condition.left_table_name))
+        self.n = int(self.n)
+
+        self.b = self.child.b
+
 
     def estimate_cost(self, statistics: Dict) -> float:
         return self._calculate_operation_cost(statistics)

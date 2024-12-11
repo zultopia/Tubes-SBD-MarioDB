@@ -25,6 +25,16 @@ class SortingNode(QueryNode):
             cloned_node.set_child(cloned_child)
         return cloned_node
 
+    def estimate_size(self, statistics: Dict):
+        if not self.child:
+            return
+        self.child.estimate_size()
+
+        # Todo: Ganti ID Kl perlu (?)
+        self.attributes = self.child.attributes
+        self.n = self.child.n
+        self.b = self.child.b
+
     def estimate_cost(self, statistics: Dict) -> float:
         return self._calculate_operation_cost(statistics)
 

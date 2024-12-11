@@ -1,4 +1,6 @@
 from typing import List, Dict
+
+from data import BLOCK_SIZE, QOData
 from ..base import QueryNode
 from ..enums import NodeType
 import uuid
@@ -25,6 +27,23 @@ class ProjectNode(QueryNode):
         if cloned_child:
             cloned_node.set_child(cloned_child)
         return cloned_node
+    
+    def estimate_size(self, statistics: Dict):
+        if not self.child:
+            return
+        self.child.estimate_size()
+
+        # Todo: Ganti ID Kl perlu (?)
+        self.attributes = self.child.attributes
+        self.n = self.child.n
+
+        record_size = 0
+        for i in self.child.attributes:
+            attribute, table_name = i.first, i.second
+            attribute = attribute.split('.')[1]
+            record_size += QOData().get_size(attribute, table_name)
+        self.b = int(BLOCK_SIZE / record_size)
+
 
     def estimate_cost(self, statistics: Dict) -> float:
         return self._calculate_operation_cost(statistics)
