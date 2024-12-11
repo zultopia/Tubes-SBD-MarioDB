@@ -369,7 +369,6 @@ class EquivalenceRules:
                 algorithm=join_node.algorithm
             )
         new_join.set_children(Pair(left_selection, right_selection))
-        #new_join.algorithm = JoinAlgorithm.NESTED_LOOP
         # Return the transformed join node
         return [new_join]
 

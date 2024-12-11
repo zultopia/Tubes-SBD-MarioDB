@@ -3,6 +3,7 @@ from tests.test_rule2 import TestOptimizerRule2
 from tests.test_rule4 import TestOptimizerRule4
 from tests.test_rule5 import TestOptimizerRule5
 from tests.test_rule6 import TestOptimizerRule6
+from tests.test_rule7 import TestOptimizerRule7
         
 if __name__ == '__main__':
     print("=============================================================")
@@ -48,6 +49,15 @@ if __name__ == '__main__':
     instance = TestOptimizerRule6()
     print("Testing for rule 6")
     # For each method that starts with "test_"
+    for method_name in dir(instance):
+        if method_name.startswith("test_"):
+            method = getattr(instance, method_name)
+            method()
+
+    print("\n\n=============================================================")
+
+    instance = TestOptimizerRule7()
+    print("Testing for rule 7")
     for method_name in dir(instance):
         if method_name.startswith("test_"):
             method = getattr(instance, method_name)
