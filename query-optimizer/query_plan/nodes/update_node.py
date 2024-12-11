@@ -5,6 +5,10 @@ from ..enums import NodeType
 class UpdateNode(QueryNode):
     def __init__(self, updates: List[Tuple[str, str]]):  # [(column, new_value),...]
         super().__init__(NodeType.UPDATE)
+
+        # sort the updates based on column name
+        updates = sorted(updates, key=lambda u: u[0])
+
         self.updates = updates
         self.child = None
     

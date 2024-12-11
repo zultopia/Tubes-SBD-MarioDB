@@ -42,8 +42,14 @@ class ConditionalJoinNode(JoinNode):
         super().__init__(algorithm)
         self.node_type = NodeType.JOIN
 
-        # Sort the condition based on Operator.EQ first then the other
+        # Sort the condition based on Operator.EQ first then the other, then sort by left operand and right operand
+
         conditions = sorted(conditions, key=lambda c: c.operator != Operator.EQ)
+        conditions = sorted(conditions, key=lambda c: c.left_operand)
+        conditions = sorted(conditions, key=lambda c: c.right_operand)
+
+
+
         self.conditions = conditions if conditions is not None else []
 
     def clone(self) -> 'ConditionalJoinNode':

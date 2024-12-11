@@ -1,1 +1,1 @@
-select a from b as c where c.id = gana;
+select id from student natural join takes where id > 500;

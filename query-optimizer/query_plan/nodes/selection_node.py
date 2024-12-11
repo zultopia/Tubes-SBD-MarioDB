@@ -11,6 +11,10 @@ class SelectionNode(QueryNode):
 
         # Sort the condition based on Operator.EQ first then the other
         conditions = sorted(conditions, key=lambda c: c.operator != Operator.EQ)
+        conditions = sorted(conditions, key=lambda c: c.left_operand)
+        conditions = sorted(conditions, key=lambda c: c.right_operand)
+
+
         self.conditions = conditions
         self.child = None  # Single child node
         self.children = None  # Not used in SelectionNode

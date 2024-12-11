@@ -30,9 +30,6 @@ class TestOptimizerRule7:
         selection_node = SelectionNode(selection_conditions)
         selection_node.set_child(join_node)
         original_plan = QueryPlan(selection_node)
-        print("Original Plan: ")
-        print(original_plan)
-        print("---------------------------------------------------------")
 
         # Expected: (σ(student.gpa > 3.5) Student) ⋉(id = i_id) (σ(instructor.salary < 70000) Instructor)
         student2 = TableNode("student")
@@ -46,15 +43,11 @@ class TestOptimizerRule7:
         ])
         expected_join.set_children(Pair(left_selection, right_selection))
         expected_plan = QueryPlan(expected_join)
-        print("Expected Plan: ")
-        print(expected_plan)
-        print("---------------------------------------------------------")
         # Apply the rule
         plans = generate_possible_plans(original_plan, [
             EquivalenceRules.distributeSelection
         ])
-        for plan in plans:
-            print(plan)
+
 
         # Verify the expected plan is in the generated plans
         assert any(p == expected_plan for p in plans), "Selection distribution over Conditional Join should exist"

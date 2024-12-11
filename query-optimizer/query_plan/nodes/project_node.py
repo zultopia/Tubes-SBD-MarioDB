@@ -6,7 +6,11 @@ import uuid
 class ProjectNode(QueryNode):
     def __init__(self, attributes: List[str]):
         super().__init__(NodeType.PROJECT)
+        # Sort the attributes to ensure consistent ordering
+        attributes.sort()
+
         self.attributes = attributes
+
         self.child = None  # Single child node
 
     def set_child(self, child: QueryNode):

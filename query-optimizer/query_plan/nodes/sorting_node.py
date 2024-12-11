@@ -6,6 +6,7 @@ import uuid
 class SortingNode(QueryNode):
     def __init__(self, attributes: List[str], ascending: bool = True):
         super().__init__(NodeType.SORTING)
+        attributes.sort()
         self.attributes = attributes
         self.ascending = ascending
         self.child = None  # Single child node

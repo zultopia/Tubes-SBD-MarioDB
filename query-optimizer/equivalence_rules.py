@@ -5,7 +5,7 @@ from query_plan.nodes.table_node import TableNode
 from query_plan.nodes.project_node import ProjectNode
 from query_plan.nodes.sorting_node import SortingNode
 from query_plan.enums import NodeType
-from typing import List
+from typing import List, Union
 from query_plan.shared import Condition
 from data import QOData
 from query_plan.enums import JoinAlgorithm
@@ -382,109 +382,104 @@ class EquivalenceRules:
     """
     @staticmethod
     def push_projections_into_join(node: QueryNode) -> List[QueryNode]:
-
+        """Pushes projections into join nodes where applicable, ensuring join condition attributes are preserved."""
         if not isinstance(node, ProjectNode):
             return [node]
-
-
-        def push_projections_on_join_directly(project_node: ProjectNode, join_node: JoinNode) -> List[QueryNode]:
-            """
-            Handle the direct scenario: PROJECT -> JOIN.
-            """
-
+        
+        def get_join_condition_attributes(join_node: QueryNode) -> List[str]:
+            """Extracts all attributes used in join conditions."""
+            if isinstance(join_node, ConditionalJoinNode):
+                attrs = []
+                for condition in join_node.conditions:
+                    # Assuming conditions have left_operand and right_operand in "table.attr" format
+                    attrs.append(condition.left_operand.split(".")[1])
+                    attrs.append(condition.right_operand.split(".")[1])
+                return attrs
+            elif isinstance(join_node, NaturalJoinNode):
+                # Natural joins implicitly join on attributes with the same name
+                # Assuming QOData can provide the common attributes
+                left_attrs = get_all_attributes_of_node(join_node.children.first)
+                right_attrs = get_all_attributes_of_node(join_node.children.second)
+                return list(set(left_attrs).intersection(set(right_attrs)))
+            return []
+        
+        def push_projections_on_join(project_node: ProjectNode, join_node: Union[ConditionalJoinNode, NaturalJoinNode]) -> List[QueryNode]:
+            """Handles pushing projections into ConditionalJoinNode or NaturalJoinNode."""
+            # Get attributes from the projection
+            proj_attrs = set(project_node.attributes)
+            
+            # Get attributes from join conditions
+            join_attrs = set(get_join_condition_attributes(join_node))
+            
+            # Combine both sets to ensure join conditions are preserved
+            required_attrs = proj_attrs.union(join_attrs)
+            
             left_child = join_node.children.first
             right_child = join_node.children.second
 
-            L1 = []
-            L2 = []
-
-            # print("Partitioning attributes for direct join scenario")
-            for attr in project_node.attributes:
-                if attribute_belongs_to(left_child, attr):
+            # Determine which attributes belong to which child
+            left_attrs = set(get_all_attributes_of_node(left_child))
+            right_attrs = set(get_all_attributes_of_node(right_child))
+            
+            # Attributes to project on the left child
+            L1 = [attr for attr in required_attrs if attr in left_attrs]
+            # Attributes to project on the right child
+            L2 = [attr for attr in required_attrs if attr in right_attrs]
+            
+            # Handle attributes that might belong to both children (e.g., for Natural Joins)
+            # Ensuring they are included in both projections if necessary
+            shared_attrs = set(L1).intersection(set(L2))
+            for attr in shared_attrs:
+                # Ensure the attribute is present in both projections
+                if attr not in L1:
                     L1.append(attr)
-                elif attribute_belongs_to(right_child, attr):
+                if attr not in L2:
                     L2.append(attr)
-                else:
-                    return [project_node]
-
-
-            # Push down projections
+            
+            # Create new ProjectNodes for left and right children if necessary
             new_left = left_child.clone()
-            if L1 and len(L1) < len(get_all_attributes_of_node(left_child)):
+            if L1 and set(L1) != left_attrs:
                 left_proj = ProjectNode(L1)
                 left_proj.set_child(new_left)
                 new_left = left_proj
-
+            
             new_right = right_child.clone()
-            if L2 and len(L2) < len(get_all_attributes_of_node(right_child)):
+            if L2 and set(L2) != right_attrs:
                 right_proj = ProjectNode(L2)
                 right_proj.set_child(new_right)
                 new_right = right_proj
-
-            # Create a new join node with these potentially projected children
+            
+            # Create a new join node with the potentially projected children
             new_join = join_node.clone()
             new_join.set_children(Pair(new_left, new_right))
-
-            # The top projection is now unnecessary since it has been pushed down
+            
             return [new_join]
-
-
+        
         # Scenario A: Project -> Join
         if isinstance(node.child, JoinNode):
-            return push_projections_on_join_directly(node, node.child)
-
+            join_node = node.child
+            if isinstance(join_node, ConditionalJoinNode) or isinstance(join_node, NaturalJoinNode):
+                return push_projections_on_join(node, join_node)
+            else:
+                return [node]
+        
+        # Scenario B: Project -> Selection -> Join
         if isinstance(node.child, SelectionNode) and isinstance(node.child.child, JoinNode):
             selection_node = node.child
             join_node = selection_node.child
-
-            # If the selection node has conditions that is not in the projection, return the original node
-            # we cannot do it
-            attrs = set()
-            for condition in selection_node.conditions:
-                if (condition.is_constant_comparison()):
-                    attrs.add(condition.left_operand)
-                else:
-                    attrs.add(condition.left_operand)
-                    attrs.add(condition.right_operand)
             
-            for condition in selection_node.child.conditions:
-                if (condition.is_constant_comparison()):
-                    attrs.add(condition.left_operand)
-                else:
-                    attrs.add(condition.left_operand)
-                    attrs.add(condition.right_operand)
-        
-            # For each attribute in the attrs, check if it belongs to the project node
-            for attr in attrs:
-                if not attribute_belongs_to(node, attr):
-                    return [node]
-            
-                
-
-            # Apply the projection pushdown as if node.child = join_node
-            transformed_plans = push_projections_on_join_directly(node, join_node)
-
-            # If no transformation occurred (transformed_plans just returns [node]), return the original node
-            if len(transformed_plans) == 1 and transformed_plans[0].id == node.id:
-                # No change; just return the original node
+            if isinstance(join_node, ConditionalJoinNode) or isinstance(join_node, NaturalJoinNode):
+                # First, push the selection down if possible (not covered here)
+                # Then, push the projection down
+                # For simplicity, we'll assume selection has already been handled
+                return push_projections_on_join(node, join_node)
+            else:
                 return [node]
-
-            # If we got a transformed join node, we must reattach the selection node
-            # BUT we do NOT reattach the original project node, as it's been effectively pushed down.
-            # This ensures the structure changes and the rule won't reapply indefinitely.
-            if len(transformed_plans) == 1 and transformed_plans[0].id != node.id:
-                transformed_join = transformed_plans[0]
-
-                new_selection = selection_node.clone()
-                new_selection.set_child(transformed_join)
-                # Now return only the selection node above the join, no top-level project.
-                return [new_selection]
-
-            return transformed_plans
-
-
-        # If none of the above scenarios match, return the node unchanged
+        
+        # If none of the above, return the node as-is
         return [node]
+
+
     
     """
     Aditional Rule
