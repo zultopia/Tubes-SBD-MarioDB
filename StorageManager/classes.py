@@ -10,7 +10,7 @@ from typing import List, Literal, Union, Dict, Tuple
 from StorageManager.HashIndex import Hash
 # from .BPlusTree import BPlusTree
 from ConcurrencyControlManager.classes import PrimaryKey
-from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
+import FailureRecoveryManager.FailureRecoveryManager as frm
 
 class Student:
     def __init__(self, id:int, name:Union[str, None]=None, dept_name:Union[str, None]=None, tot_cred:Union[int, None]=None):
@@ -151,7 +151,7 @@ class StorageManager:
     HASH_DIR = "hash/" # DATA_DIR/HASH_DIR/{table}_{column}_{hash}_{block_id}
     BLOCK_SIZE = 4096  # bytes
 
-    def __init__(self, frm: FailureRecoveryManager):
+    def __init__(self, frm: frm.FailureRecoveryManager):
         print("INITIATING")
         os.makedirs(self.DATA_DIR, exist_ok=True)
         os.makedirs(os.path.join(self.DATA_DIR, self.HASH_DIR), exist_ok=True)
@@ -192,6 +192,10 @@ class StorageManager:
 
     def _save_block(self, table: str, block_id: int, block_data: List[Dict]):
         block_file = self._get_block_file(table, block_id)
+        if not block_data:
+            if os.path.exists(block_file):
+                os.remove(block_file)
+                return
         with open(block_file, "wb") as file:
             pickle.dump(block_data, file)
     
