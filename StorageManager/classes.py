@@ -10,7 +10,7 @@ from typing import List, Literal, Union, Dict, Tuple
 from StorageManager.HashIndex import Hash
 # from .BPlusTree import BPlusTree
 from ConcurrencyControlManager.classes import PrimaryKey
-# import FailureRecoveryManager.FailureRecoveryManager as frm
+from FailureRecoveryManager.FailureRecoveryManager import LRUCache
 
 class Student:
     def __init__(self, id:int, name:Union[str, None]=None, dept_name:Union[str, None]=None, tot_cred:Union[int, None]=None):
@@ -151,11 +151,11 @@ class StorageManager:
     HASH_DIR = "hash/" # DATA_DIR/HASH_DIR/{table}_{column}_{hash}_{block_id}
     BLOCK_SIZE = 4096  # bytes
 
-    def __init__(self, frm=None):
+    def __init__(self, lru: Union[LRUCache, None]=None):
         print("INITIATING")
         os.makedirs(self.DATA_DIR, exist_ok=True)
         os.makedirs(os.path.join(self.DATA_DIR, self.HASH_DIR), exist_ok=True)
-        self.frm = frm
+        self.lru = lru
         self.indexes = {}
         self.logs = self._load_logs()
         self.action_logs = []
@@ -210,6 +210,15 @@ class StorageManager:
         self.action_logs.append(log_entry)
 
     def write_block(self, data_write: DataWrite):
+        """Writes to buffer
+
+        Args:
+            data_write (DataWrite): Data to write
+
+        Returns:
+            int: The number of rows affected
+            (for INSERT operation this is always 1) 
+        """
         table = data_write.table
         columns = data_write.columns
         new_values = data_write.new_values
@@ -219,15 +228,15 @@ class StorageManager:
         if not data_write.conditions:
             # add operation
             for block_id in blocks:
-                block = None # self.frm.get_buffer(table, block_id)
+                block = self.lru.get() # .get_buffer(table, block_id)
                 if not block:
                     block = self._load_block(table, block_id)
                 if len(block) < self.BLOCK_SIZE:
                     block.append(dict_new_values)
-                    self._save_block(table, block_id, block)
-                    # self.frm.put_buffer(table, block_id, block)
-                    self.update_all_column_with_hash(table, columns, dict_new_values, block_id)
-                    self.log_action("write", table, {"block_id": block_id, "data": new_values})
+                    # self._save_block(table, block_id, block)
+                    self.lru.put(table, block_id, block)
+                    # self.update_all_column_with_hash(table, columns, dict_new_values, block_id)
+                    # self.log_action("write", table, {"block_id": block_id, "data": new_values})
                     return 1
 
             # If no space, create a new block
