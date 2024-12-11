@@ -373,7 +373,7 @@ class FailureRecoveryManager:
             # Write recovery log
             exec_result = ExecutionResult(
                 transaction_id,
-                Rows(None),
+                Rows(after_states),
                 Rows(before_states),
                 "WRITE",
                 table,
@@ -490,7 +490,7 @@ class FailureRecoveryManager:
                 # Write recovery log
                 exec_result = ExecutionResult(
                     transaction_id,
-                    Rows(None),
+                    Rows(after_states),
                     Rows(before_states),
                     "WRITE",
                     table,
