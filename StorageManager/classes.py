@@ -1,15 +1,19 @@
+import ast
+import inspect
 import os
 import pickle
 import math
-from typing import List, Union, Dict, Tuple
+import sys
+import textwrap
+from typing import List, Literal, Union, Dict, Tuple
 
 from StorageManager.HashIndex import Hash
-from .BPlusTree import BPlusTree
+# from .BPlusTree import BPlusTree
 from ConcurrencyControlManager.classes import PrimaryKey
 from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
 
 class Student:
-    def __init__(self, id:int, name:str, dept_name:str, tot_cred:int):
+    def __init__(self, id:int, name:Union[str, None]=None, dept_name:Union[str, None]=None, tot_cred:Union[int, None]=None):
         self.id = id
         self.name = name
         self.dept_name = dept_name
@@ -17,7 +21,7 @@ class Student:
         self.primary_key = PrimaryKey(id)
 
 class Instructor:
-    def __init__(self, id:int, name:str, dept_name:str, salary:int):
+    def __init__(self, id:int, name:Union[str, None]=None, dept_name:Union[str, None]=None, salary:Union[str, None]=None):
         self.id = id
         self.name = name
         self.dept_name = dept_name
@@ -25,14 +29,14 @@ class Instructor:
         self.primary_key = PrimaryKey(id)
 
 class Department:
-    def __init__(self, dept_name:str, building:str, budget:int):
+    def __init__(self, dept_name:str, building:Union[str, None]=None, budget:Union[int, None]=None):
         self.dept_name = dept_name
         self.building = building
         self.budget = budget
         self.primary_key = PrimaryKey(dept_name)
 
 class Course:
-    def __init__(self, course_id:int, title:str, dept_name:str, credits:int):
+    def __init__(self, course_id:int, title:Union[str, None]=None, dept_name:Union[str, None]=None, credits:Union[int, None]=None):
         self.course_id = course_id
         self.title = title
         self.dept_name = dept_name
@@ -40,7 +44,7 @@ class Course:
         self.primary_key = PrimaryKey(course_id)
 
 class Section:
-    def __init__(self, course_id:int, sec_id:str, semester:int, year:int, building:str, room_number:int, time_slot_id:int):
+    def __init__(self, course_id:int, sec_id:str, semester:int, year:int, building:Union[str, None]=None, room_number:Union[int, None]=None, time_slot_id:Union[int, None]=None):
         self.course_id = course_id
         self.sec_id = sec_id
         self.semester = semester
@@ -60,7 +64,7 @@ class Teaches:
         self.primary_key = PrimaryKey(id, course_id, sec_id, semester, year)
 
 class Advisor:
-    def __init__(self, s_id:int, i_id:int):
+    def __init__(self, s_id:int, i_id:Union[int, None]=None):
         self.s_id = s_id
         self.i_id = i_id
         self.primary_key = PrimaryKey(s_id)
@@ -72,7 +76,7 @@ class Prerequisite:
         self.primary_key = PrimaryKey(course_id, prereq_id)
 
 class TimeSlot:
-    def __init__(self, time_slot_id:int, day:str, start_time:str, end_time:str):
+    def __init__(self, time_slot_id:int, day:Union[str, None]=None, start_time:Union[str, None]=None, end_time:Union[str, None]=None):
         self.time_slot_id = time_slot_id
         self.day = day
         self.start_time = start_time
@@ -80,7 +84,7 @@ class TimeSlot:
         self.primary_key = PrimaryKey(time_slot_id)
 
 class Takes:
-    def __init__(self, id:int, course_id:int, sec_id:str, semester:int, year:int, grade:str):
+    def __init__(self, id:int, course_id:int, sec_id:str, semester:int, year:int, grade:Union[str, None]=None):
         self.id = id
         self.course_id = course_id
         self.sec_id = sec_id
@@ -90,7 +94,7 @@ class Takes:
         self.primary_key = PrimaryKey(id, course_id, sec_id, semester, year)
 
 class Classroom:
-    def __init__(self, building:str, room_number:int, capacity:int):
+    def __init__(self, building:str, room_number:int, capacity:Union[int, None]=None):
         self.building = building
         self.room_number = room_number
         self.capacity = capacity
@@ -153,7 +157,6 @@ class StorageManager:
         os.makedirs(os.path.join(self.DATA_DIR, self.HASH_DIR), exist_ok=True)
         self.frm = frm
         self.indexes = {}
-        self.bplusindexes: Dict[object, Tuple[str, BPlusTree]] = {}
         self.logs = self._load_logs()
         self.action_logs = []
 
@@ -370,6 +373,50 @@ class StorageManager:
             raise ValueError(f"Key {value} tidak ditemukan di {table}.{column}")
         return query_result
     """
+    
+    def get_index(self, attribute: str, relation: str) -> Union[Literal["hash", "btree"], None]:
+        """Get the type of index on the given attribute in the relation."""
+        for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
+            if file.startswith(f"{relation}_{attribute}_hash"):
+                return "hash"
+        return None
+        # return self.data.get(relation, {}).get("attributes", {}).get(attribute, {}).get("index", None)
+    
+    def has_index(self, attribute: str, relation: str) -> bool:
+        """Check if the attribute in the relation has an index."""
+        for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
+            if file.startswith(f"{relation}_{attribute}_hash"):
+                return True
+        return False
+    
+    def get_all_relations(self):
+        """Get all relations in the data."""
+        relations = []
+        helper_classes = ['Condition', 'ConditionGroup', 'DataDeletion', 'DataRetrieval', 'DataWrite', 'Statistic']
+        for name, obj in inspect.getmembers(sys.modules[__name__], lambda member: inspect.isclass(member) and member.__module__ == __name__):
+            if name != type(self).__name__ and name not in helper_classes:
+                relations.append(name)
+        return relations
+
+    def get_all_attributes(self, relation: str):
+        """Get all attributes in the relation."""
+        cls = globals()[relation]
+        init_method = getattr(cls, "__init__", None)
+        if not init_method:
+            return []
+
+        source = textwrap.dedent(inspect.getsource(init_method))
+        tree = ast.parse(source)
+        attributes = [node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Store) and node.attr != "primary_key"]
+        return attributes
+    
+    def has_relation(self, relation: str) -> bool:
+        """Check if the relation is in the data."""
+        return relation in self.get_all_relations()
+    
+    def has_attribute(self, attribute: str, relation: str) -> bool:
+        """Check if the attribute is in the relation."""
+        return attribute in self.get_all_attributes(relation)
         
     def get_stats(self):
         stats = {}
