@@ -29,7 +29,7 @@ def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules]) -
 
             for rule in rules:
                 transformed_nodes = rule(current_node)
-                print(f" - Rule {rule.__name__} applied to node id: {current_node.id}")
+                # print(f" - Rule {rule.__name__} applied to node id: {current_node.id}")
                 
 
                 # Check if a transformation occurred
@@ -59,7 +59,7 @@ def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules]) -
                             queue.append(new_plan)
 
                     transformed_this_node = True
-                    break
+                    # break
 
 
             # Add children to the nodes_to_process queue

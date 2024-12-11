@@ -58,14 +58,13 @@ if (current == 'gana'):
     print(query_plan
     )
     print("\n\n\nGenerated plans:" + str(len(plans)))
-    LIMIT_5 = min(len(plans), 5)
+    LIMIT_5 = min(len(plans), 20)
     for plan in plans[:LIMIT_5]:
         print(plan)
 
     # bf = BFOptimizer()
-    # plans = bf.generate_possible_plans(query_plan)
-    # for plan in plans:
-    
+    # bestPlan = bf.optimize(query_plan)
+    # bestPlan.print()
 elif (current == 'azmi'):
     pass
     # from query_plan.query_plan import QueryPlan

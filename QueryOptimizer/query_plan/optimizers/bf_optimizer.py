@@ -11,15 +11,7 @@ def get_cost(query: 'QueryPlan') -> float:
 class BFOptimizer(QueryPlanOptimizer):
     def optimize(self, query: 'QueryPlan') -> 'QueryPlan':
         best_plan = query.clone()
-        possible_plans = generate_possible_plans(query, [
-            EquivalenceRules.deconstruct_conjunction, # Rule 1
-            EquivalenceRules.commute_selections, # Rule 2
-            EquivalenceRules.collapse_projections, # Rule 3
-            EquivalenceRules.combineJoinCondition, # Rule 4
-            EquivalenceRules.switchChildrenJoin, # Rule 5
-            EquivalenceRules.associativeJoins, # Rule 6
-        ])
-
+        possible_plans = generate_possible_plans(query)
         best_cost = get_cost(best_plan)
         for plan in possible_plans:
             current_cost = get_cost(plan)

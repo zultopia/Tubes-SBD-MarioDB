@@ -13,7 +13,9 @@ def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules] = 
     EquivalenceRules.combineJoinCondition, # Rule 4
     EquivalenceRules.switchChildrenJoin, # Rule 5
     EquivalenceRules.associativeJoins, # Rule 6
-    EquivalenceRules.push_projections_into_join, # Rule 8
+    EquivalenceRules.distributeSelection, #Rule 7
+    # EquivalenceRules.push_projections_into_join, # Rule 8
+    EquivalenceRules.joinAlgorithmVariation, # Additional Rule
 ]) -> List['QueryPlan']:
 
 
@@ -67,7 +69,7 @@ def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules] = 
                             queue.append(new_plan)
 
                     transformed_this_node = True
-                    break
+                    # break
 
 
             # Add children to the nodes_to_process queue

@@ -209,14 +209,27 @@ class EquivalenceRules:
     switches the children of natural and theta joins
     '''
     #revised
+    @staticmethod
     def switchChildrenJoin(node: QueryNode) -> List[QueryNode]:
+        # Check if the node is a ConditionalJoinNode or NaturalJoinNode
         if not isinstance(node, (ConditionalJoinNode, NaturalJoinNode)):
-            return [node]
-        nodeClone = node.clone()
-        temp = nodeClone.children.first
-        nodeClone.children.first = nodeClone.children.second
-        nodeClone.children.second = temp
-        return [nodeClone, node]
+            return [node]  # Return the original node as-is if it's not a join node
+
+        # Clone the original node to ensure no modifications to the original
+        if isinstance(node, ConditionalJoinNode):
+            new_node = ConditionalJoinNode(
+                algorithm=node.algorithm,
+                conditions=node.conditions
+            )
+        elif isinstance(node, NaturalJoinNode):
+            new_node = NaturalJoinNode(algorithm=node.algorithm)
+        # print("This is the type of node clone:",nodeClone)
+        # Switch the children in the cloned node
+        if node.children and isinstance(node.children,Pair):
+            new_node.set_children(Pair(node.children.second.clone(),node.children.first.clone()))
+
+        # Return the modified clone along with the original node
+        return [new_node]
     
     
     """
@@ -241,16 +254,35 @@ class EquivalenceRules:
                 grandchild_left = inner.children.first.clone() if inner.children.first else None
                 grandchild_right = inner.children.second.clone() if inner.children.second else None
                 # takes the class of input, assign the condition if it has the attribute else bakal jadi natural join
-                associated_inner = parent.__class__(inner.conditions if hasattr(inner, 'conditions') else None)
+                if isinstance(parent, ConditionalJoinNode):
+                    associated_inner = ConditionalJoinNode(
+                        algorithm=parent.algorithm,
+                        conditions=parent.conditions
+                    )
+                elif isinstance(parent, NaturalJoinNode):
+                    associated_inner = NaturalJoinNode(algorithm=parent.algorithm)
                 if is_left:
-                    associated_inner.set_children(grandchild_right, outer.clone())
-                    new_node = parent.__class__(parent.conditions if hasattr(parent, 'conditions') else None)
-                    new_node.set_children(grandchild_left, associated_inner)
+                    associated_inner.set_children(Pair(grandchild_right, outer.clone()))
+                    if isinstance(parent, ConditionalJoinNode):
+                        new_node = ConditionalJoinNode(
+                            algorithm=parent.algorithm,
+                            conditions=parent.conditions
+                        )
+                    elif isinstance(parent, NaturalJoinNode):
+                        new_node = NaturalJoinNode(algorithm=parent.algorithm)
+                    new_node.set_children(Pair(grandchild_left, associated_inner))
                 else:
-                    associated_inner.set_children(outer.clone(), grandchild_left)
-                    new_node = parent.__class__(parent.conditions if hasattr(parent, 'conditions') else None)
-                    new_node.set_children(associated_inner, grandchild_right)
+                    associated_inner.set_children(Pair(outer.clone(), grandchild_left))
+                    if isinstance(parent, ConditionalJoinNode):
+                        new_node = ConditionalJoinNode(
+                            algorithm=parent.algorithm,
+                            conditions=parent.conditions
+                        )
+                    elif isinstance(parent, NaturalJoinNode):
+                        new_node = NaturalJoinNode(algorithm=parent.algorithm)
+                    new_node.set_children(Pair(associated_inner, grandchild_right))
                 return new_node
+            
             return parent.clone()  
 
         # Handle (left ⋈ middle) ⋈ right
@@ -471,6 +503,50 @@ class EquivalenceRules:
 
         # If none of the above scenarios match, return the node unchanged
         return [node]
+    
+    """
+    Aditional Rule
+    give variation of join the same query plan with different join algorithm
+    """
+
+    @staticmethod
+    def joinAlgorithmVariation(node: QueryNode) -> List[QueryNode]:
+        """
+        Additional Rule: Generate variations of join nodes with different algorithms.
+        """
+        variations = []
+
+        # Check if the node is a ConditionalJoinNode or NaturalJoinNode
+        print("node type: ",node)
+        if not isinstance(node, (NaturalJoinNode, ConditionalJoinNode)):
+            return [node]  # Return the original node as-is if it's not a join node
+
+        print("ASDFASDFASFASDFS")
+        # Iterate over all join algorithms
+        for algorithm in JoinAlgorithm:
+            
+            # Create a new join node with the same type and conditions but different algorithm
+            if isinstance(node, ConditionalJoinNode):
+                new_node = ConditionalJoinNode(
+                    algorithm=algorithm,
+                    conditions=node.conditions
+                )
+            elif isinstance(node, NaturalJoinNode):
+                new_node = NaturalJoinNode(algorithm=algorithm)
+
+            # Clone children to maintain subtree structure
+            if node.children:
+                new_node.set_children(
+                    Pair(
+                        node.children.first.clone(),
+                        node.children.second.clone()
+                    )
+                )
+
+            # Add the new node to variations
+            variations.append(new_node)
+
+        return variations 
 
 
 
