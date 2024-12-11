@@ -103,7 +103,7 @@ class Cell(IDataItem):
         return False
 
     def __hash__(self):
-        return hash(self.table + self.pkey.__str__() + self.attribute)
+        return hash(self.table.table + self.pkey.__str__() + self.attribute)
     
     def get_row(self):
         return self.row
@@ -175,6 +175,9 @@ class TransactionAction:
         if isinstance(other, TransactionAction):
             return (self.id == other.id) and (self.action == other.action) and (self.level == other.level) and (self.data_item == other.data_item) and (self.old_data_item == other.old_data_item)
         return False
+    
+    def __str__(self):
+        return f"====================\nid={self.id}\naction={self.action}\nlevel={self.level}\ndataitem={self.data_item}\nold_data_item={self.old_data_item}\n==============================================\n"
 
 class WaitForGraph:
     def __init__(self):
@@ -247,6 +250,7 @@ class ConcurrencyControlManager:
         self.transaction_queue = set() # Set transaction_id
         self.transaction_dataitem_map = {} # Map transaction_id -> List[DataItem]
         self.waiting_list : List[TransactionAction] = []
+        self.tid = 0
         # self.failure_recovery = FailureRecoveryManager()
     
     def __str__(self):
@@ -254,7 +258,9 @@ class ConcurrencyControlManager:
     
     def __generate_id(self) -> int:
         # return int(f"{datetime.now().strftime("%Y%m%d%H%M%S%f")}{random.randint(10000, 99999)}")
-        return int((str(time.perf_counter()*1000000000)).replace('.', ''))
+        # return int((str(time.perf_counter()*1000000000)).replace('.', ''))
+        self.tid += 1
+        return self.tid
     
     def begin_transaction(self) -> int:
         # will return transaction_id: int
@@ -330,13 +336,7 @@ class ConcurrencyControlManager:
                     break
                 
                 if holders and minimum_lock_type in conflict_matrix[held_lock]:
-                    if transaction_id in holders:
-                        holders.remove(transaction_id)
-                        
-                    if transaction_id not in holders:
-                        print("tid", transaction_id)
-                        print("holder", holders)
-                        print("key", minimum_lock_type)
+                    if len(holders) > 1 or transaction_id not in holders:
                         failed = True
                         conflict_list.append(holders)
                         
@@ -369,8 +369,6 @@ class ConcurrencyControlManager:
                             
                 if not abort:
                     self.transaction_queue.add(transaction_id)
-                    print("append2: ", transaction_action.id)
-                    self.waiting_list.append(transaction_action)
                     # self.wait_for_graph.addEdge()
                 
                 # while (not self.wait_for_graph.waiting(transaction_action)): 
