@@ -25,7 +25,7 @@ class Buffer:
         self._buffer = LRUCache(capacity)
 
         # Buffer mutex
-        self._lock = Lock()
+        self._buffer_lock = Lock()
 
     def get_buffer(self, table_name: str, block_id: int) -> Union[any, None]:
         """

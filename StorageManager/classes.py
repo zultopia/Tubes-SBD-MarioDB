@@ -8,7 +8,6 @@ import textwrap
 from typing import Any, List, Literal, Union, Dict, Tuple
 
 from StorageManager.HashIndex import Hash
-# from .BPlusTree import BPlusTree
 from ConcurrencyControlManager.classes import PrimaryKey
 from FailureRecoveryManager.Buffer import Buffer
 
