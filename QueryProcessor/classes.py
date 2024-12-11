@@ -229,7 +229,20 @@ class QueryProcessor:
                     for table, conditions in conditions.items():
                         print(f"Table: {table}")
                         for condition in conditions:
-                            print(f"  - {condition.column} {condition.operation} {condition.operand}")    
+                            print(f"  - {condition.column} {condition.operation} {condition.operand}")
+        # Jika ada klausa ORDER BY
+        if len(query_tree.childs) >= 7 and query_tree.childs[6].root == "ORDER_BY":
+            order_by_node = query_tree.childs[6]
+            order_by_attr = order_by_node.childs[1].root.value
+            descending = len(order_by_node.childs) > 2 and order_by_node.childs[2].root.value.upper() == "DESC"
+            rows = execute_ORDER_BY(rows, order_by_attr, descending)
+            
+        # Jika ada klausa LIMIT
+        if len(query_tree.childs) >= 8 and query_tree.childs[7].root == "LIMIT":
+            limit_node = query_tree.childs[7]
+            limit_value = int(limit_node.childs[1].root.value)
+            rows = execute_LIMIT(rows, limit_value)    
+    
         # Mengambil dari StorageManager
         rows = []
         for table, attributes in retrieval_schema.items() :
@@ -289,24 +302,16 @@ class QueryProcessor:
 
     # TODO (sekarang)
     # fungsi untuk ORDER BY dan LIMIT
-    def apply_order_by_and_limit(self, data: List[Dict[str, Union[int, str]]], 
-                                order_by: Optional[Dict[str, str]], 
-                                limit: Optional[int]) -> List[Dict[str, Union[int, str]]]:
-        # :param data: daftar/list berisi baris hasil query yang tiap baris direpresentasikan sbg dictionary
-        # :param order_by: dictionary -> column: nama kolom yg ingin diurutkan, direction: ascending/descendingDictionary with 'column' and 'direction' for ordering.
-                        # contoh: order_by = {"column": "age", "direction": "DESC"}.
-        # :param limit: jumlah max baris yang diinginkan pada hasil query
-        # :return: mengembalikan daftar/list order by dan limit
-        if order_by:
-            column = order_by.get("column")
-            direction = order_by.get("direction", "ASC").upper()
-            reverse = direction == "DESC"
-            # mengurutkan daftar data
-            data.sort(key=lambda x: x.get(column, None), reverse=reverse)
-        if limit is not None:
-            # mengambil jumlah elemen sesuai limit dari daftar data
-            data = data[:limit]
-        return data
+    def execute_ORDER_BY(rows: List[Dict[str, Union[int, str]]], order_by_attr: str, descending: bool = False) -> List[Dict[str, Union[int, str]]]:
+        def get_sort_key(row):
+            value = row.get(order_by_attr, None)
+            if isinstance(value, str):
+                return tuple(ord(char) for char in value)
+            return value
+        return sorted(rows, key=get_sort_key, reverse=descending)
+
+    def execute_LIMIT(rows: List[Dict[str, Union[int, str]]], limit: int) -> List[Dict[str, Union[int, str]]]:
+        return rows[:limit]
 
     # TODO (menunggu kelompok query optimizer)
     # handle query UPDATE, menerima input node query tree
