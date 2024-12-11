@@ -58,7 +58,7 @@ class QueryPlan(Prototype):
                 
             return '\n'.join(result)
 
-        return f"Query Plan:\n{repr_node(self.root)}"
+        return f"{repr_node(self.root)}\n"
 
     def clone(self) -> 'QueryPlan':
         cloned_root = self.root.clone()

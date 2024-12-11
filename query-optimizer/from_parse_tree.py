@@ -14,11 +14,6 @@ from query_plan.enums import JoinAlgorithm, Operator
 from parse_tree import ParseTree, Node
 from lexer import Token 
 from query_plan.shared import Condition
-import logging
-
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
     if not isinstance(parse_tree.root, str) or parse_tree.root != "Query":
@@ -150,8 +145,6 @@ def process_table_result(table_result_tree: ParseTree) -> QueryNode:
     # Process the initial TableTerm
     current_node = process_table_term(table_result_tree.childs[0])
 
-    logger.debug("checkpoint 1: Processed initial TableTerm")
-
     # Check if there is a TableResultTail
     if len(table_result_tree.childs) > 1 and table_result_tree.childs[1].root == "TableResultTail":
         table_result_tail = table_result_tree.childs[1]
@@ -160,13 +153,11 @@ def process_table_result(table_result_tree: ParseTree) -> QueryNode:
             if not table_result_tail.childs:
                 break  # No further processing needed
 
-            logger.debug("checkpoint 2: Processing TableResultTail")
             first_child = table_result_tail.childs[0]
             if not isinstance(first_child.root, Node):
                 raise SyntaxError("Invalid structure in TableResultTail")
 
             if first_child.root.token_type == Token.JOIN:
-                logger.debug("Processing JOIN")
                 # Handle explicit JOINs
                 join_node = process_conditional_join(table_result_tail)
                 right_node = process_table_term(table_result_tail.childs[1])
@@ -177,7 +168,6 @@ def process_table_result(table_result_tree: ParseTree) -> QueryNode:
                 table_result_tail = table_result_tail.childs[4] if len(table_result_tail.childs) > 4 else None
 
             elif first_child.root.token_type == Token.NATURAL:
-                logger.debug("Processing NATURAL JOIN")
                 # Handle NATURAL JOINs
                 join_node = NaturalJoinNode(JoinAlgorithm.NESTED_LOOP)
                 right_node = process_table_term(table_result_tail.childs[2])

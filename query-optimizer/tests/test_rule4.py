@@ -36,28 +36,23 @@ class TestOptimizerRule4:
         
         original_plan = QueryPlan(selection2)
 
-        print(original_plan)
 
         # Expected plan: Student ⋈(student_id=id AND grade='A') Course
         student_table2 = TableNode("Student")
         course_table2 = TableNode("Course")
-        combined_join = ConditionalJoinNode(JoinAlgorithm.HASH, [
+        combined_join = ConditionalJoinNode(JoinAlgorithm.NESTED_LOOP, [
             Condition("student_id", "id", Operator.EQ),
             Condition("grade", "A", Operator.EQ)
         ])
         combined_join.set_children(Pair(student_table2, course_table2))
         expected_plan = QueryPlan(combined_join)
 
-        print(expected_plan)
-
         plans = generate_possible_plans(original_plan, [
-            EquivalenceRules.associativeJoins
+            EquivalenceRules.combineJoinCondition
         ])
-
-        print(plans)
         
-        assert any(p == expected_plan for p in plans), "Associative join transformation should exist"
-        print(f"Associative joins test 1: Passed - {time() - start_time:.6f} s")
+        assert any(p == expected_plan for p in plans), "Combine Join transformation should exist"
+        print(f"Combine Joins test 1: Passed - {time() - start_time:.6f} s")
 
     def test_associative_joins_2(self):
         """Test more complex combination of selections and joins"""
@@ -88,7 +83,7 @@ class TestOptimizerRule4:
         # Expected plan: Employee ⋈(dept=dept_id AND salary>manager_salary) Department
         emp_table2 = TableNode("Employee")
         dept_table2 = TableNode("Department")
-        combined_join = ConditionalJoinNode(JoinAlgorithm.HASH, [
+        combined_join = ConditionalJoinNode(JoinAlgorithm.NESTED_LOOP, [
             Condition("dept", "dept_id", Operator.EQ),
             Condition("salary", "manager_salary", Operator.GREATER)
         ])
@@ -96,8 +91,8 @@ class TestOptimizerRule4:
         expected_plan = QueryPlan(combined_join)
 
         plans = generate_possible_plans(original_plan, [
-            EquivalenceRules.associativeJoins
+            EquivalenceRules.combineJoinCondition
         ])
         
-        assert any(p == expected_plan for p in plans), "Complex associative join transformation should exist"
-        print(f"Associative joins test 2: Passed - {time() - start_time:.6f} s")
+        assert any(p == expected_plan for p in plans), "Complex Combine Join transformation should exist"
+        print(f"Combine Joins test 2: Passed - {time() - start_time:.6f} s")

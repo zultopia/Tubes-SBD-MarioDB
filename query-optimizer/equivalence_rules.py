@@ -192,6 +192,8 @@ class EquivalenceRules:
         nodeClone = node.clone()
         if not isinstance(nodeClone, SelectionNode) or not isinstance(nodeClone.child, ConditionalJoinNode):
             return [nodeClone]
+        
+        
         combinedNode = nodeClone.child
         newConditions = [
             Condition(
@@ -517,11 +519,9 @@ class EquivalenceRules:
         variations = []
 
         # Check if the node is a ConditionalJoinNode or NaturalJoinNode
-        print("node type: ",node)
         if not isinstance(node, (NaturalJoinNode, ConditionalJoinNode)):
             return [node]  # Return the original node as-is if it's not a join node
 
-        print("ASDFASDFASFASDFS")
         # Iterate over all join algorithms
         for algorithm in JoinAlgorithm:
             

@@ -11,13 +11,12 @@ def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules] = 
     EquivalenceRules.commute_selections, # Rule 2
     # EquivalenceRules.collapse_projections, # Rule 3
     EquivalenceRules.combineJoinCondition, # Rule 4
-    EquivalenceRules.switchChildrenJoin, # Rule 5
+    # EquivalenceRules.switchChildrenJoin, # Rule 5
     EquivalenceRules.associativeJoins, # Rule 6
-    EquivalenceRules.distributeSelection, #Rule 7
+    # EquivalenceRules.distributeSelection, #Rule 7
     # EquivalenceRules.push_projections_into_join, # Rule 8
-    EquivalenceRules.joinAlgorithmVariation, # Additional Rule
+    # EquivalenceRules.joinAlgorithmVariation, # Additional Rule
 ]) -> List['QueryPlan']:
-
 
     initial_plan = query.clone()
     plans = { initial_plan }
@@ -38,8 +37,10 @@ def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules] = 
             transformed_this_node = False
 
             for rule in rules:
+                
                 transformed_nodes = rule(current_node)
                 # print(f" - Rule {rule.__name__} applied to node id: {current_node.id}")
+                # print(current_node)
                 
 
                 # Check if a transformation occurred
@@ -69,7 +70,6 @@ def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules] = 
                             queue.append(new_plan)
 
                     transformed_this_node = True
-                    # break
 
 
             # Add children to the nodes_to_process queue
