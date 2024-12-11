@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional, List  # kalo gaboleh dihapus aja
 import time
 
-from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
+# from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
 
 class PrimaryKey:
     def __init__(self, *keys):
@@ -43,7 +43,7 @@ class Table(IDataItem):
     def __init__(self, table: str):
         self.table = table
     
-    def __eq__(self, other):
+    def __eq__(self, other: 'Table'):
         if isinstance(other, Table):
             return self.table == other.table
         return False
@@ -73,7 +73,7 @@ class Row(IDataItem):
         if isinstance(other, Row):
             return (self.pkey == other.pkey) and (self.table == other.table)
         return False
-    
+
     def __ne__(self, other):
         return not self.__eq__(other)
     
@@ -170,6 +170,11 @@ class TransactionAction:
         self.level  = level
         self.data_item = data_item
         self.old_data_item = old_data_item
+    
+    def __eq__(self, other):
+        if isinstance(other, TransactionAction):
+            return (self.id == other.id) and (self.action == other.action) and (self.level == other.level) and (self.data_item == other.data_item) and (self.old_data_item == other.old_data_item)
+        return False
 
 class WaitForGraph:
     def __init__(self):
@@ -241,8 +246,8 @@ class ConcurrencyControlManager:
         self.wait_for_graph = WaitForGraph()
         self.transaction_queue = set() # Set transaction_id
         self.transaction_dataitem_map = {} # Map transaction_id -> List[DataItem]
-        self.waiting_list = [TransactionAction]
-        self.failure_recovery = FailureRecoveryManager()
+        self.waiting_list : List[TransactionAction] = []
+        # self.failure_recovery = FailureRecoveryManager()
     
     def __str__(self):
         return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"
@@ -277,7 +282,7 @@ class ConcurrencyControlManager:
         
         minimum_lock_matrix = {
             "IS": {"IX", "S", "SIX", "X"},
-            "S": {"SIX", "X"},
+            "S": {"SIX", "X", "IX"},
             "IX": {"X", "SIX"},
             "SIX": {"X"},
             "X": {}
@@ -319,27 +324,33 @@ class ConcurrencyControlManager:
                         minimum_lock_type = "IS"
                     elif lock_type == "X":
                         minimum_lock_type = "IX"
-                        
+                print(self.transaction_dataitem_map)
+                print(transaction_id)
                 if self.transaction_dataitem_map[transaction_id].get(current, None) == minimum_lock_type:
                     break
                 
                 if holders and minimum_lock_type in conflict_matrix[held_lock]:
-                    if len(holders) > 1 or transaction_id not in holders:
+                    if transaction_id in holders:
+                        holders.remove(transaction_id)
+                        
+                    if transaction_id not in holders:
+                        print("tid", transaction_id)
+                        print("holder", holders)
+                        print("key", minimum_lock_type)
                         failed = True
                         conflict_list.append(holders)
                         
                         for tid in holders:
-                            if tid != transaction_id:
-                                if held_lock == "S":
-                                    self.wait_for_graph.addEdge(transaction_id, tid)
-                                if held_lock == "IS":
-                                    self.wait_for_graph.addEdge(transaction_id, tid)
-                                if held_lock == "S":
-                                    self.wait_for_graph.addEdge(transaction_id, tid)
-                                if held_lock == "S":
-                                    self.wait_for_graph.addEdge(transaction_id, tid)
-                                if held_lock == "S":
-                                    self.wait_for_graph.addEdge(transaction_id, tid)
+                            if held_lock == "S":
+                                self.wait_for_graph.addEdge(transaction_id, tid)
+                            if held_lock == "IS":
+                                self.wait_for_graph.addEdge(transaction_id, tid)
+                            if held_lock == "S":
+                                self.wait_for_graph.addEdge(transaction_id, tid)
+                            if held_lock == "S":
+                                self.wait_for_graph.addEdge(transaction_id, tid)
+                            if held_lock == "S":
+                                self.wait_for_graph.addEdge(transaction_id, tid)
             
             abort_transaction_id = []
             if failed:
@@ -358,6 +369,7 @@ class ConcurrencyControlManager:
                             
                 if not abort:
                     self.transaction_queue.add(transaction_id)
+                    print("append2: ", transaction_action.id)
                     self.waiting_list.append(transaction_action)
                     # self.wait_for_graph.addEdge()
                 
@@ -373,7 +385,7 @@ class ConcurrencyControlManager:
                     self.lock_IS.setdefault(current, set()).add(transaction_id)
                 elif minimum_lock_type == "IX":
                     print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
-                    self.lock_IS.setdefault(current, set()).add(transaction_id)
+                    self.lock_IX.setdefault(current, set()).add(transaction_id)
                 elif minimum_lock_type == "S":
                     print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
                     self.lock_S.setdefault(current, set()).add(transaction_id)
@@ -388,6 +400,7 @@ class ConcurrencyControlManager:
                 if current_lock not in minimum_lock_matrix[minimum_lock_type]:
                     if current_lock == "S":
                         if current in self.lock_S:
+                            print("Discard S: ", transaction_id)
                             self.lock_S[current].discard(transaction_id)
                     elif current_lock == "IS":
                         if current in self.lock_IS:
@@ -412,8 +425,18 @@ class ConcurrencyControlManager:
                         print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
                         self.lock_X.setdefault(current, set()).add(transaction_id)
                 
-            self.log_object(transaction_action)     
-            self.transaction_dataitem_map[transaction_id][transaction_action.data_item] = lock_type
+            self.log_object(transaction_action)
+            if not current_lock or current_lock not in minimum_lock_matrix[minimum_lock_type]:        
+                self.transaction_dataitem_map[transaction_id][current] = minimum_lock_type
+                print("dataitem map:", self.transaction_dataitem_map)
+        
+        print("=========================================")
+        print("lock-IS:", self.lock_IS)
+        print("lock-IX:", self.lock_IX)
+        print("lock-S:", self.lock_S)
+        print("lock-X:", self.lock_X)
+        print("lock-SIX:", self.lock_SIX)
+        print("dataitem map:", self.transaction_dataitem_map)
         
         return True, None, f"Transaction {transaction_id} successfully get lock-{lock_type} on {transaction_action.data_item}"
     
@@ -423,8 +446,9 @@ class ConcurrencyControlManager:
         action = transactionAction.action
         
         if transactionAction.id in self.transaction_queue:
+            print("append3: ", transactionAction.id)
             self.waiting_list.append(transactionAction)
-            return Response(False, transactionAction.id, f"Transaction {transaction_id} must wait for {transactionAction.action}")
+            return Response(False, "wait", transactionAction.id, f"Transaction {transaction_id} must wait for {transactionAction.action}")
         
         action = action.lower()
         if action not in ["read", "write", "six", "commit", "abort"]:
@@ -432,29 +456,40 @@ class ConcurrencyControlManager:
         
         if action in ["commit", "abort"]:
             self.end_transaction(transactionAction.id, action)
-            return Response(True, transactionAction.id, f"Transaction {transaction_id} succesfully {action}ed")
+            return Response(True, action, transactionAction.id, f"Transaction {transaction_id} succesfully {action}ed")
 
         lock_type = 'S' if action == "read" else 'X' if action == "write" else "SIX"
         
-        # Apply lock with hierarchical checks
         allowed, abort, message = self.apply_lock(transactionAction)
         if not allowed:
             print(f"Failed to grant Lock-{lock_type} on {transactionAction.data_item} for transaction {transaction_id}: {message}")
-            return Response(allowed, transaction_id, message)
+            if not abort:
+                print("append1: ", transactionAction.id)
+                self.waiting_list.append(transactionAction)
+            else:
+                self.end_transaction(transactionAction.id, "abort")
+            
+            return Response(allowed, "wait" if not abort else "abort", transaction_id, message)
 
-        # If successful, return response
-        print(f"Lock-{lock_type} granted on {transactionAction.data_item} for transaction {transaction_id}")
-        return Response(allowed, transaction_id, message)
+        return Response(allowed, "success", transaction_id, message)
     
     def end_transaction(self, transaction_id: int, status: str):
-        # Flush objects of a particular transaction after it has successfully committed/aborted
-        # Terminates the transaction
-        for data_item, lock_type in self.transaction_dataitem_map[transaction_id]: 
+        print("a" * 50)
+        print("dataitem map:", self.transaction_dataitem_map[transaction_id])
+        print("lock-IS:", self.lock_IS)
+        print("lock-S:", self.lock_S)
+        print("lock-IX:", self.lock_IX)
+        print("lock-X:", self.lock_X)
+        print("lock-SIX:", self.lock_SIX)
+        print("a" * 50)
+        
+        for data_item, lock_type in self.transaction_dataitem_map[transaction_id].items(): 
             if (lock_type == "X"):
                 print(f"Transaction {transaction_id} remove X on {data_item}")
                 self.lock_X[data_item].remove(transaction_id)
             if (lock_type == "S"): 
                 print(f"Transaction {transaction_id} remove S on {data_item}")
+                print("lock-S", self.lock_S)
                 self.lock_S[data_item].remove(transaction_id)
             if (lock_type == "IX"): 
                 print(f"Transaction {transaction_id} remove IX on {data_item}")
@@ -466,105 +501,48 @@ class ConcurrencyControlManager:
                 print(f"Transaction {transaction_id} remove SIX on {data_item}")
                 self.lock_SIX[data_item].remove(transaction_id)
         
-        self.transaction_queue.remove(transaction_id)
-        self.wait_for_graph.deleteNode(transaction_id)
+        if transaction_id in self.transaction_queue:
+            self.transaction_queue.remove(transaction_id)
+        if self.wait_for_graph.waiting(transaction_id):
+            self.wait_for_graph.deleteNode(transaction_id)
         del self.transaction_dataitem_map[transaction_id]
         
         t_action = TransactionAction(transaction_id, status, None, None, None)
         self.log_object(t_action)
         
+        self.process_waiting_list()
+        
     def process_waiting_list(self): 
         need_check = True
 
-        while (need_check): 
+        while need_check: 
             check_waiting = False
+            run_transaction = []
+
+            print(self.wait_for_graph.waitfor)
             for tid in self.transaction_queue: 
-                if (self.wait_for_graph.waiting(tid)) :
-                    self.transaction_queue.remove(tid)
+                if not self.wait_for_graph.waiting(tid):
+                    run_transaction.append(tid)
                     check_waiting = True
 
+            for transaction_id in run_transaction:
+                self.transaction_queue.remove(transaction_id)
+
+            print(self.transaction_queue)
+            for act in self.waiting_list: 
+                print("ini", act.id)
             need_check = False
-            if (check_waiting):
-                for t_process in self.waiting_list: 
+            if check_waiting:
+                for t_process in list(self.waiting_list): 
                     if t_process.id not in self.transaction_queue : 
-                        self.validate_object(t_process)
-                        need_check = True
+                        response = self.validate_object(t_process)
+                        if response.status == "abort" or response.status == "commit": 
+                            need_check = True
                 
-                    self.waiting_list.remove(t_process)
-            
-        
-# ccm = ConcurrencyControlManager(algorithm="Test")
-# print(ccm.begin_transaction())
-# print(ccm.begin_transaction())
-# print(ccm.begin_transaction())
-
-# pkey = PrimaryKey("lala", 1)
-# pkey1 = PrimaryKey("lala", 1)
-# print(pkey1)
-# pkey2 = PrimaryKey("lala")
-# print(pkey != pkey1)
-# print(pkey == pkey2)
-
-# row = Row(table="table", pkey=pkey, map={'att1': 15})
-# print(row)
-# row1 = Row(table="table", pkey=pkey, map={'att1': 15})
-# row2 = Row(table="table", pkey=pkey2, map={'att1': 15})
-# row3 = Row(table="table1", pkey=pkey, map={'att1': 15, 'att2': "16"})
-# print("=== tes Row comparison ===")
-# print(row == row1)
-# print(row == row2)
-# print(row == row3)
-# print(row != row1)
-# print(row != row2)
-# print(row != row3)
-
-# print(row3['att1'])
-# print(row3['att2'])
-
-# lock = Lock('S',2,row)
-# print(lock)
-
-# row_tes_1 = Row('table', 1, {'col1': 1, 'col2': 'SBD'})
-# tid1 = ccm.begin_transaction()
-# tid2 = ccm.begin_transaction()
-
-# print(ccm.validate_object(row_tes_1, tid1,'ReAd'))  # T
-# print(ccm.validate_object(row_tes_1, tid2,'reAd'))  # T
-# print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # F
-
-# print(ccm.validate_object(row_tes_1, tid1,'ReAd'))  # T
-# print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # T
-# print(ccm.validate_object(row_tes_1, tid2,'reAd'))  # F
-
-# print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # T
-# print(ccm.validate_object(row_tes_1, tid1,'ReAd'))  # T
-# print(ccm.validate_object(row_tes_1, tid2,'reAd'))  # F
-
-# print(ccm.validate_object(row_tes_1, tid1,'rEAd'))  # T
-# print(ccm.validate_object(row_tes_1, tid2,'ReAd'))  # T
-# print(ccm.validate_object(row_tes_1, tid1,'reAd'))  # T
-
-# print(ccm.validate_object(row_tes_1, tid1,'wriTe')) # T
-# print(ccm.validate_object(row_tes_1, tid2,'wriTe')) # F
-
-# wfg = WaitForGraph()
-# wfg.addEdge(1, 2)
-# wfg.addEdge(4, 1)
-# wfg.addEdge(2, 3)
-# wfg.addEdge(3, 5)
-
-# print(wfg.isCyclic())
-
-# wfg.addEdge(5, 1)
-# print(wfg.isCyclic())
-
-# wfg.deleteEdge(5, 1)
-# print(wfg)
-
-# wfg.deleteEdge(4, 1)
-# wfg.addEdge(4, 5)
-
-# print(wfg)
-
-# wfg.deleteNode(5)
-# print(wfg)
+                        print("before remove")
+                        for t_action in self.waiting_list:
+                            print(t_action.id)
+                        self.waiting_list.remove(t_action)
+                        print("hasil remove", self.waiting_list)
+                        for t_action in self.waiting_list:
+                            print(t_action.id)
