@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from FailureRecoveryManager.ExecutionResult import ExecutionResult
 from FailureRecoveryManager.Rows import Rows
-
+from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
 from .FailureRecoveryManager import FailureRecoveryManager, LRUCache
 
 
@@ -119,8 +119,41 @@ class TestFailureRecoveryManager(unittest.TestCase):
         self.frm._save_checkpoint()
         self.assertEqual(self.frm._wa_logs, [])
 
-    # test_recover
+    # test_recover (belum selesai lagi process)
+    @patch("FailureRecoveryManager.FailureRecoveryManager._read_lines_from_end")
+    @patch("FailureRecoveryManager.FailureRecoveryManager.write_log")
+    @patch("FailureRecoveryManager.StorageManager")
+    # @patch("builtins.open", new_callable=MagicMock)
+    def test_recover(self, mock_storage_manager, mock_write_log, mock_read_lines_from_end):
+        pass
+        
+        mock_storage = mock_storage_manager.return_value
+        mock_storage.write_block.return_value = 1
+        mock_storage.delete_block.return_value = 1
+        
+        log_lines = [
+            "CHECKPOINT|[]",
+            "101|START",
+            "101|WRITE|employees|None|[{\"id\": 1, \"name\": \"Alice\", \"salary\": 5000}]",
+            "101|COMMIT",
+            "102|START",
+            "103|START",
+            "CHECKPOINT|[102,103]",
+        ]
+        mock_read_lines_from_end.return_value = log_lines
+        
+        # Create a FailureRecoveryManager instance
+        frm = FailureRecoveryManager()
+
+        # Create recovery criteria for transaction 102
+        criteria = RecoverCriteria(transaction_id=102)
+
+        # Call the recover method
+        frm.recover(criteria)
+    
     # recover_system_crash
+    def recover_system_crash(self):
+        pass
 
 
 if __name__ == "__main__":

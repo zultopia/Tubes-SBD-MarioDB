@@ -7,6 +7,7 @@ from FailureRecoveryManager.ExecutionResult import ExecutionResult
 from FailureRecoveryManager.LRUCache import LRUCache
 from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
 from FailureRecoveryManager.Rows import Rows
+from StorageManager.classes import StorageManager, DataRetrieval, DataWrite, DataDeletion, Condition
 
 
 class FailureRecoveryManager:
@@ -25,12 +26,13 @@ class FailureRecoveryManager:
         # Log file name
         self._log_file = log_file
         # Write-ahead logs (in-memory)
-        self._wa_logs = [
-            '102|WRITE|employees|None|[{"id": 2, "name": "Bob", "salary": 4000}]',
-            '102|WRITE|employees|[{"id": 2, "name": "Bob", "salary": 4000}]|None',
-            "102|ABORT",
-            '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]',
-        ]
+        # self._wa_logs = [
+        #     '102|WRITE|employees|None|[{"id": 2, "name": "Bob", "salary": 4000}]',
+        #     '102|WRITE|employees|[{"id": 2, "name": "Bob", "salary": 4000}]|None',
+        #     "102|ABORT",
+        #     '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]',
+        # ]
+        self._wa_logs =[]
         # Write-ahead log mutex
         self._wa_log_lock = Lock()
 
@@ -45,6 +47,13 @@ class FailureRecoveryManager:
         self._buffer = LRUCache(self._max_size_buffer)
         # Buffer mutex
         self._buffer_lock = Lock()
+        
+        
+        """
+        STORAGE MANAGER CLASS
+        """
+        self.storage = StorageManager()
+        
 
         """
         SAVE CHECKPOINT CRON JOB
@@ -52,9 +61,11 @@ class FailureRecoveryManager:
         self._checkpoint_interval = checkpoint_interval
         self.timer = None
         self._start_checkpoint_cron_job()
+        
+        
 
     def __del__(self):
-        print("Destroy Failure Recovery Manager...")
+        # print("Destroy Failure Recovery Manager...")
         self._stop_checkpoint_cron_job()
 
     def get_buffer(self, table_name: str, block_id: int) -> Union[any, None]:
@@ -88,9 +99,9 @@ class FailureRecoveryManager:
         with self._buffer_lock:
             cache_key = f"{table_name}:{block_id}"
             self._buffer.put(cache_key, block_data)
-            print(
-                f"[FRM | {str(datetime.now())}]: Block {block_id} of table {table_name} added to buffer."
-            )
+            # print(
+            #     f"[FRM | {str(datetime.now())}]: Block {block_id} of table {table_name} added to buffer."
+            # )
 
     def delete_buffer(self, table_name: str, block_id: int) -> bool:
         """
@@ -107,13 +118,15 @@ class FailureRecoveryManager:
             cache_key = f"{table_name}:{block_id}"
             result = self._buffer.delete(cache_key)
             if result:
-                print(
-                    f"[FRM | {str(datetime.now())}]: Block {block_id} of table {table_name} deleted from buffer."
-                )
+                # print(
+                #     f"[FRM | {str(datetime.now())}]: Block {block_id} of table {table_name} deleted from buffer."
+                # )
+                pass
             else:
-                print(
-                    f"[FRM | {str(datetime.now())}]: Block {block_id} of table {table_name} not found in buffer."
-                )
+                # print(
+                #     f"[FRM | {str(datetime.now())}]: Block {block_id} of table {table_name} not found in buffer."
+                # )
+                pass
             return result
 
     def clear_buffer(self) -> None:
@@ -122,7 +135,7 @@ class FailureRecoveryManager:
         """
         with self._buffer_lock:
             self._buffer.clear()
-            print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
+            # print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
 
     def write_log(self, execution_result: ExecutionResult) -> None:
         # This method accepts execution result object as input and appends
@@ -192,19 +205,19 @@ class FailureRecoveryManager:
         As a result, it is impossible to have a write log that is not savable in the log.log file.
         """
 
-        print(f"[FRM | {str(datetime.now())}]: Saving checkpoint...")
+        # print(f"[FRM | {str(datetime.now())}]: Saving checkpoint...")
 
         # MANAGE BUFFER
         # Clear the buffer
         self.clear_buffer()
         # Send buffer to storage manager
-        print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
+        # print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
 
         self._wa_log_lock.acquire()
         # MANAGE WA LOG
         # Check write ahead not empty
         if len(self._wa_logs) == 0:
-            print(f"[FRM | {str(datetime.now())}]: No logs to save.")
+            # print(f"[FRM | {str(datetime.now())}]: No logs to save.")
             return
 
         # Save the wh_log to the log.log file (append to the end of the file)\
@@ -224,9 +237,10 @@ class FailureRecoveryManager:
                 file.write(f"CHECKPOINT|{json.dumps(list(active_transactions))}\n")
             # Clear the wh_log
             self._wa_logs.clear()
-            print(f"[FRM | {str(datetime.now())}]: write ahead log saved.")
+            # print(f"[FRM | {str(datetime.now())}]: write ahead log saved.")
         except Exception as e:
-            print(f"[FRM | {str(datetime.now())}]: Error saving checkpoint: {e}")
+            # print(f"[FRM | {str(datetime.now())}]: Error saving checkpoint: {e}")
+            pass
         finally:
             self._wa_log_lock.release()
 
@@ -255,7 +269,8 @@ class FailureRecoveryManager:
             self.timer.start()
 
         except Exception as e:
-            print(f"Error in checkpoint cron job: {e}")
+            # print(f"Error in checkpoint cron job: {e}")
+            pass
 
     def _stop_checkpoint_cron_job(self):
         """
@@ -364,12 +379,59 @@ class FailureRecoveryManager:
                 else:
                     after_states = json.loads(after_states_raw)
             except json.JSONDecodeError as e:
-                print(f"Error decoding JSON: {e}")
+                # print(f"Error decoding JSON: {e}")
                 exit()
             # send before and after data to storage manager to process
-            print("table:", table)
-            print("send before to storage manager: ", before_states)
-            print("send after to storage manager: ", after_states)
+            # print("table:", table)
+            # print("send before to storage manager: ", before_states)
+            # print("send after to storage manager: ", after_states)
+            
+            # insert case
+            if before_states == None and after_states != None:
+                for state in after_states:
+                    data_write = DataWrite(table, state.keys(), state.values())
+                    affected = self.storage.write_block(data_write)
+                    if (affected == 1):
+                        # print(f"[FRM | {str(datetime.now())}]: success write block for rollback query.")
+                        pass
+                    else:
+                        # print(f"[FRM | {str(datetime.now())}]: failed write block for rollback query.")
+                        pass
+                        exit()
+                        
+            # delete case
+            elif before_states != None and after_states == None:
+                for state in before_states:
+                    conditions = []
+                    for column, value in state.items():
+                        new_condition = Condition(column, "=", value)
+                        conditions.append(new_condition)
+                    data_deletion = DataDeletion(table, conditions)
+                    affected = self.storage.delete_block(data_deletion)
+                    if (affected == 1):
+                        # print(f"[FRM | {str(datetime.now())}]: success delete block for rollback query.")
+                        pass
+                    else:
+                        # print(f"[FRM | {str(datetime.now())}]: failed delete block for rollback query.")
+                        exit()
+                        
+            # udpdate case
+            elif before_states != None and after_states != None:
+                for i in range(len(before_states)):
+                    conditions = []
+                    for column, value in before_states[i].items():
+                        new_condition = Condition(column, "=", value)
+                        conditions.append(new_condition)
+                    data_write = DataWrite(table, after_states[i].keys(), after_states[i].values(), conditions=conditions)
+                    affected = self.storage.write_block(data_write)
+                    if (affected == 1):
+                        # print(f"[FRM | {str(datetime.now())}]: success delete block for rollback query.")
+                        pass
+                    else:
+                        # print(f"[FRM | {str(datetime.now())}]: failed delete block for rollback query.")
+                        exit()
+                
+            
             # Write recovery log
             exec_result = ExecutionResult(
                 transaction_id,
@@ -378,7 +440,7 @@ class FailureRecoveryManager:
                 "WRITE",
                 table,
             )
-            print("write log: ", exec_result.__dict__)
+            # print("write log: ", exec_result.__dict__)
             self.write_log(exec_result)
         # Close rollback process
         abort_result = ExecutionResult(
@@ -388,7 +450,7 @@ class FailureRecoveryManager:
             "ABORT",
             "",
         )
-        print("write log: ", exec_result.__dict__)
+        # print("write log: ", exec_result.__dict__)
         self.write_log(abort_result)
 
     def recover_system_crash(self):
@@ -435,12 +497,56 @@ class FailureRecoveryManager:
                     else:
                         after_states = json.loads(after_states_raw)
                 except json.JSONDecodeError as e:
-                    print(f"Error decoding JSON: {e}")
+                    # print(f"Error decoding JSON: {e}")
                     exit()
-                # send after data to storage manager to redo process
-                print("table:", table)
-                print("send before data to storage manager: ", before_states)
-                print("send after data to storage manager: ", after_states)
+                # send before after data to storage manager to redo process
+                # print("table:", table)
+                # print("send before data to storage manager: ", before_states)
+                # print("send after data to storage manager: ", after_states)
+                
+                # insert case
+                if before_states == None and after_states != None:
+                    for state in after_states:
+                        data_write = DataWrite(table, state.keys(), state.values())
+                        affected = self.storage.write_block(data_write)
+                        # if (affected == 1):
+                            # print(f"[FRM | {str(datetime.now())}]: success write block for rollback query.")
+                        # else:
+                            # print(f"[FRM | {str(datetime.now())}]: failed write block for rollback query.")
+                            # exit()
+                            
+                # delete case
+                elif before_states != None and after_states == None:
+                    for state in before_states:
+                        conditions = []
+                        for column, value in state.items():
+                            new_condition = Condition(column, "=", value)
+                            conditions.append(new_condition)
+                        data_deletion = DataDeletion(table, conditions)
+                        affected = self.storage.delete_block(data_deletion)
+                        if (affected == 1):
+                            # print(f"[FRM | {str(datetime.now())}]: success delete block for rollback query.")
+                            pass
+                        else:
+                            # print(f"[FRM | {str(datetime.now())}]: failed delete block for rollback query.")
+                            pass
+                            exit()
+                            
+                # udpdate case
+                elif before_states != None and after_states != None:
+                    for i in range(len(before_states)):
+                        conditions = []
+                        for column, value in before_states[i].items():
+                            new_condition = Condition(column, "=", value)
+                            conditions.append(new_condition)
+                        data_write = DataWrite(table, after_states[i].keys(), after_states[i].values(), conditions=conditions)
+                        affected = self.storage.write_block(data_write)
+                        if (affected == 1):
+                            # print(f"[FRM | {str(datetime.now())}]: success delete block for rollback query.")
+                            pass
+                        else:
+                            # print(f"[FRM | {str(datetime.now())}]: failed delete block for rollback query.")
+                            exit()
 
         # undo (rollback)
         for log_line in self._read_lines_from_end(self._log_file):
@@ -462,7 +568,7 @@ class FailureRecoveryManager:
                         "ABORT",
                         "",
                     )
-                    print("write log: ", abort_result.__dict__)
+                    # print("write log: ", abort_result.__dict__)
                     self.write_log(abort_result)
                     continue
                 # rollback processs
@@ -481,12 +587,57 @@ class FailureRecoveryManager:
                     else:
                         after_states = json.loads(after_states_raw)
                 except json.JSONDecodeError as e:
-                    print(f"Error decoding JSON: {e}")
+                    # print(f"Error decoding JSON: {e}")
                     exit()
                 # send before and after data to storage manager to process
-                print("table:", table)
-                print("send before to storage manager: ", before_states)
-                print("send after to storage manager: ", after_states)
+                # print("table:", table)
+                # print("send before to storage manager: ", before_states)
+                # print("send after to storage manager: ", after_states)
+                # insert case
+                if before_states == None and after_states != None:
+                    for state in after_states:
+                        data_write = DataWrite(table, state.keys(), state.values())
+                        affected = self.storage.write_block(data_write)
+                        if (affected == 1):
+                            # print(f"[FRM | {str(datetime.now())}]: success write block for rollback query.")
+                            pass
+                        else:
+                            # print(f"[FRM | {str(datetime.now())}]: failed write block for rollback query.")
+                            exit()
+
+                # delete case
+                elif before_states != None and after_states == None:
+                    for state in before_states:
+                        conditions = []
+                        for column, value in state.items():
+                            new_condition = Condition(column, "=", value)
+                            conditions.append(new_condition)
+                        data_deletion = DataDeletion(table, conditions)
+                        affected = self.storage.delete_block(data_deletion)
+                        if (affected == 1):
+                            # print(f"[FRM | {str(datetime.now())}]: success delete block for rollback query.
+                            pass
+                        else:
+                            # print(f"[FRM | {str(datetime.now())}]: failed delete block for rollback query.")
+                            exit()
+
+                # udpdate case
+                elif before_states != None and after_states != None:
+                    for i in range(len(before_states)):
+                        conditions = []
+                        for column, value in before_states[i].items():
+                            new_condition = Condition(column, "=", value)
+                            conditions.append(new_condition)
+                        data_write = DataWrite(table, after_states[i].keys(), after_states[i].values(), conditions=conditions)
+                        affected = self.storage.write_block(data_write)
+                        if (affected == 1):
+                            # print(f"[FRM | {str(datetime.now())}]: success delete block for rollback query.")
+                            pass
+                        else:
+                            # print(f"[FRM | {str(datetime.now())}]: failed delete block for rollback query.")
+        
+                            exit()
+                
                 # Write recovery log
                 exec_result = ExecutionResult(
                     transaction_id,
@@ -495,7 +646,7 @@ class FailureRecoveryManager:
                     "WRITE",
                     table,
                 )
-                print("write log: ", exec_result.__dict__)
+                # print("write log: ", exec_result.__dict__)
                 self.write_log(exec_result)
             if len(active_transactions) == 0:
                 break
