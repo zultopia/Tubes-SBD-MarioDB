@@ -236,7 +236,33 @@ class StorageManager:
             log_entry["columns"] = columns
         self.action_logs.append(log_entry)
         
-    def write_block_to_disk(self, data_write: DataWrite):
+    def read_block(self, data_retrieval: DataRetrieval) -> List[Any]: 
+        """Reads blocks from buffer (if exist)
+        If block isn't in buffer read from disk
+
+        Args:
+            data_retrieval (DataRetrieval): Data to retrieve
+
+        Returns:
+            List[Any]: List of dictionaries satisfying data_retrieval 
+        """
+        table = data_retrieval.table
+        columns = data_retrieval.columns
+        conditions = data_retrieval.conditions
+        results = []
+
+        for file in os.listdir(self.DATA_DIR):
+            if file.startswith(table):
+                block_id = int(file.split('__')[-1].split('.')[0])
+                block = self.buffer.get_buffer(table, block_id)
+                if not block:
+                    block = self._load_block(table, block_id)
+                for row in block:
+                    if self._evaluate_conditions(row, conditions):
+                        results.append({col: row[col] for col in columns})
+        return results
+        
+    def write_block_to_disk(self, data_write: DataWrite) -> int:
         """Writes blocks straight to disk.
 
         Args:
@@ -293,7 +319,7 @@ class StorageManager:
                 self._save_block(table, block_id, new_block)
         return num_updated
 
-    def write_block(self, data_write: DataWrite):
+    def write_block(self, data_write: DataWrite) -> int:
         """Writes to buffer
 
         Args:
@@ -346,33 +372,7 @@ class StorageManager:
                 self.buffer.put_buffer(table, block_id, new_block)
         return num_updated
     
-    def read_block(self, data_retrieval: DataRetrieval) -> List[Any]: 
-        """Reads blocks from buffer (if exist)
-        If block isn't in buffer read from disk
-
-        Args:
-            data_retrieval (DataRetrieval): Data to retrieve
-
-        Returns:
-            List[Any]: List of dictionaries satisfying data_retrieval 
-        """
-        table = data_retrieval.table
-        columns = data_retrieval.columns
-        conditions = data_retrieval.conditions
-        results = []
-
-        for file in os.listdir(self.DATA_DIR):
-            if file.startswith(table):
-                block_id = int(file.split('__')[-1].split('.')[0])
-                block = self.buffer.get_buffer(table, block_id)
-                if not block:
-                    block = self._load_block(table, block_id)
-                for row in block:
-                    if self._evaluate_conditions(row, conditions):
-                        results.append({col: row[col] for col in columns})
-        return results
-    
-    def delete_block_to_disk(self, data_deletion: DataDeletion):
+    def delete_block_to_disk(self, data_deletion: DataDeletion) -> int:
         """Deletes block in disk
 
         Args:
@@ -399,7 +399,7 @@ class StorageManager:
                 self.delete_all_column_with_hash(table, self.get_all_attributes(table), block, block_id)
         return total_deleted
     
-    def delete_block(self, data_deletion: DataDeletion):
+    def delete_block(self, data_deletion: DataDeletion) -> int:
         """Deletes blocks, putting blocks in buffer
 
         Args:
@@ -424,6 +424,92 @@ class StorageManager:
                     new_block = None
                 self.buffer.put_buffer(block_id, new_block)
         return total_deleted
+    
+    def get_stats(self) -> Dict[str, Statistic]:
+        """Get summary of the whole schema
+
+        Returns:
+            Dict[str, Statistic]: Statistic of every table in the schema
+        """
+        stats = {}
+        for file in os.listdir(self.DATA_DIR):
+            if file.endswith(".blk"):
+                parts = file.split("__block__")
+                table_name = parts[0]
+                block_id = int(parts[1].split(".")[0])
+                block = self._load_block(table_name, block_id)
+                if table_name not in stats:
+                    stats[table_name] = {
+                        "n_r": 0, 
+                        "b_r": 0,  
+                        "l_r": 0,  
+                        "f_r": 0,  
+                        "V_a_r": {} 
+                    }
+                stats[table_name]["n_r"] += len(block)
+                stats[table_name]["b_r"] += 1
+                if block:
+                    row_length = len(block[0])
+                    stats[table_name]["l_r"] = row_length
+                    for col in block[0].keys():
+                        if col not in stats[table_name]["V_a_r"]:
+                            stats[table_name]["V_a_r"][col] = set()
+                        stats[table_name]["V_a_r"][col].update(row[col] for row in block)
+        for table_name, table_stats in stats.items():
+            if table_stats["l_r"] > 0:
+                table_stats["f_r"] = math.floor(self.BLOCK_SIZE / table_stats["l_r"])
+            table_stats["V_a_r"] = {col: len(values) for col, values in table_stats["V_a_r"].items()}
+            stats[table_name] = Statistic(
+                n_r=table_stats["n_r"],
+                b_r=table_stats["b_r"],
+                l_r=table_stats["l_r"],
+                f_r=table_stats["f_r"],
+                V_a_r=table_stats["V_a_r"]
+            )
+        return stats
+    
+    def get_index(self, attribute: str, relation: str) -> Union[Literal["hash", "btree"], None]:
+        """Get the type of index on the given attribute in the relation."""
+        for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
+            if file.startswith(f"{relation}__{attribute}__hash"):
+                return "hash"
+        return None
+    
+    def has_index(self, attribute: str, relation: str) -> bool:
+        """Check if the attribute in the relation has an index."""
+        for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
+            if file.startswith(f"{relation}__{attribute}__hash"):
+                return True
+        return False
+    
+    def get_all_relations(self):
+        """Get all relations in the data."""
+        relations = []
+        helper_classes = ['Condition', 'ConditionGroup', 'DataDeletion', 'DataRetrieval', 'DataWrite', 'Statistic']
+        for name, obj in inspect.getmembers(sys.modules[__name__], lambda member: inspect.isclass(member) and member.__module__ == __name__):
+            if name != type(self).__name__ and name not in helper_classes:
+                relations.append(name)
+        return relations
+
+    def get_all_attributes(self, relation: str):
+        """Get all attributes in the relation."""
+        cls = globals()[relation]
+        init_method = getattr(cls, "__init__", None)
+        if not init_method:
+            return []
+
+        source = textwrap.dedent(inspect.getsource(init_method))
+        tree = ast.parse(source)
+        attributes = [node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Store) and node.attr != "primary_key"]
+        return attributes
+    
+    def has_relation(self, relation: str) -> bool:
+        """Check if the relation is in the data."""
+        return relation in self.get_all_relations()
+    
+    def has_attribute(self, attribute: str, relation: str) -> bool:
+        """Check if the attribute is in the relation."""
+        return attribute in self.get_all_attributes(relation)
 
     def set_index(self, table: str, column: str, index_type: str):
         if index_type != "hash" and index_type != "B+":
@@ -474,90 +560,8 @@ class StorageManager:
     def read_block_with_hash(self, table: str, column: str, value):
         return Hash._get_rows(table, column, value)
     
-    
     def write_block_with_hash(self, table: str, column: str, value, new_block_id: int):
         Hash._write_row(table, column, new_block_id, value)
-        
-    def get_index(self, attribute: str, relation: str) -> Union[Literal["hash", "btree"], None]:
-        """Get the type of index on the given attribute in the relation."""
-        for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
-            if file.startswith(f"{relation}__{attribute}__hash"):
-                return "hash"
-        return None
-    
-    def has_index(self, attribute: str, relation: str) -> bool:
-        """Check if the attribute in the relation has an index."""
-        for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
-            if file.startswith(f"{relation}__{attribute}__hash"):
-                return True
-        return False
-    
-    def get_all_relations(self):
-        """Get all relations in the data."""
-        relations = []
-        helper_classes = ['Condition', 'ConditionGroup', 'DataDeletion', 'DataRetrieval', 'DataWrite', 'Statistic']
-        for name, obj in inspect.getmembers(sys.modules[__name__], lambda member: inspect.isclass(member) and member.__module__ == __name__):
-            if name != type(self).__name__ and name not in helper_classes:
-                relations.append(name)
-        return relations
-
-    def get_all_attributes(self, relation: str):
-        """Get all attributes in the relation."""
-        cls = globals()[relation]
-        init_method = getattr(cls, "__init__", None)
-        if not init_method:
-            return []
-
-        source = textwrap.dedent(inspect.getsource(init_method))
-        tree = ast.parse(source)
-        attributes = [node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Store) and node.attr != "primary_key"]
-        return attributes
-    
-    def has_relation(self, relation: str) -> bool:
-        """Check if the relation is in the data."""
-        return relation in self.get_all_relations()
-    
-    def has_attribute(self, attribute: str, relation: str) -> bool:
-        """Check if the attribute is in the relation."""
-        return attribute in self.get_all_attributes(relation)
-        
-    def get_stats(self):
-        stats = {}
-        for file in os.listdir(self.DATA_DIR):
-            if file.endswith(".blk"):
-                parts = file.split("__block__")
-                table_name = parts[0]
-                block_id = int(parts[1].split(".")[0])
-                block = self._load_block(table_name, block_id)
-                if table_name not in stats:
-                    stats[table_name] = {
-                        "n_r": 0, 
-                        "b_r": 0,  
-                        "l_r": 0,  
-                        "f_r": 0,  
-                        "V_a_r": {} 
-                    }
-                stats[table_name]["n_r"] += len(block)
-                stats[table_name]["b_r"] += 1
-                if block:
-                    row_length = len(block[0])
-                    stats[table_name]["l_r"] = row_length
-                    for col in block[0].keys():
-                        if col not in stats[table_name]["V_a_r"]:
-                            stats[table_name]["V_a_r"][col] = set()
-                        stats[table_name]["V_a_r"][col].update(row[col] for row in block)
-        for table_name, table_stats in stats.items():
-            if table_stats["l_r"] > 0:
-                table_stats["f_r"] = math.floor(self.BLOCK_SIZE / table_stats["l_r"])
-            table_stats["V_a_r"] = {col: len(values) for col, values in table_stats["V_a_r"].items()}
-            stats[table_name] = Statistic(
-                n_r=table_stats["n_r"],
-                b_r=table_stats["b_r"],
-                l_r=table_stats["l_r"],
-                f_r=table_stats["f_r"],
-                V_a_r=table_stats["V_a_r"]
-            )
-        return stats
     
     def _evaluate_condition(self, row: Dict, condition: Condition):
         value = row[condition.column]
