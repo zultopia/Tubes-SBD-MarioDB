@@ -1,3 +1,5 @@
+import os
+import pickle
 from typing import Union, List, Dict
 
 class BPlusTreeNode:
@@ -94,3 +96,96 @@ class BPlusTree:
         parent.children.insert(index + 1, child)
         if len(parent.keys) == self.degree:
             self._split_node(parent)
+
+"""
+TODO: FINISH B+
+class BPlusReader:
+    DATA_DIR = "data_blocks/"
+    HASH_DIR = "hash/"
+    BPLUS_DIR = "bplus/"
+    
+    
+    Bawah ini copasan StorageManager
+    
+    @staticmethod
+    def _get_block_file(table: str, block_id: int) -> str:
+        return os.path.join(BPlusReader.DATA_DIR, f"{table}_block_{block_id}.blk")
+    
+    @staticmethod
+    def _load_block(table: str, block_id: int) -> List[Dict]:
+        block_file = Hash._get_block_file(table, block_id)
+        if os.path.exists(block_file):
+            with open(block_file, "rb") as file:
+                return pickle.load(file)
+        return []
+    
+    @staticmethod
+    def read_block(table: str, column: str, hash_value: int, block_id: int):
+        results = []
+        block = Hash._load_block(table, block_id)
+        for row in block:
+            if Hash._hash_function(row[column]) == hash_value:
+                results.append({col: row[col] for col in row.keys()})
+        return results
+    
+    
+    Di bawah ini fungsi hash
+    TODO: DELETE OPERATION
+    UPDATE: DELETE OPERATION DONE 
+    
+    
+    @staticmethod
+    def change_config(DATA_DIR="data_blocks/", BPLUS_DIR="bplus/"):
+        BPlusReader.DATA_DIR = DATA_DIR
+        BPlusReader.BPLUS_DIR = BPLUS_DIR
+    
+    @staticmethod
+    def _get_bplus_block_file(table: str, column: str, block_id: int) -> str:
+        return os.path.join(BPlusReader.DATA_DIR, BPlusReader.BPLUS_DIR, f"{table}_{column}_bplus_block_{block_id}.blk")
+    
+    @staticmethod
+    def _load_bplus_block(table: str, column: str, block_id: int) -> List[Dict] :
+        block_file = BPlusReader._get_bplus_block_file(table, column, block_id)
+        if os.path.exists(block_file):
+            with open(block_file, "rb") as file:
+                return pickle.load(file)
+        return []
+    
+    @staticmethod
+    def _save_bplus_block(table: str, column: str, block_id: int, block_data: List[Dict]):
+        block_file = BPlusReader._get_bplus_block_file(table, column, block_id)
+        with open(block_file, "wb") as file:
+            pickle.dump(block_data, file)
+    
+    @staticmethod
+    def _write_bplus_block(table: str, column: str, new_block_id: int):
+        blocks = sorted(int(file.split('_')[-1].split('.')[0]) 
+                        for file in os.listdir(os.path.join(BPlusReader.DATA_DIR, BPlusReader.BPLUS_DIR)) 
+                        if file.startswith(f"{table}_{column}_bplus"))
+        block = BPlusReader._load_bplus_block(table, column, 0)
+        if {'id': new_block_id} in block:
+            return
+        
+        block.append({'id': new_block_id})
+        # assumes entries fit in one block
+        Hash._save_hash_block(table, column, hash_value, 0, block)
+        print("HASH SAVED")
+        return
+    
+    @staticmethod
+    def _delete_hash_block(table: str, column: str, hash_value: int, old_block_id: int):
+        # assumes entries fit in one block
+        block = Hash._load_hash_block(table, column, hash_value, 0)
+        new_block = []
+        for row in block:
+            if row['id'] != old_block_id:
+                new_block.append(row)
+        # assumes entries fit in one block
+        if not new_block and hash_value != 0:
+            if os.path.exists(Hash._get_hash_block_file(table, column, hash_value, old_block_id)):
+                os.remove(Hash._get_hash_block_file(table, column, hash_value, old_block_id))
+        else:
+            Hash._save_hash_block(table, column, hash_value, 0, new_block)
+        print("HASH UPDATED")
+        return
+"""

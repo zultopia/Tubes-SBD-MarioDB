@@ -67,6 +67,14 @@ if __name__ == "__main__":
     test_stat = manager.get_stats()
     print("TEST STAT", test_stat)
     
+    all_relation = manager.get_all_relations()
+    print(all_relation)
+    
+    for relation in all_relation:
+        print(relation, ":")
+        print(manager.get_all_attributes(relation))
+        print()
+    
     # Checking Logs
     print("\nAction Logs:")
     for log_entry in manager.action_logs:
