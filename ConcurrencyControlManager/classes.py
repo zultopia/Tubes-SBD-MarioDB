@@ -310,11 +310,10 @@ class ConcurrencyControlManager:
 
         # Validate against the conflict matrix            
         while validate_stack:
-            current = validate_stack.pop()
+            current = validate_stack[-1]
             abort = False
             failed = False
             
-            conflict_list = []
             
             for held_lock, holders in [
                 ("IS", self.lock_IS.get(current, set())),
@@ -325,7 +324,7 @@ class ConcurrencyControlManager:
             ]:
 
                 minimum_lock_type = lock_type
-                if len(validate_stack) > 0:
+                if len(validate_stack) > 1:
                     if lock_type == "S":
                         minimum_lock_type = "IS"
                     elif lock_type == "X":
@@ -367,75 +366,76 @@ class ConcurrencyControlManager:
                             
                 if not abort:
                     self.transaction_queue.add(transaction_id)
+                    # sleep()
+                    # triggered()                     
                     # self.wait_for_graph.addEdge()
                 
-                # while (not self.wait_for_graph.waiting(transaction_action)): 
-                #     TODO: threading
+                    # while (not self.wait_for_graph.waiting(transaction_action)): 
+                    #     TODO: threading
+                
                 return False, abort, f"Transaction {transaction_id} failed to get lock-{lock_type} on {transaction_action.data_item}"
-            
+
             
             current_lock = self.transaction_dataitem_map[transaction_id].get(current,None)
-            if not current_lock:
-                if minimum_lock_type == "IS":
-                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
-                    self.lock_IS.setdefault(current, set()).add(transaction_id)
-                elif minimum_lock_type == "IX":
-                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
-                    self.lock_IX.setdefault(current, set()).add(transaction_id)
-                elif minimum_lock_type == "S":
-                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
-                    self.lock_S.setdefault(current, set()).add(transaction_id)
-                elif minimum_lock_type == "X":
-                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
-                    self.lock_X.setdefault(current, set()).add(transaction_id)
-                elif minimum_lock_type == "SIX":
-                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
-                    self.lock_SIX.setdefault(current, set()).add(transaction_id)
-                   
-            else:
-                if current_lock not in minimum_lock_matrix[minimum_lock_type]:
-                    if current_lock == "S":
-                        if current in self.lock_S:
-                            print("Discard S: ", transaction_id)
-                            self.lock_S[current].discard(transaction_id)
-                    elif current_lock == "IS":
-                        if current in self.lock_IS:
-                            self.lock_IS[current].discard(transaction_id)
-                    elif current_lock == "IX":
-                        if current in self.lock_IX:
-                            self.lock_IX[current].discard(transaction_id)
-                    elif current_lock == "SIX":
-                        if current in self.lock_SIX:
-                            self.lock_SIX[current].discard(transaction_id)
-
-                    if minimum_lock_type == "S":
-                        print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
-                        self.lock_S.setdefault(current, set()).add(transaction_id)
-                    elif minimum_lock_type == "IX":
-                        print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
-                        self.lock_IX.setdefault(current, set()).add(transaction_id)
-                    elif minimum_lock_type == "SIX":
-                        print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
-                        self.lock_SIX.setdefault(current, set()).add(transaction_id)
-                    elif minimum_lock_type == "X":
-                        print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
-                        self.lock_X.setdefault(current, set()).add(transaction_id)
-                
+            self.acquire_lock(current_lock, minimum_lock_type, transaction_id, current, minimum_lock_matrix)
             self.log_object(transaction_action)
             if not current_lock or current_lock not in minimum_lock_matrix[minimum_lock_type]:        
                 self.transaction_dataitem_map[transaction_id][current] = minimum_lock_type
                 print("dataitem map:", self.transaction_dataitem_map)
-        
-        print("=========================================")
-        print("lock-IS:", self.lock_IS)
-        print("lock-IX:", self.lock_IX)
-        print("lock-S:", self.lock_S)
-        print("lock-X:", self.lock_X)
-        print("lock-SIX:", self.lock_SIX)
-        print("dataitem map:", self.transaction_dataitem_map)
-        
+
+            
+            validate_stack.pop()
+
         return True, None, f"Transaction {transaction_id} successfully get lock-{lock_type} on {transaction_action.data_item}"
     
+    def acquire_lock(self, current_lock: str, minimum_lock_type: str, transaction_id: int, current: TransactionAction, minimum_lock_matrix): 
+        if not current_lock:
+            if minimum_lock_type == "IS":
+                print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                self.lock_IS.setdefault(current, set()).add(transaction_id)
+            elif minimum_lock_type == "IX":
+                print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                self.lock_IX.setdefault(current, set()).add(transaction_id)
+            elif minimum_lock_type == "S":
+                print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                self.lock_S.setdefault(current, set()).add(transaction_id)
+            elif minimum_lock_type == "X":
+                print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                self.lock_X.setdefault(current, set()).add(transaction_id)
+            elif minimum_lock_type == "SIX":
+                print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                self.lock_SIX.setdefault(current, set()).add(transaction_id)
+                
+        else:
+            if current_lock not in minimum_lock_matrix[minimum_lock_type]:
+                if current_lock == "S":
+                    if current in self.lock_S:
+                        print("Discard S: ", transaction_id)
+                        self.lock_S[current].discard(transaction_id)
+                elif current_lock == "IS":
+                    if current in self.lock_IS:
+                        self.lock_IS[current].discard(transaction_id)
+                elif current_lock == "IX":
+                    if current in self.lock_IX:
+                        self.lock_IX[current].discard(transaction_id)
+                elif current_lock == "SIX":
+                    if current in self.lock_SIX:
+                        self.lock_SIX[current].discard(transaction_id)
+
+                if minimum_lock_type == "S":
+                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                    self.lock_S.setdefault(current, set()).add(transaction_id)
+                elif minimum_lock_type == "IX":
+                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                    self.lock_IX.setdefault(current, set()).add(transaction_id)
+                elif minimum_lock_type == "SIX":
+                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                    self.lock_SIX.setdefault(current, set()).add(transaction_id)
+                elif minimum_lock_type == "X":
+                    print(f"Transaction {transaction_id} granted lock-{minimum_lock_type} on {current}")
+                    self.lock_X.setdefault(current, set()).add(transaction_id)
+
+
     #  Validate and apply lock
     def validate_object(self, transactionAction: TransactionAction) -> Response:
         transaction_id = transactionAction.id
