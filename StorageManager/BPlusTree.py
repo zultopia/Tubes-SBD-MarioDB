@@ -6,12 +6,69 @@ class BPlusBlock:
     def __init__(self, block_id: int, sequence_id: int):
         self.block_id = block_id
         self.sequence_id = sequence_id
-
+    
 class BPlusTreeNode:
-    def __init__(self, is_leaf=False):
+    def __init__(self, parent=None, is_leaf=False):
         self.is_leaf = is_leaf
         self.keys: List[Union[str, int]] = []
-        self.children: List[BPlusBlock] = []
+        self.children: List[BPlusTreeNode] = []
+        self.parent: BPlusTreeNode = parent
+        
+    def _find(self, key: Union[str, int]):
+        for i, item in enumerate(self.keys):
+            if key < item:
+                return i
+        return len(self.keys)
+
+    def get(self, item: Union[str, int]):
+        return self.children[self._find(item)]
+    
+    def delete(self, key):
+        key_index = self._find(key)
+        self.children.pop(key_index)
+        if key_index < len(self.keys):
+            self.keys.pop(key_index)
+        else:
+            self.keys.pop(key_index - 1)
+    
+    def split_node(self):
+        left = BPlusTreeNode(self.parent)
+        
+        mid = len(self.keys) // 2
+        
+        left.keys = self.keys[:mid]
+        left.children = self.children[:mid + 1]
+        for child in left.children:
+            child.parent = left
+        
+        key = self.keys[mid]
+        self.keys = self.keys[mid + 1:]
+        self.children = self.children[mid + 1:]
+        return (key, [left, self])
+    
+    def merge(self):
+        self_index = self.parent._find(self.keys[0])
+        if self_index < len(self.parent.keys):
+            next = self.parent.children[self_index + 1]
+            next.keys = self.keys + [self.parent.keys[self_index]] + next.keys
+            for child in self.children:
+                child.parent = next
+            next.children = self.children + next.children
+        else:
+            prev = self.parent.children[-2]
+            prev.keys += [self.parent.keys[-1]] + self.keys
+            for child in self.children:
+                child.parent = prev
+            prev.children += self.children
+            
+    def take(self, min: int):
+        self_index = self.parent.get(self.keys[0])
+        if self_index < len(self.parent.keys):
+            next: BPlusTreeNode = self.parent.children[self_index + 1]
+            if len(next.keys) > min:
+                self.keys += [self.parent.keys[self_index]]
+                key_taken = next.children.pop(0)
+                key_taken.parent = self
 
 class BPlusTree:
     def __init__(self, degree):
