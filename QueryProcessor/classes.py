@@ -192,6 +192,18 @@ class QueryProcessor:
         if len(TableResultTail_node.childs) == 4:
             self.add_table_from_FromListTail(schema, alias, TableResultTail_node.childs[3])
 
+    # fungsi untuk ORDER BY dan LIMIT
+    def execute_ORDER_BY(self, rows: List[Dict[str, Union[int, str]]], order_by_attr: str, descending: bool = False) -> List[Dict[str, Union[int, str]]]:
+        def get_sort_key(row):
+            value = row.get(order_by_attr, None)
+            if isinstance(value, str):
+                return tuple(ord(char) for char in value)
+            return value
+        return sorted(rows, key=get_sort_key, reverse=descending)
+
+    def execute_LIMIT(rows: List[Dict[str, Union[int, str]]], limit: int) -> List[Dict[str, Union[int, str]]]:
+        return rows[:limit]
+
     # handle query SELECT, menerima input node query tree
     def execute_SELECT(self, query_tree: ParseTree):
         # child kedua dari query tree adalah node SelectList
@@ -235,13 +247,13 @@ class QueryProcessor:
             order_by_node = query_tree.childs[6]
             order_by_attr = order_by_node.childs[1].root.value
             descending = len(order_by_node.childs) > 2 and order_by_node.childs[2].root.value.upper() == "DESC"
-            rows = execute_ORDER_BY(rows, order_by_attr, descending)
+            rows = self.execute_ORDER_BY(rows, order_by_attr, descending)
             
         # Jika ada klausa LIMIT
         if len(query_tree.childs) >= 8 and query_tree.childs[7].root == "LIMIT":
             limit_node = query_tree.childs[7]
             limit_value = int(limit_node.childs[1].root.value)
-            rows = execute_LIMIT(rows, limit_value)    
+            rows = self.execute_LIMIT(rows, limit_value)    
     
         # Mengambil dari StorageManager
         rows = []
@@ -299,19 +311,6 @@ class QueryProcessor:
             AndConditionTail_node = AndCondition_node.childs[1]
             self.add_condition_from_AndConditionTail(schema, alias, conditions, AndConditionTail_node)
         return conditions
-
-    # TODO (sekarang)
-    # fungsi untuk ORDER BY dan LIMIT
-    def execute_ORDER_BY(rows: List[Dict[str, Union[int, str]]], order_by_attr: str, descending: bool = False) -> List[Dict[str, Union[int, str]]]:
-        def get_sort_key(row):
-            value = row.get(order_by_attr, None)
-            if isinstance(value, str):
-                return tuple(ord(char) for char in value)
-            return value
-        return sorted(rows, key=get_sort_key, reverse=descending)
-
-    def execute_LIMIT(rows: List[Dict[str, Union[int, str]]], limit: int) -> List[Dict[str, Union[int, str]]]:
-        return rows[:limit]
 
     # TODO (menunggu kelompok query optimizer)
     # handle query UPDATE, menerima input node query tree
