@@ -7,7 +7,7 @@ class DoublyNode:
 
     Attributes
     ----------
-    key : str
+    key : any
         The key of the node
     val : any
         The value of the node
@@ -17,7 +17,7 @@ class DoublyNode:
         The next node
     """
 
-    def __init__(self, key: str, val: any):
+    def __init__(self, key: any, val: any):
         self.key = key
         self.val = val
         self.prev = None
@@ -44,7 +44,7 @@ class LRUCache:
         self.oldest.next = self.latest
         self.latest.prev = self.oldest
 
-    def _remove(self, node: DoublyNode):
+    def _remove(self, node: DoublyNode) -> None:
         """
         Removes a node from the linked list
 
@@ -58,7 +58,7 @@ class LRUCache:
         prev.next = next
         next.prev = prev
 
-    def _insert(self, node: DoublyNode):
+    def _insert(self, node: DoublyNode) -> None:
         """
         Inserts a node to the linked list
 
@@ -73,19 +73,19 @@ class LRUCache:
         node.next = next
         node.prev = prev
 
-    def get(self, key: str) -> Union[any, None]:
+    def get(self, key: any) -> Union[any, None]:
         """
         Gets the value of a key in the cache
 
         Parameters
         ----------
-        key : str
+        key : any
             The key to be searched
 
         Returns
         -------
-        any
-            The value of the key
+        any: The value of the key
+        None: If the key is not found
         """
         if key in self.cache:
             node = self.cache[key]
@@ -94,16 +94,21 @@ class LRUCache:
             return node.val
         return None
 
-    def put(self, key: str, value: any):
+    def put(self, key: any, value: any) -> Union[any, None]:
         """
         Puts a key-value pair in the cache
 
         Parameters
         ----------
-        key : str
+        key : any
             The key to be inserted
         value : any
             The value to be inserted
+
+        Returns
+        -------
+        any: The least recently used value, overwritten by the new value
+        None: There is still space in the cache or old key is overwritten
         """
         if key in self.cache:
             self._remove(self.cache[key])
@@ -112,18 +117,29 @@ class LRUCache:
         self._insert(node)
 
         if len(self.cache) > self.cap:
+            # if full, must remove the oldest
             node = self.oldest.next
             self._remove(node)
             del self.cache[node.key]
 
-    def delete(self, key: str) -> bool:
+            # return the least recently used value
+            return node.val
+
+        # if still have space or old key is overwritten
+        return None
+
+    def delete(self, key: any) -> bool:
         """
         Deletes a key from the cache
 
         Parameters
         ----------
-        key : str
+        key : any
             The key to be deleted
+
+        Returns
+        -------
+        bool: True if the key is deleted, False otherwise
         """
         if key in self.cache:
             node = self.cache[key]
@@ -132,11 +148,25 @@ class LRUCache:
             return True
         return False
 
-    def clear(self):
+    def get_cache(self) -> dict[any, any]:
+        """
+        Gets the cache dictionary
+
+        Returns
+        -------
+        dict[any, any]: The cache dictionary
+        """
+        return self.cache
+
+    def clear(self) -> None:
         """
         Clears the cache
+
+        Returns
+        -------
+        the cache values before it is cleared
         """
-        # Clear the dictionary
+        # Clear the current dictionary
         self.cache.clear()
 
         # Reinitialize the linked list
