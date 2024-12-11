@@ -12,7 +12,7 @@ class Hash(object):
     """
     @staticmethod
     def _get_block_file(table: str, block_id: int) -> str:
-        return os.path.join(Hash.DATA_DIR, f"{table}_block_{block_id}.blk")
+        return os.path.join(Hash.DATA_DIR, f"{table}__block__{block_id}.blk")
     
     @staticmethod
     def _load_block(table: str, block_id: int) -> List[Dict]:
@@ -63,7 +63,7 @@ class Hash(object):
     
     @staticmethod
     def _get_hash_block_file(table: str, column: str, hash_value: int, block_id: int) -> str:
-        return os.path.join(Hash.DATA_DIR, Hash.HASH_DIR, f"{table}_{column}_hash_{hash_value}_block_{block_id}.blk")
+        return os.path.join(Hash.DATA_DIR, Hash.HASH_DIR, f"{table}__{column}__hash__{hash_value}__block__{block_id}.blk")
     
     @staticmethod
     def _load_hash_block(table: str, column: str, hash_value: int, block_id: int) -> List[Dict] :

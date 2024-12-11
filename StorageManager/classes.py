@@ -181,7 +181,7 @@ class StorageManager:
             pickle.dump(self.logs, file)
             
     def _get_block_file(self, table: str, block_id: int) -> str:
-        return os.path.join(self.DATA_DIR, f"{table}_block_{block_id}.blk")
+        return os.path.join(self.DATA_DIR, f"{table}__block__{block_id}.blk")
 
     def _load_block(self, table: str, block_id: int) -> List[Dict]:
         block_file = self._get_block_file(table, block_id)
@@ -215,7 +215,7 @@ class StorageManager:
         new_values = data_write.new_values
         conditions = data_write.conditions
         dict_new_values = dict(zip(columns, new_values))
-        blocks = sorted(int(file.split('_')[-1].split('.')[0]) for file in os.listdir(self.DATA_DIR) if file.startswith(table))
+        blocks = sorted(int(file.split('__')[-1].split('.')[0]) for file in os.listdir(self.DATA_DIR) if file.startswith(table))
         if not data_write.conditions:
             # add operation
             for block_id in blocks:
@@ -269,7 +269,7 @@ class StorageManager:
 
         for file in os.listdir(self.DATA_DIR):
             if file.startswith(table):
-                block_id = int(file.split('_')[-1].split('.')[0])
+                block_id = int(file.split('__')[-1].split('.')[0])
                 block = None # self.frm.get_buffer(table, block_id)
                 if not block:
                     block = self._load_block(table, block_id)
@@ -288,7 +288,7 @@ class StorageManager:
 
         for file in os.listdir(self.DATA_DIR):
             if file.startswith(table):
-                block_id = int(file.split('_')[-1].split('.')[0])
+                block_id = int(file.split('__')[-1].split('.')[0])
                 block = None # self.frm.get_buffer(table, block_id)
                 if not block:
                     block = self._load_block(table, block_id)
@@ -305,7 +305,7 @@ class StorageManager:
         if index_type == "hash":
             exist = False
             for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
-                if file.startswith(f"{table}_{column}_hash"):
+                if file.startswith(f"{table}__{column}__hash"):
                     exist = True
                     break
             if exist:
@@ -314,7 +314,7 @@ class StorageManager:
             Hash._initiate_block(table, column)
             for file in os.listdir(self.DATA_DIR):
                 if file.startswith(f"{table}"):
-                    block_id = int(file.split('_')[-1].split('.')[0])
+                    block_id = int(file.split('__')[-1].split('.')[0])
                     block = self._load_block(table, block_id)
                     for row in block:
                         self.write_block_with_hash(table, column, row[column], block_id)
@@ -334,7 +334,7 @@ class StorageManager:
         for column in changed_columns:
             hash_exist = False
             for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
-                if file.startswith(f"{table}_{column}_hash"):
+                if file.startswith(f"{table}__{column}__hash"):
                     hash_exist = True
                     break
             if not hash_exist:
@@ -345,7 +345,7 @@ class StorageManager:
         for column in changed_columns:
             hash_exist = False
             for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
-                if file.startswith(f"{table}_{column}_hash"):
+                if file.startswith(f"{table}__{column}__hash"):
                     hash_exist = True
                     break
             if not hash_exist:
@@ -381,7 +381,7 @@ class StorageManager:
     def get_index(self, attribute: str, relation: str) -> Union[Literal["hash", "btree"], None]:
         """Get the type of index on the given attribute in the relation."""
         for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
-            if file.startswith(f"{relation}_{attribute}_hash"):
+            if file.startswith(f"{relation}__{attribute}__hash"):
                 return "hash"
         return None
         # return self.data.get(relation, {}).get("attributes", {}).get(attribute, {}).get("index", None)
@@ -389,7 +389,7 @@ class StorageManager:
     def has_index(self, attribute: str, relation: str) -> bool:
         """Check if the attribute in the relation has an index."""
         for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
-            if file.startswith(f"{relation}_{attribute}_hash"):
+            if file.startswith(f"{relation}__{attribute}__hash"):
                 return True
         return False
     
@@ -426,7 +426,7 @@ class StorageManager:
         stats = {}
         for file in os.listdir(self.DATA_DIR):
             if file.endswith(".blk"):
-                parts = file.split("_block_")
+                parts = file.split("__block__")
                 table_name = parts[0]
                 block_id = int(parts[1].split(".")[0])
                 block = self._load_block(table_name, block_id)

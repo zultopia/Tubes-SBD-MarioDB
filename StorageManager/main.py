@@ -8,9 +8,9 @@ if __name__ == "__main__":
 
     # Write Example
     write_action = DataWrite(
-        table="Student",
-        columns=["StudentID", "FullName", "GPA"],
-        new_values=[3, "Eve", 3.9],
+        table="student",
+        columns=["id", "name", "dept_name", "tot_cred"],
+        new_values=[3, "Eve", "STEI", 101],
         level="row"
     )
     manager.write_block(write_action)
@@ -20,9 +20,9 @@ if __name__ == "__main__":
 
     # Read Example
     read_action = DataRetrieval(
-        table="Student",
-        columns=["FullName", "GPA"],
-        conditions=ConditionGroup([Condition("GPA", ">", 3.0)], "AND"),
+        table="student",
+        columns=["name", "tot_cred"],
+        conditions=ConditionGroup([Condition("tot_cred", ">", 100)], "AND"),
         search_type="sequential",
         level="table"
     )
@@ -32,18 +32,18 @@ if __name__ == "__main__":
 
     # Delete Example
     delete_action = DataDeletion(
-        table="Student",
-        conditions=ConditionGroup([Condition("GPA", ">", 2.0)], "AND"),
+        table="student",
+        conditions=ConditionGroup([Condition("tot_cred", ">", 102)], "AND"),
         level="table"
     )
     # removed = manager.delete_block(delete_action)
     # manager.log_action("write", delete_action.table, {"deleted_rows": removed})
     # print("Removed Rows:", removed)
     # print("Data After Delete:", manager.data)
-    manager.set_index("Student", "FullName", "hash")
-    manager.set_index("Student", "GPA", "hash")
+    manager.set_index("student", "name", "hash")
+    manager.set_index("student", "tot_cred", "hash")
     
-    data = manager.read_block_with_hash("Student", "FullName", "Eve")
+    data = manager.read_block_with_hash("student", "name", "Eve")
     print("Data", data)
     
     #removed = manager.delete_block(delete_action)
@@ -51,10 +51,10 @@ if __name__ == "__main__":
     #print("Removed Rows:", removed)
     
     write_action = DataWrite(
-        table="Student",
-        columns=["FullName", "GPA"],
-        new_values=["EVA", 2.1],
-        conditions=ConditionGroup([Condition("FullName", "=", "Eve")], logic_operator="AND"),
+        table="student",
+        columns=["name", "tot_cred"],
+        new_values=["EVA", 140],
+        conditions=ConditionGroup([Condition("name", "=", "Eve")], logic_operator="AND"),
         level="row"
     )
     manager.write_block(write_action)
@@ -62,19 +62,19 @@ if __name__ == "__main__":
     results = manager.read_block(read_action)
     print("RESULT AFTER UPDATING", results)
     
-    data = manager.read_block_with_hash("Student", "FullName", "EVA")
+    data = manager.read_block_with_hash("student", "name", "EVA")
     print("HASH AFTER UPDATING", data)
     
     # results = manager.delete_block(delete_action)
     # print("RESULTS DELETE BLOCK", results)
     
     read_hash_action = DataRetrieval(
-        "Student", ["StudentID", "FullName"], 
-        ConditionGroup([Condition("GPA", ">", 1.0)]), 
+        "student", ["id", "name"], 
+        ConditionGroup([Condition("tot_cred", ">", 100)]), 
         "sequential", 
         "cell")
     
-    read_hash_if = manager.read_block_with_hash("Student", "GPA", 2.1)
+    read_hash_if = manager.read_block_with_hash("student", "tot_cred", 140)
     print("READ HASH WITH NUMBER", read_hash_if)
     
     test_stat = manager.get_stats()
