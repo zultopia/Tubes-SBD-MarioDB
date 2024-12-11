@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from utils import Pair
 from query_plan.query_plan import QueryPlan
 from query_plan.base import QueryNode
@@ -7,6 +7,7 @@ from query_plan.nodes.sorting_node import SortingNode
 from query_plan.nodes.project_node import ProjectNode
 from query_plan.nodes.table_node import TableNode
 from query_plan.nodes.selection_node import SelectionNode, UnionSelectionNode
+from query_plan.nodes.update_node import UpdateNode
 from query_plan.enums import JoinAlgorithm, Operator
 from parse_tree import ParseTree, Node
 from lexer import Token 
@@ -14,37 +15,47 @@ from query_plan.shared import Condition
 
 
 def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
-    if isinstance(parse_tree.root, str) and parse_tree.root == "Query":
-        project_node = process_select_list(parse_tree.childs[1])
-        
-        # First process the base table structure (FROM/JOIN)
-        table_node = None
-        for i, child in enumerate(parse_tree.childs):
-            if isinstance(child.root, Node) and child.root.token_type == Token.FROM:
-                table_node = process_from_list(parse_tree.childs[i + 1])
-                break
+    if not isinstance(parse_tree.root, str) or parse_tree.root != "Query":
+        raise ValueError("Invalid parse tree: root must be 'Query'")
 
-        # Process WHERE with possible unions
-        where_index = None
-        for i, child in enumerate(parse_tree.childs):
-            if isinstance(child.root, Node) and child.root.token_type == Token.WHERE:
-                where_index = i
-                break
+    # Check first token to determine query type
+    first_token = parse_tree.childs[0].root
+    if isinstance(first_token, Node):
+        if first_token.token_type == Token.SELECT:
+            # Process SELECT query
+            project_node = process_select_list(parse_tree.childs[1])
+            
+            table_node = None
+            for i, child in enumerate(parse_tree.childs):
+                if isinstance(child.root, Node) and child.root.token_type == Token.FROM:
+                    table_node = process_from_list(parse_tree.childs[i + 1])
+                    break
 
-        if where_index is not None:
-            condition_node = process_where_clause(parse_tree.childs[where_index + 1])
-            if isinstance(condition_node, UnionSelectionNode):
-                # For each branch in the union, create a complete copy of the table structure
-                for selection_node in condition_node.children:
-                    table_copy = process_from_list(parse_tree.childs[3])  # Create fresh copy of table structure
-                    selection_node.set_child(table_copy)
-            else:
-                condition_node.set_child(table_node)
-            table_node = condition_node
+            # Process WHERE with possible unions
+            where_index = None
+            for i, child in enumerate(parse_tree.childs):
+                if isinstance(child.root, Node) and child.root.token_type == Token.WHERE:
+                    where_index = i
+                    break
 
-        project_node.set_child(table_node)
-        
-        return QueryPlan(project_node)
+            if where_index is not None:
+                condition_node = process_where_clause(parse_tree.childs[where_index + 1])
+                if isinstance(condition_node, UnionSelectionNode):
+                    for selection_node in condition_node.children:
+                        table_copy = process_from_list(parse_tree.childs[3])
+                        selection_node.set_child(table_copy)
+                else:
+                    condition_node.set_child(table_node)
+                table_node = condition_node
+
+            project_node.set_child(table_node)
+            return QueryPlan(project_node)
+
+        elif first_token.token_type == Token.UPDATE:
+            # Process UPDATE query
+            return process_update_query(parse_tree)
+
+    raise ValueError(f"Unsupported query type: {first_token}")
 
 def process_select_list(select_list_tree: ParseTree) -> ProjectNode:
     """Process SELECT list and create ProjectNode."""
@@ -115,7 +126,6 @@ def process_table_result(table_result_tree: ParseTree) -> QueryNode:
     return current_node
 
 def process_table_term(table_term_tree: ParseTree) -> QueryNode:
-    """Process table term and create TableNode."""
     if not table_term_tree.childs:
         raise ValueError("Empty table term")
 
@@ -123,11 +133,12 @@ def process_table_term(table_term_tree: ParseTree) -> QueryNode:
         return TableNode(table_term_tree.root.value)
 
     if table_term_tree.childs[0].root.token_type == Token.TABLE:
+        # Check for AS clause
+        if len(table_term_tree.childs) >= 3 and table_term_tree.childs[1].root.token_type == Token.AS:
+            table_name = table_term_tree.childs[0].root.value
+            alias = table_term_tree.childs[2].root.value
+            return TableNode(table_name, alias)
         return TableNode(table_term_tree.childs[0].root.value)
-    elif table_term_tree.childs[0].root.token_type == Token.OPEN_PARANTHESIS:
-        return process_table_result(table_term_tree.childs[1])
-    else:
-        raise ValueError(f"Unexpected token in table term: {table_term_tree.childs[0].root}")
 
 def process_conditional_join(join_tree: ParseTree) -> ConditionalJoinNode:
     """Process conditional join and create ConditionalJoinNode."""
@@ -278,3 +289,38 @@ def process_order_by(order_tree: ParseTree) -> SortingNode:
         attributes.append(extract_field(order_tree))
     
     return SortingNode(attributes)  
+
+def process_update_query(parse_tree: ParseTree) -> QueryPlan:
+    """Process UPDATE queries."""
+    # Get table node first
+    table_node = TableNode(parse_tree.childs[1].root.value)
+    
+    # Process SET clause
+    set_list = parse_tree.childs[3]  # SetList node
+    updates = []
+    
+    def process_set_term(set_term: ParseTree) -> Tuple[str, str]:
+        field = set_term.childs[0].childs[0].root.value  # Field -> ATTRIBUTE
+        value = set_term.childs[2].root.value
+        return (field, value)
+    
+    updates.append(process_set_term(set_list.childs[0]))  # First SetTerm
+    
+    # Create UpdateNode
+    update_node = UpdateNode(updates)
+    
+    # Process WHERE clause if exists
+    current_node = table_node
+    where_index = None
+    for i, child in enumerate(parse_tree.childs):
+        if isinstance(child.root, Node) and child.root.token_type == Token.WHERE:
+            where_index = i
+            break
+    
+    if where_index is not None:
+        condition_node = process_where_clause(parse_tree.childs[where_index + 1])
+        condition_node.set_child(current_node)
+        current_node = condition_node
+    
+    update_node.set_child(current_node)
+    return QueryPlan(update_node)

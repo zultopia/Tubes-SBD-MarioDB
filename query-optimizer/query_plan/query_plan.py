@@ -6,6 +6,7 @@ from .nodes.selection_node import SelectionNode, UnionSelectionNode
 from .nodes.table_node import TableNode
 from .nodes.join_nodes import JoinNode, ConditionalJoinNode, NaturalJoinNode
 from .nodes.sorting_node import SortingNode
+from .nodes.update_node import UpdateNode
 from utils import Pair, Prototype
 
 
@@ -23,21 +24,47 @@ class QueryPlan(Prototype):
     def print(self):
         def print_node(node: QueryNode, level: int = 0):
             indent = "    " * level
-            print(f"{indent}└─ {node}")
+            node_str = f"{indent}└─ {node}"
             
-            if isinstance(node, ProjectNode) and node.child:
-                print_node(node.child, level + 1)
+            if isinstance(node, ProjectNode):
+                print(node_str)
+                if hasattr(node, 'child') and node.child:
+                    print_node(node.child, level + 1)
+            
             elif isinstance(node, UnionSelectionNode):
+                print(node_str)
                 for child in node.children:
                     print_node(child, level + 1)
-            elif isinstance(node, SelectionNode) and node.child:
-                print_node(node.child, level + 1)
-            elif isinstance(node, (JoinNode, ConditionalJoinNode, NaturalJoinNode)) and isinstance(node.children, Pair):
-                print_node(node.children.first, level + 1)
-                print_node(node.children.second, level + 1)
-            elif isinstance(node, SortingNode) and node.child:
-                print_node(node.child, level + 1)
-    
+            
+            elif isinstance(node, SelectionNode):
+                print(node_str)
+                if hasattr(node, 'child') and node.child:
+                    print_node(node.child, level + 1)
+            
+            elif isinstance(node, UpdateNode):
+                print(node_str)
+                if hasattr(node, 'child') and node.child:
+                    print_node(node.child, level + 1)
+            
+            elif isinstance(node, (JoinNode, ConditionalJoinNode, NaturalJoinNode)):
+                node_str += f" [{node.algorithm.value}]"
+                if isinstance(node, ConditionalJoinNode) and hasattr(node, 'conditions'):
+                    conditions = [f"{c.left_attr} {c.operator} {c.right_attr}" for c in node.conditions]
+                    node_str += f" ON {' AND '.join(conditions)}"
+                print(node_str)
+                if hasattr(node, 'children') and node.children:
+                    print_node(node.children.first, level + 1)
+                    print_node(node.children.second, level + 1)
+            
+            elif isinstance(node, SortingNode):
+                node_str += f" BY {', '.join(node.attributes)}"
+                print(node_str)
+                if hasattr(node, 'child') and node.child:
+                    print_node(node.child, level + 1)
+            
+            elif isinstance(node, TableNode):
+                print(node_str)
+        
         print("\nQuery Plan:")
         print_node(self.root)
 

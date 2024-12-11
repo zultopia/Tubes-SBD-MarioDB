@@ -7,6 +7,7 @@ class NodeType(Enum):
     TABLE = "TABLE"
     SELECTION = "SELECTION"
     UNION_SELECTION = "UNION"
+    UPDATE = "UPDATE"
 
 class JoinAlgorithm(Enum):
     NESTED_LOOP = "nested_loop"

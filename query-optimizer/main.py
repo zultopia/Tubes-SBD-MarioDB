@@ -52,15 +52,15 @@ if (current == 'gana'):
     query_plan = from_parse_tree(tree)
     query_plan.print()
 
-    plans = generate_possible_plans(query_plan, [
-        EquivalenceRules.push_projections_into_join,
-        EquivalenceRules.deconstruct_conjunction
+    # plans = generate_possible_plans(query_plan, [
+    #     EquivalenceRules.push_projections_into_join,
+    #     # EquivalenceRules.deconstruct_conjunction
                                                  
-                                                 ])
-    print("\n\n\nGenerated plans:" + str(len(plans)))
-    LIMIT_5 = min(len(plans), 32)
-    for plan in plans[:LIMIT_5]:
-        plan.print()
+    #                                              ])
+    # print("\n\n\nGenerated plans:" + str(len(plans)))
+    # LIMIT_5 = min(len(plans), 32)
+    # for plan in plans[:LIMIT_5]:
+    #     plan.print()
 
     # bf = BFOptimizer()
     # plans = bf.generate_possible_plans(query_plan)
