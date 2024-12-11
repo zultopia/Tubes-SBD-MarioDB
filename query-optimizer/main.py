@@ -42,7 +42,7 @@ current = 'gana'
 #     project.set_child(sort)
     
 #     query_plan = QueryPlan(project)
-#     query_plan.print()
+#     print(query_plan)
 
 
 if (current == 'gana'):
@@ -50,22 +50,22 @@ if (current == 'gana'):
     tree = get_parse_tree(query_string)
     print(tree)
     query_plan = from_parse_tree(tree)
-    query_plan.print()
+    print(query_plan)
 
     plans = generate_possible_plans(query_plan)
 
     print("Initial plan:")
-    query_plan.print()
-    
+    print(query_plan
+    )
     print("\n\n\nGenerated plans:" + str(len(plans)))
     LIMIT_5 = min(len(plans), 5)
     for plan in plans[:LIMIT_5]:
-        plan.print()
+        print(plan)
 
     # bf = BFOptimizer()
     # plans = bf.generate_possible_plans(query_plan)
     # for plan in plans:
-    #     plan.print()
+    
 elif (current == 'azmi'):
     pass
     # from query_plan.query_plan import QueryPlan
@@ -107,4 +107,4 @@ elif (current == 'azmi'):
     # plans = generate_possible_plans(plan)
     # print("\n\n\nGenerated plans:" + str(len(plans)))
     # for plan in plans:
-    #     plan.print()
+    #     plan)

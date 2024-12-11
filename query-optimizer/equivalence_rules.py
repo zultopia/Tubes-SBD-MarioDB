@@ -368,7 +368,6 @@ class EquivalenceRules:
     """
     @staticmethod
     def push_projections_into_join(node: QueryNode) -> List[QueryNode]:
-        print("Pushing projections into join")
 
         if not isinstance(node, ProjectNode):
             return [node]
@@ -385,7 +384,7 @@ class EquivalenceRules:
             L1 = []
             L2 = []
 
-            print("Partitioning attributes for direct join scenario")
+            # print("Partitioning attributes for direct join scenario")
             for attr in project_node.attributes:
                 if attribute_belongs_to(left_child, attr):
                     L1.append(attr)

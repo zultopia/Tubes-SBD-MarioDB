@@ -21,48 +21,44 @@ class QueryPlan(Prototype):
         # Implementation here
         pass
 
-    def print(self):
-        def print_node(node: QueryNode, level: int = 0):
+    def __repr__(self):
+        def repr_node(node: QueryNode, level: int = 0) -> str:
             indent = "    " * level
             node_str = f"{indent}└─ {node}"
+            result = [node_str]
             
             if isinstance(node, ProjectNode):
-                print(node_str)
                 if hasattr(node, 'child') and node.child:
-                    print_node(node.child, level + 1)
+                    result.append(repr_node(node.child, level + 1))
             
             elif isinstance(node, UnionSelectionNode):
-                print(node_str)
                 for child in node.children:
-                    print_node(child, level + 1)
+                    result.append(repr_node(child, level + 1))
             
             elif isinstance(node, SelectionNode):
-                print(node_str)
                 if hasattr(node, 'child') and node.child:
-                    print_node(node.child, level + 1)
+                    result.append(repr_node(node.child, level + 1))
             
             elif isinstance(node, UpdateNode):
-                print(node_str)
                 if hasattr(node, 'child') and node.child:
-                    print_node(node.child, level + 1)
+                    result.append(repr_node(node.child, level + 1))
             
             elif isinstance(node, (JoinNode, ConditionalJoinNode, NaturalJoinNode)):
-                print(node_str)
                 if hasattr(node, 'children') and node.children:
-                    print_node(node.children.first, level + 1)
-                    print_node(node.children.second, level + 1)
+                    result.append(repr_node(node.children.first, level + 1))
+                    result.append(repr_node(node.children.second, level + 1))
             
             elif isinstance(node, SortingNode):
                 node_str += f" BY {', '.join(node.attributes)}"
-                print(node_str)
                 if hasattr(node, 'child') and node.child:
-                    print_node(node.child, level + 1)
+                    result.append(repr_node(node.child, level + 1))
             
             elif isinstance(node, TableNode):
-                print(node_str)
-        
-        print("\nQuery Plan:")
-        print_node(self.root)
+                pass  # TableNode has no children
+                
+            return '\n'.join(result)
+
+        return f"Query Plan:\n{repr_node(self.root)}"
 
     def clone(self) -> 'QueryPlan':
         cloned_root = self.root.clone()

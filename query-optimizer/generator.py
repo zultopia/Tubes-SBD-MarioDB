@@ -24,7 +24,7 @@ def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules] = 
 
     while queue:
         current_plan = queue.popleft()
-        print(f"\nProcessing plan with root id: {current_plan.root.id}")
+        # print(f"\nProcessing plan with root id: {current_plan.root.id}")
 
         # Traverse the query plan tree
         nodes_to_process = deque([current_plan.root])
@@ -37,14 +37,14 @@ def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules] = 
 
             for rule in rules:
                 transformed_nodes = rule(current_node)
-                print(f" - Rule {rule.__name__} applied to node id: {current_node.id}")
+                # print(f" - Rule {rule.__name__} applied to node id: {current_node.id}")
                 
 
                 # Check if a transformation occurred
                 if len(transformed_nodes) > 1 or (len(transformed_nodes) == 1 and transformed_nodes[0].id != current_node.id):
                     # print(f"Transformation applied on node id: {current_node.id}")
                     for transformed_node in transformed_nodes:
-                        print(f" - Generated transformed node with id: {transformed_node.id}")
+                        # print(f" - Generated transformed node with id: {transformed_node.id}")
                         # Clone the current plan to create a new plan
                         new_plan = current_plan.clone()
 
@@ -55,7 +55,7 @@ def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules] = 
                                 new_plan.root = transformed_node
                                 # print(f" - Replaced root node with id: {transformed_node.id}")
                             else:
-                                print(f" - Failed to replace node id: {current_node.id}")
+                                # print(f" - Failed to replace node id: {current_node.id}")
                                 continue
                         else:
                             # print(f" - Replaced node id: {current_node.id} with id: {transformed_node.id}")
@@ -95,7 +95,7 @@ def replace_node(current: QueryNode, target_id: str, replacement: QueryNode) -> 
             if current.child.id == target_id:
                 old_child_id = current.child.id
                 current.set_child(replacement)
-                print(f"Replaced ProjectNode child {old_child_id} with {replacement.id}")
+                # print(f"Replaced ProjectNode child {old_child_id} with {replacement.id}")
                 return True
             else:
                 return replace_node(current.child, target_id, replacement)
@@ -106,7 +106,7 @@ def replace_node(current: QueryNode, target_id: str, replacement: QueryNode) -> 
             if child.id == target_id:
                 old_child_id = child.id
                 current.children[i] = replacement
-                print(f"Replaced UnionSelectionNode child {old_child_id} with {replacement.id}")
+                # print(f"Replaced UnionSelectionNode child {old_child_id} with {replacement.id}")
                 return True
             else:
                 if replace_node(child, target_id, replacement):
@@ -118,7 +118,7 @@ def replace_node(current: QueryNode, target_id: str, replacement: QueryNode) -> 
             if current.child.id == target_id:
                 old_child_id = current.child.id
                 current.set_child(replacement)
-                print(f"Replaced SelectionNode child {old_child_id} with {replacement.id}")
+                # print(f"Replaced SelectionNode child {old_child_id} with {replacement.id}")
                 return True
             else:
                 return replace_node(current.child, target_id, replacement)
@@ -130,13 +130,13 @@ def replace_node(current: QueryNode, target_id: str, replacement: QueryNode) -> 
             if current.children.first.id == target_id:
                 old_child_id = current.children.first.id
                 current.children.first = replacement
-                print(f"Replaced JoinNode first child {old_child_id} with {replacement.id}")
+                # print(f"Replaced JoinNode first child {old_child_id} with {replacement.id}")
                 return True
             # Check second child
             elif current.children.second.id == target_id:
                 old_child_id = current.children.second.id
                 current.children.second = replacement
-                print(f"Replaced JoinNode second child {old_child_id} with {replacement.id}")
+                # print(f"Replaced JoinNode second child {old_child_id} with {replacement.id}")
                 return True
             else:
                 # Recursively try to replace down the tree
@@ -151,7 +151,7 @@ def replace_node(current: QueryNode, target_id: str, replacement: QueryNode) -> 
             if current.child.id == target_id:
                 old_child_id = current.child.id
                 current.set_child(replacement)
-                print(f"Replaced SortingNode child {old_child_id} with {replacement.id}")
+                # print(f"Replaced SortingNode child {old_child_id} with {replacement.id}")
                 return True
             else:
                 return replace_node(current.child, target_id, replacement)
