@@ -7,9 +7,6 @@ class Hash(object):
     DATA_DIR = "data_blocks/"
     HASH_DIR = "hash/"
     
-    """
-    Bawah ini copasan StorageManager
-    """
     @staticmethod
     def _get_block_file(table: str, block_id: int) -> str:
         return os.path.join(Hash.DATA_DIR, f"{table}__block__{block_id}.blk")
@@ -30,12 +27,6 @@ class Hash(object):
             if Hash._hash_function(row[column]) == hash_value:
                 results.append({col: row[col] for col in row.keys()})
         return results
-    
-    """
-    Di bawah ini fungsi hash
-    TODO: DELETE OPERATION
-    UPDATE: DELETE OPERATION DONE 
-    """
     
     @staticmethod
     def change_config(DATA_DIR="data_blocks/", HASH_DIR="hash/"):
@@ -83,9 +74,6 @@ class Hash(object):
     def _write_hash_block(table: str, column: str, hash_value: int, new_block_id: int):
         # assumes entries fit in one block
         block = Hash._load_hash_block(table, column, hash_value, 0)
-        if {'id': new_block_id} in block:
-            return
-        
         block.append({'id': new_block_id})
         # assumes entries fit in one block
         Hash._save_hash_block(table, column, hash_value, 0, block)
@@ -97,9 +85,12 @@ class Hash(object):
         # assumes entries fit in one block
         block = Hash._load_hash_block(table, column, hash_value, 0)
         new_block = []
+        found = False
         for row in block:
-            if row['id'] != old_block_id:
+            if row['id'] != old_block_id or found:
                 new_block.append(row)
+            else:
+                found = True
         # assumes entries fit in one block
         if not new_block and hash_value != 0:
             if os.path.exists(Hash._get_hash_block_file(table, column, hash_value, old_block_id)):
@@ -114,11 +105,14 @@ class Hash(object):
         results = []
         block_id = 0
         hash_value = Hash._hash_function(value)
+        id_read = []
         # assumes entries fit in one block
         while(os.path.exists(Hash._get_hash_block_file(table, column, hash_value, block_id))):
             block = Hash._load_hash_block(table, column, hash_value, block_id)
             for row in block:
-                results.extend(Hash.read_block(table, column, hash_value, row['id']))
+                if row['id'] not in id_read:
+                    results.extend(Hash.read_block(table, column, hash_value, row['id']))
+                    id_read.append(row['id'])
             break # hapus ketika asumsi di atas salah
         return results
     
@@ -126,7 +120,7 @@ class Hash(object):
     def _write_row(table: str, column: str, new_block_id: int, value):
         hash_value = Hash._hash_function(value)
         print("HASH", hash_value)
-        Hash._write_hash_block(table, column, hash_value, new_block_id)\
+        Hash._write_hash_block(table, column, hash_value, new_block_id)
             
     @staticmethod
     def _delete_row(table: str, column: str, old_block_id: int, value):

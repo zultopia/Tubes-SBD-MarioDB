@@ -1,7 +1,7 @@
 from threading import Lock
 from typing import Union
 
-from LRUCache import LRUCache
+from .LRUCache import LRUCache
 
 
 class Buffer:

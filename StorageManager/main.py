@@ -1,9 +1,9 @@
 from StorageManager.classes import ConditionGroup, StorageManager, DataRetrieval, DataWrite, DataDeletion, Condition
-from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
+from FailureRecoveryManager.Buffer import Buffer
 
 if __name__ == "__main__":
     # frm = FailureRecoveryManager()
-    manager = StorageManager(None)
+    manager = StorageManager(Buffer(100))
     # print("Initial Data:", manager.data)
 
     # Write Example
