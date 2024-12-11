@@ -68,6 +68,7 @@ class ConditionalJoinNode(JoinNode):
         return 1
 
     def __str__(self) -> str:
+
         if not self.conditions:
             return f"JOIN [{self.algorithm.value}]"
         conditions_str = ', '.join([f"{c.left_operand} {c.operator.value} {c.right_operand}" for c in self.conditions])

@@ -53,6 +53,9 @@ if (current == 'gana'):
     query_plan.print()
 
     plans = generate_possible_plans(query_plan)
+
+    print("Initial plan:")
+    query_plan.print()
     
     print("\n\n\nGenerated plans:" + str(len(plans)))
     LIMIT_5 = min(len(plans), 5)

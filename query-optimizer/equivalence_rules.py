@@ -395,8 +395,6 @@ class EquivalenceRules:
                     print("Attribute does not belong cleanly to either side of the join")
                     return [project_node]
 
-            print("L1:", L1)
-            print("L2:", L2)
 
             # Push down projections
             new_left = left_child.clone()
@@ -426,6 +424,30 @@ class EquivalenceRules:
         if isinstance(node.child, SelectionNode) and isinstance(node.child.child, JoinNode):
             selection_node = node.child
             join_node = selection_node.child
+
+            # If the selection node has conditions that is not in the projection, return the original node
+            # we cannot do it
+            attrs = set()
+            for condition in selection_node.conditions:
+                if (condition.is_constant_comparison()):
+                    attrs.add(condition.left_operand)
+                else:
+                    attrs.add(condition.left_operand)
+                    attrs.add(condition.right_operand)
+            
+            for condition in selection_node.child.conditions:
+                if (condition.is_constant_comparison()):
+                    attrs.add(condition.left_operand)
+                else:
+                    attrs.add(condition.left_operand)
+                    attrs.add(condition.right_operand)
+        
+            # For each attribute in the attrs, check if it belongs to the project node
+            for attr in attrs:
+                if not attribute_belongs_to(node, attr):
+                    return [node]
+            
+                
 
             # Apply the projection pushdown as if node.child = join_node
             transformed_plans = push_projections_on_join_directly(node, join_node)
