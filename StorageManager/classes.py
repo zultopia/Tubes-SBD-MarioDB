@@ -151,7 +151,7 @@ class StorageManager:
     HASH_DIR = "hash/" # DATA_DIR/HASH_DIR/{table}_{column}_{hash}_{block_id}
     BLOCK_SIZE = 4096  # bytes
 
-    def __init__(self, frm):
+    def __init__(self, frm=None):
         print("INITIATING")
         os.makedirs(self.DATA_DIR, exist_ok=True)
         os.makedirs(os.path.join(self.DATA_DIR, self.HASH_DIR), exist_ok=True)

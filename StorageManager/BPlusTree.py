@@ -2,11 +2,16 @@ import os
 import pickle
 from typing import Union, List, Dict
 
+class BPlusBlock:
+    def __init__(self, block_id: int, sequence_id: int):
+        self.block_id = block_id
+        self.sequence_id = sequence_id
+
 class BPlusTreeNode:
     def __init__(self, is_leaf=False):
         self.is_leaf = is_leaf
-        self.keys = []
-        self.children: List[Union[Dict, BPlusTreeNode]] = []
+        self.keys: List[Union[str, int]] = []
+        self.children: List[BPlusBlock] = []
 
 class BPlusTree:
     def __init__(self, degree):
@@ -35,14 +40,6 @@ class BPlusTree:
         self._insert_in_leaf(leaf, key, value)
         if len(leaf.keys) == self.degree:
             self._split_node(leaf)
-
-    def update(self, key, value):
-        leaf = self._find_leaf(self.root, key)
-        for i, item in enumerate(leaf.keys):
-            if item == key:
-                leaf.children[i] = value
-                return
-        raise KeyError(f"Key {key} tidak ditemukan.")
 
     def delete(self, key):
         leaf = self._find_leaf(self.root, key)
