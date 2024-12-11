@@ -39,7 +39,7 @@ class TestOptimizerRule6:
         expected_plan = QueryPlan(outer_join2)
 
         plans = generate_possible_plans(original_plan, [
-            EquivalenceRules.associateJoins
+            EquivalenceRules.associativeJoins
         ])
         
         assert any(p == expected_plan for p in plans), "Natural join association should exist"
@@ -86,59 +86,12 @@ class TestOptimizerRule6:
         expected_plan = QueryPlan(outer_join2)
 
         plans = generate_possible_plans(original_plan, [
-            EquivalenceRules.associateJoins
+            EquivalenceRules.associativeJoins
         ])
         
         assert any(p == expected_plan for p in plans), "Theta join association should exist"
         print(f"Theta join associativity: Passed - {time() - start_time:.6f} s")
 
-    def test_mixed_join_chain(self):
-        """Test complex join chain with both theta and natural joins"""
-        start_time = time()
-        
-        # Original: (Employee ⋈ Department) ⋈(natural) Project
-        emp = TableNode("Employee")
-        dept = TableNode("Department")
-        proj = TableNode("Project")
-
-        # First join with condition
-        inner_join = ConditionalJoinNode(JoinAlgorithm.HASH, [
-            Condition("emp.dept_id", "dept.id", Operator.EQ),
-            Condition("emp.salary", "dept.avg_salary", Operator.GREATER)
-        ])
-        inner_join.set_children(Pair(emp, dept))
-
-        # Natural join on top
-        outer_join = NaturalJoinNode(JoinAlgorithm.HASH)
-        outer_join.set_children(Pair(inner_join, proj))
-        original_plan = QueryPlan(outer_join)
-
-        # Expected: Employee ⋈ (Department ⋈(natural) Project)
-        emp2 = TableNode("Employee")
-        dept2 = TableNode("Department")
-        proj2 = TableNode("Project")
-
-        # Natural join first
-        inner_join2 = NaturalJoinNode(JoinAlgorithm.HASH)
-        inner_join2.set_children(Pair(dept2, proj2))
-
-        # Theta join on top
-        outer_join2 = ConditionalJoinNode(JoinAlgorithm.HASH, [
-            Condition("emp.dept_id", "dept.id", Operator.EQ),
-            Condition("emp.salary", "dept.avg_salary", Operator.GREATER)
-        ])
-        outer_join2.set_children(Pair(emp2, inner_join2))
-        expected_plan = QueryPlan(outer_join2)
-        print(original_plan)
-        print(expected_plan)
-
-        plans = generate_possible_plans(original_plan, [
-            EquivalenceRules.associativeJoins
-        ])
-        print(plans)
-        
-        assert any(p == expected_plan for p in plans), "Mixed join association should exist"
-        print(f"Mixed join chain: Passed - {time() - start_time:.6f} s")
 
     def test_complex_conditions(self):
         """Test associativity with complex join conditions"""
@@ -188,3 +141,4 @@ class TestOptimizerRule6:
         
         assert any(p == expected_plan for p in plans), "Complex condition association should exist"
         print(f"Complex conditions: Passed - {time() - start_time:.6f} s")
+

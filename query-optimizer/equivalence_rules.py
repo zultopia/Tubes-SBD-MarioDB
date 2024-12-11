@@ -249,6 +249,15 @@ class EquivalenceRules:
         left_child = node.children.first
         right_child = node.children.second
         ret = []
+        def filter_conditions(conditions: List[Condition], left: QueryNode, right: QueryNode) -> List[Condition]:
+            """
+            Filter conditions to include only those relevant to the given children.
+            """
+            relevant_conditions = []
+            for condition in conditions:
+                if checkRelevance(condition,left) or checkRelevance(condition,right):
+                    relevant_conditions.append(condition)
+            return relevant_conditions
 
         def create_associative_node(parent: QueryNode, outer: QueryNode, inner: QueryNode, is_left: bool) -> QueryNode:
             """Semua logic sebenearnya di sini"""
@@ -256,13 +265,21 @@ class EquivalenceRules:
                 grandchild_left = inner.children.first.clone() if inner.children.first else None
                 grandchild_right = inner.children.second.clone() if inner.children.second else None
                 # takes the class of input, assign the condition if it has the attribute else bakal jadi natural join
-                if isinstance(parent, ConditionalJoinNode):
+                filteredConditions=[]
+                if isinstance(inner, ConditionalJoinNode) and is_left:
+                    filteredConditions = filter_conditions(inner.conditions,grandchild_right,outer.clone())
                     associated_inner = ConditionalJoinNode(
-                        algorithm=parent.algorithm,
-                        conditions=parent.conditions
+                        algorithm=inner.algorithm,
+                        conditions=filteredConditions
                     )
-                elif isinstance(parent, NaturalJoinNode):
-                    associated_inner = NaturalJoinNode(algorithm=parent.algorithm)
+                elif isinstance(inner, ConditionalJoinNode) and not is_left:
+                    filteredConditions = filter_conditions(inner.conditions,outer.clone(),grandchild_left)
+                    associated_inner = ConditionalJoinNode(
+                        algorithm=inner.algorithm,
+                        conditions=filteredConditions
+                    )
+                elif isinstance(inner, NaturalJoinNode):
+                    associated_inner = NaturalJoinNode(algorithm=inner.algorithm)
                 if is_left:
                     associated_inner.set_children(Pair(grandchild_right, outer.clone()))
                     if isinstance(parent, ConditionalJoinNode):
@@ -306,42 +323,6 @@ class EquivalenceRules:
         RULE 7: Selection operation can be distributed.
         - Distributes selection conditions across joins where applicable.
         """
-        def checkRelevance(c: Condition, _node: QueryNode) -> bool:
-            leftOperand = c.left_operand
-            attr = leftOperand
-            table = ''
-
-            # Split the operand into table and attribute if applicable
-            if '.' in leftOperand:
-                table, attr = leftOperand.split(".")
-
-            # Check relevance for ProjectNode
-            if isinstance(_node, ProjectNode):
-                for attribute in _node.attributes:
-                    if attr == attribute:
-                        return True
-
-            # Check relevance for TableNode
-            elif isinstance(_node, TableNode):
-                tempData = QOData()
-                actualTable = tempData.data.get(_node.table_name)
-                if actualTable:
-                    attributes = actualTable["attributes"]
-                    if attr in attributes:
-                        return True
-
-            # Check relevance for nodes with children (e.g., JoinNode, ConditionalJoinNode, etc.)
-            elif hasattr(_node, 'children') and isinstance(_node.children, Pair):
-                # Recursively check both children in the Pair
-                if checkRelevance(c, _node.children.first) or checkRelevance(c, _node.children.second):
-                    return True
-
-            # Check relevance for a single child node
-            elif hasattr(_node, 'child') and _node.child:
-                return checkRelevance(c, _node.child)
-
-            # If no match is found in the subtree, return False
-            return False
 
         if not isinstance(node, SelectionNode) or not isinstance(node.child, (ConditionalJoinNode, NaturalJoinNode)):
             return [node]
@@ -550,7 +531,43 @@ class EquivalenceRules:
 
 
 
-        
+#helper functions
+def checkRelevance(c: Condition, _node: QueryNode) -> bool:
+    leftOperand = c.left_operand
+    attr = leftOperand
+    table = ''
+
+    # Split the operand into table and attribute if applicable
+    if '.' in leftOperand:
+        table, attr = leftOperand.split(".")
+
+    # Check relevance for ProjectNode
+    if isinstance(_node, ProjectNode):
+        for attribute in _node.attributes:
+            if attr == attribute:
+                return True
+
+    # Check relevance for TableNode
+    elif isinstance(_node, TableNode):
+        tempData = QOData()
+        actualTable = tempData.data.get(_node.table_name)
+        if actualTable:
+            attributes = actualTable["attributes"]
+            if attr in attributes:
+                return True
+
+    # Check relevance for nodes with children (e.g., JoinNode, ConditionalJoinNode, etc.)
+    elif hasattr(_node, 'children') and isinstance(_node.children, Pair):
+        # Recursively check both children in the Pair
+        if checkRelevance(c, _node.children.first) or checkRelevance(c, _node.children.second):
+            return True
+
+    # Check relevance for a single child node
+    elif hasattr(_node, 'child') and _node.child:
+        return checkRelevance(c, _node.child)
+
+    # If no match is found in the subtree, return False
+    return False
 
 # test functions 
 
