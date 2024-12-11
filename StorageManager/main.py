@@ -2,8 +2,8 @@ from StorageManager.classes import ConditionGroup, StorageManager, DataRetrieval
 from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
 
 if __name__ == "__main__":
-    frm = FailureRecoveryManager()
-    manager = StorageManager(frm)
+    # frm = FailureRecoveryManager()
+    manager = StorageManager(None)
     # print("Initial Data:", manager.data)
 
     # Write Example
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     # Delete Example
     delete_action = DataDeletion(
         table="Student",
-        conditions=ConditionGroup([Condition("GPA", ">", 3.0)], "AND"),
+        conditions=ConditionGroup([Condition("GPA", ">", 2.0)], "AND"),
         level="table"
     )
     # removed = manager.delete_block(delete_action)
@@ -41,6 +41,7 @@ if __name__ == "__main__":
     # print("Removed Rows:", removed)
     # print("Data After Delete:", manager.data)
     manager.set_index("Student", "FullName", "hash")
+    manager.set_index("Student", "GPA", "hash")
     
     data = manager.read_block_with_hash("Student", "FullName", "Eve")
     print("Data", data)
@@ -52,7 +53,7 @@ if __name__ == "__main__":
     write_action = DataWrite(
         table="Student",
         columns=["FullName", "GPA"],
-        new_values=["EVA", 3.1],
+        new_values=["EVA", 2.1],
         conditions=ConditionGroup([Condition("FullName", "=", "Eve")], logic_operator="AND"),
         level="row"
     )
@@ -63,6 +64,18 @@ if __name__ == "__main__":
     
     data = manager.read_block_with_hash("Student", "FullName", "EVA")
     print("HASH AFTER UPDATING", data)
+    
+    # results = manager.delete_block(delete_action)
+    # print("RESULTS DELETE BLOCK", results)
+    
+    read_hash_action = DataRetrieval(
+        "Student", ["StudentID", "FullName"], 
+        ConditionGroup([Condition("GPA", ">", 1.0)]), 
+        "sequential", 
+        "cell")
+    
+    read_hash_if = manager.read_block_with_hash("Student", "GPA", 2.1)
+    print("READ HASH WITH NUMBER", read_hash_if)
     
     test_stat = manager.get_stats()
     print("TEST STAT", test_stat)

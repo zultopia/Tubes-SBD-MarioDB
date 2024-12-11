@@ -10,7 +10,7 @@ from typing import List, Literal, Union, Dict, Tuple
 from StorageManager.HashIndex import Hash
 # from .BPlusTree import BPlusTree
 from ConcurrencyControlManager.classes import PrimaryKey
-import FailureRecoveryManager.FailureRecoveryManager as frm
+# import FailureRecoveryManager.FailureRecoveryManager as frm
 
 class Student:
     def __init__(self, id:int, name:Union[str, None]=None, dept_name:Union[str, None]=None, tot_cred:Union[int, None]=None):
@@ -151,7 +151,7 @@ class StorageManager:
     HASH_DIR = "hash/" # DATA_DIR/HASH_DIR/{table}_{column}_{hash}_{block_id}
     BLOCK_SIZE = 4096  # bytes
 
-    def __init__(self, frm: frm.FailureRecoveryManager):
+    def __init__(self, frm):
         print("INITIATING")
         os.makedirs(self.DATA_DIR, exist_ok=True)
         os.makedirs(os.path.join(self.DATA_DIR, self.HASH_DIR), exist_ok=True)
@@ -219,13 +219,13 @@ class StorageManager:
         if not data_write.conditions:
             # add operation
             for block_id in blocks:
-                block = self.frm.get_buffer(table, block_id)
+                block = None # self.frm.get_buffer(table, block_id)
                 if not block:
                     block = self._load_block(table, block_id)
                 if len(block) < self.BLOCK_SIZE:
                     block.append(dict_new_values)
                     self._save_block(table, block_id, block)
-                    self.frm.put_buffer(table, block_id, block)
+                    # self.frm.put_buffer(table, block_id, block)
                     self.update_all_column_with_hash(table, columns, dict_new_values, block_id)
                     self.log_action("write", table, {"block_id": block_id, "data": new_values})
                     return 1
@@ -234,14 +234,14 @@ class StorageManager:
             new_block_id = max(blocks, default=-1) + 1
             new_block = [dict_new_values]
             self._save_block(table, new_block_id, new_block)
-            self.frm.put_buffer(table, new_block_id, new_block)
+            # self.frm.put_buffer(table, new_block_id, new_block)
             self.update_all_column_with_hash(table, columns, dict_new_values, new_block_id)
             self.log_action("write", table, {"block_id": new_block_id, "data": new_values})
             return 1
         # UPDATE 
         num_updated = 0
         for block_id in blocks:
-            block = self.frm.get_buffer(table, block_id)
+            block = None # self.frm.get_buffer(table, block_id)
             if not block:
                 block = self._load_block(table, block_id)
             new_block = []
@@ -257,7 +257,7 @@ class StorageManager:
                 else:
                     new_block.append(row)
             self._save_block(table, block_id, new_block)
-            self.frm.put_buffer(table, block_id, new_block)
+            # self.frm.put_buffer(table, block_id, new_block)
 
         return num_updated
     
@@ -270,7 +270,7 @@ class StorageManager:
         for file in os.listdir(self.DATA_DIR):
             if file.startswith(table):
                 block_id = int(file.split('_')[-1].split('.')[0])
-                block = self.frm.get_buffer(table, block_id)
+                block = None # self.frm.get_buffer(table, block_id)
                 if not block:
                     block = self._load_block(table, block_id)
                 for row in block:
@@ -289,13 +289,13 @@ class StorageManager:
         for file in os.listdir(self.DATA_DIR):
             if file.startswith(table):
                 block_id = int(file.split('_')[-1].split('.')[0])
-                block = self.frm.get_buffer(table, block_id)
+                block = None # self.frm.get_buffer(table, block_id)
                 if not block:
                     block = self._load_block(table, block_id)
                 new_block = [row for row in block if not self._evaluate_conditions(row, conditions)]
                 total_deleted += len(block) - len(new_block)
                 self._save_block(table, block_id, new_block)
-                self.frm.put_buffer(table, block_id, new_block)
+                # self.frm.put_buffer(table, block_id, new_block)
         return total_deleted
 
     def set_index(self, table: str, column: str, index_type: str):
