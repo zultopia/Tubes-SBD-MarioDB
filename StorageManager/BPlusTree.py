@@ -96,15 +96,17 @@ class BPlusTree:
         parent.children.insert(index + 1, child)
         if len(parent.keys) == self.degree:
             self._split_node(parent)
-            
+
+"""
+TODO: FINISH B+
 class BPlusReader:
     DATA_DIR = "data_blocks/"
     HASH_DIR = "hash/"
     BPLUS_DIR = "bplus/"
     
-    """
+    
     Bawah ini copasan StorageManager
-    """
+    
     @staticmethod
     def _get_block_file(table: str, block_id: int) -> str:
         return os.path.join(BPlusReader.DATA_DIR, f"{table}_block_{block_id}.blk")
@@ -126,11 +128,11 @@ class BPlusReader:
                 results.append({col: row[col] for col in row.keys()})
         return results
     
-    """
+    
     Di bawah ini fungsi hash
     TODO: DELETE OPERATION
     UPDATE: DELETE OPERATION DONE 
-    """
+    
     
     @staticmethod
     def change_config(DATA_DIR="data_blocks/", BPLUS_DIR="bplus/"):
@@ -186,3 +188,4 @@ class BPlusReader:
             Hash._save_hash_block(table, column, hash_value, 0, new_block)
         print("HASH UPDATED")
         return
+"""

@@ -1,0 +1,7 @@
+CHECKPOINT|[]
+101|START
+101|WRITE|employees|None|[{"id": 1, "name": "Alice", "salary": 5000}]
+101|COMMIT
+102|START
+103|START
+CHECKPOINT|[102,103]

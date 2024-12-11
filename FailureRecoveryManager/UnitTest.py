@@ -4,8 +4,10 @@ from unittest.mock import MagicMock, patch
 
 from FailureRecoveryManager.ExecutionResult import ExecutionResult
 from FailureRecoveryManager.Rows import Rows
+from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
+from FailureRecoveryManager import FailureRecoveryManager, LRUCache
+from StorageManager.classes import StorageManager, DataWrite, DataDeletion, Condition
 
-from .FailureRecoveryManager import FailureRecoveryManager, LRUCache
 
 
 class TestFailureRecoveryManager(unittest.TestCase):
@@ -13,7 +15,7 @@ class TestFailureRecoveryManager(unittest.TestCase):
     # Run  python -m "FailureRecoveryManager.UnitTest"
     def setUp(self):
         self.lru = LRUCache(5)
-        self.frm = FailureRecoveryManager()
+        self.frm = FailureRecoveryManager(log_file="./FailureRecoveryManager/log2.log")
 
     def test_lru_cache(self):
         """
@@ -67,7 +69,7 @@ class TestFailureRecoveryManager(unittest.TestCase):
             '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]',
         ]
         self.frm._save_checkpoint()
-        mock_open.assert_called_once_with("./FailureRecoveryManager/log.log", "a")
+        mock_open.assert_called_once_with("./FailureRecoveryManager/log2.log", "a")
 
     def test_write_log(self):
         execution_result = ExecutionResult(
@@ -119,8 +121,55 @@ class TestFailureRecoveryManager(unittest.TestCase):
         self.frm._save_checkpoint()
         self.assertEqual(self.frm._wa_logs, [])
 
-    # test_recover
+    # test_recover (belum selesai lagi process)
+    @patch.object(FailureRecoveryManager, "_read_lines_from_end", return_value=[
+            "CHECKPOINT|[]",
+            "101|START",
+            "101|WRITE|employees|None|[{\"id\": 1, \"name\": \"Alice\", \"salary\": 5000}]",
+            "101|COMMIT",
+            "102|START",
+            "103|START",
+            "CHECKPOINT|[102,103]",
+        ])
+    @patch("StorageManager.StorageManager")
+    # @patch("builtins.open", new_callable=MagicMock)
+    def test_recover(self, _, mock_storage_manager):
+        pass
+        
+        mock_storage = mock_storage_manager.return_value
+        def mock_write_block(data_write: DataWrite):
+            print("table: ", data_write.table)
+            print("column: ", data_write.columns)
+            print("Value: ", data_write.new_values)
+            print("Condition", data_write.conditions)
+            return 1
+
+        def mock_delete_block(data_delete: DataDeletion):
+            print("table: ", data_delete.table)
+            print("Condition", data_delete.conditions)
+            return 1
+        mock_storage.write_block = mock_write_block
+        mock_storage.delete_block = mock_delete_block
+        
+        # Create a FailureRecoveryManager instance
+        self.frm._wa_logs = [
+            '102|WRITE|employees|None|[{"id": 2, "name": "Bob", "salary": 4000}]',
+            '102|WRITE|employees|[{"id": 2, "name": "Bob", "salary": 4000}]|None',
+            "102|ABORT",
+            '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]',
+        ]
+
+        # Create recovery criteria for transaction 102
+        criteria = RecoverCriteria(transaction_id=102)
+
+        # Call the recover method
+        self.frm.recover(criteria)
+        
+        print(self._wa_logs)
+    
     # recover_system_crash
+    def recover_system_crash(self):
+        pass
 
 
 if __name__ == "__main__":
