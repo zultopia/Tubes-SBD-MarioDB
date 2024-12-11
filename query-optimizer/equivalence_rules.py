@@ -391,7 +391,6 @@ class EquivalenceRules:
                 elif attribute_belongs_to(right_child, attr):
                     L2.append(attr)
                 else:
-                    print("Attribute does not belong cleanly to either side of the join")
                     return [project_node]
 
 

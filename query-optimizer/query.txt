@@ -1,1 +1,1 @@
-SELECT id, name, dept_name, course_id, semester, year FROM student JOIN takes ON id = id WHERE dept_name < 'Comp. Sci' AND semester = 'Fall' AND year = 2021;
+select budi from table1 join table2 on table1.id = table2.id join table3 on table2.id = table3.id where x=5;

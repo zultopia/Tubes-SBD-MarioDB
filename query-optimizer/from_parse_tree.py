@@ -24,14 +24,15 @@ def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
         if first_token.token_type == Token.SELECT:
             # Process SELECT query
             project_node = process_select_list(parse_tree.childs[1])
-            
+
+            # Find the FROM clause
             table_node = None
             for i, child in enumerate(parse_tree.childs):
                 if isinstance(child.root, Node) and child.root.token_type == Token.FROM:
                     table_node = process_from_list(parse_tree.childs[i + 1])
                     break
 
-            # Process WHERE with possible unions
+            # Process WHERE clause if present
             where_index = None
             for i, child in enumerate(parse_tree.childs):
                 if isinstance(child.root, Node) and child.root.token_type == Token.WHERE:
@@ -40,15 +41,15 @@ def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
 
             if where_index is not None:
                 condition_node = process_where_clause(parse_tree.childs[where_index + 1])
-                if isinstance(condition_node, UnionSelectionNode):
-                    for selection_node in condition_node.children:
-                        table_copy = process_from_list(parse_tree.childs[3])
-                        selection_node.set_child(table_copy)
-                else:
-                    condition_node.set_child(table_node)
+                condition_node.set_child(table_node)
                 table_node = condition_node
 
+            # Attach the table_node to the project_node
             project_node.set_child(table_node)
+
+            # Additional processing for ORDER BY, LIMIT, etc., if needed
+            # (Not required for the current example)
+
             return QueryPlan(project_node)
 
         elif first_token.token_type == Token.UPDATE:
@@ -56,6 +57,8 @@ def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
             return process_update_query(parse_tree)
 
     raise ValueError(f"Unsupported query type: {first_token}")
+
+
 
 def process_select_list(select_list_tree: ParseTree) -> ProjectNode:
     """Process SELECT list and create ProjectNode."""
@@ -91,39 +94,94 @@ def process_from_list(from_list_tree: ParseTree) -> QueryNode:
     """Process FROM list and create appropriate nodes."""
     if not from_list_tree.childs:
         raise ValueError("Empty FROM list")
-    return process_table_result(from_list_tree.childs[0])
+    
+    # Process the initial TableResult
+    table_result = from_list_tree.childs[0]
+    table_node = process_table_result(table_result)
+    
+    # Process FromListTail for additional tables
+    from_list_tail = from_list_tree.childs[1] if len(from_list_tree.childs) > 1 else None
+    while from_list_tail:
+        if not from_list_tail.childs:
+            break  # No further processing needed
+        
+        # FromListTail structure: COMMA, TableResult, FromListTail
+        comma_node = from_list_tail.childs[0]
+        if not (isinstance(comma_node.root, Node) and comma_node.root.token_type == Token.COMMA):
+            raise SyntaxError(f"Expected COMMA in FromListTail, found {comma_node.root}")
+        
+        # Process the next TableResult
+        next_table_result = from_list_tail.childs[1]
+        next_table_node = process_table_result(next_table_result)
+        
+        # Create a ConditionalJoinNode representing a cross join (no conditions)
+        join_node = ConditionalJoinNode(JoinAlgorithm.NESTED_LOOP, conditions=[])
+        join_node.set_children(Pair(table_node, next_table_node))
+        
+        # Update the current table_node to the new join_node
+        table_node = join_node
+        
+        # Move to the next FromListTail
+        from_list_tail = from_list_tail.childs[2] if len(from_list_tail.childs) > 2 else None
+    
+    return table_node
+
+
 
 def process_table_result(table_result_tree: ParseTree) -> QueryNode:
     """Process table result (handles JOINs)."""
     if not table_result_tree.childs:
         raise ValueError("Empty table result")
 
+    # Process the initial TableTerm
     current_node = process_table_term(table_result_tree.childs[0])
-    
-    if len(table_result_tree.childs) > 1:
-        tail = table_result_tree.childs[1]
-        while tail and tail.childs:
-            if isinstance(tail.root, str) and tail.root == "TableResultTail":
-                if len(tail.childs) >= 1:  
-                    if tail.childs[0].root.token_type == Token.NATURAL:
-                        join_node = NaturalJoinNode(JoinAlgorithm.NESTED_LOOP)
-                        right_node = process_table_term(tail.childs[2])
-                        join_node.set_children(Pair(current_node, right_node))
-                        current_node = join_node
-                    elif tail.childs[0].root.token_type == Token.JOIN:
-                        join_node = process_conditional_join(tail)
-                        right_node = process_table_term(tail.childs[1])
-                        join_node.set_children(Pair(current_node, right_node))
-                        current_node = join_node
-                
-                if len(tail.childs) == 4: 
-                    tail = tail.childs[3]
-                else:
-                    break
+
+    print("checkpoint 1: Processed initial TableTerm")
+
+    # Check if there is a TableResultTail
+    if len(table_result_tree.childs) > 1 and table_result_tree.childs[1].root == "TableResultTail":
+        table_result_tail = table_result_tree.childs[1]
+
+        while table_result_tail:
+            if not table_result_tail.childs:
+                break  # No further processing needed
+
+            print("checkpoint 2: Processing TableResultTail")
+            first_child = table_result_tail.childs[0]
+            if not isinstance(first_child.root, Node):
+                raise SyntaxError("Invalid structure in TableResultTail")
+
+            if first_child.root.token_type == Token.JOIN:
+                print("Processing JOIN")
+                # Handle explicit JOINs
+                join_node = process_conditional_join(table_result_tail)
+                right_node = process_table_term(table_result_tail.childs[1])
+                join_node.set_children(Pair(current_node, right_node))
+                current_node = join_node
+
+                # Correct indexing: access childs[4] for the next TableResultTail
+                table_result_tail = table_result_tail.childs[4] if len(table_result_tail.childs) > 4 else None
+
+            elif first_child.root.token_type == Token.NATURAL:
+                print("Processing NATURAL JOIN")
+                # Handle NATURAL JOINs
+                join_node = NaturalJoinNode(JoinAlgorithm.NESTED_LOOP)
+                right_node = process_table_term(table_result_tail.childs[2])
+                join_node.set_children(Pair(current_node, right_node))
+                current_node = join_node
+
+                # Correct indexing: access childs[4] for the next TableResultTail
+                table_result_tail = table_result_tail.childs[4] if len(table_result_tail.childs) > 4 else None
+
             else:
-                break
-            
+                raise SyntaxError(f"Unexpected token in TableResultTail: {first_child.root.token_type}")
+
     return current_node
+
+
+
+
+
 
 def process_table_term(table_term_tree: ParseTree) -> QueryNode:
     if not table_term_tree.childs:
