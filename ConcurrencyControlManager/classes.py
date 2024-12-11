@@ -336,10 +336,10 @@ class ConcurrencyControlManager:
                     break
                 
                 if holders and minimum_lock_type in conflict_matrix[held_lock]:
-                    if len(holders) > 1 or transaction_id not in holders:
+                    holders.discard(transaction_id)
+                    if len(holders) > 0:
                         failed = True
-                        conflict_list.append(holders)
-                        
+
                         for tid in holders:
                             if held_lock == "S":
                                 self.wait_for_graph.addEdge(transaction_id, tid)
@@ -354,11 +354,9 @@ class ConcurrencyControlManager:
             
             abort_transaction_id = []
             if failed:
-                for holders in conflict_list:
-                    for other_transaction_id in holders:
-                        # Wait-die
-                        if other_transaction_id > transaction_id:
-                            abort = True
+                for holder in holders:
+                    if holder > transaction_id:
+                        abort = True
                         # Wound-wait
                         # if transaction_id > other_transaction_id:
                         #     abort_transaction_id.append(other_transaction_id)
