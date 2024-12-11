@@ -3,6 +3,7 @@ from ..base import QueryNode
 from ..enums import NodeType, JoinAlgorithm
 from utils import Pair
 from ..shared import Condition
+from ..enums import Operator
 
 class JoinNode(QueryNode):
     def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP):
@@ -40,6 +41,9 @@ class ConditionalJoinNode(JoinNode):
     def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP, conditions: List[Condition] = None):
         super().__init__(algorithm)
         self.node_type = NodeType.JOIN
+
+        # Sort the condition based on Operator.EQ first then the other
+        conditions = sorted(conditions, key=lambda c: c.operator != Operator.EQ)
         self.conditions = conditions if conditions is not None else []
 
     def clone(self) -> 'ConditionalJoinNode':
@@ -66,7 +70,7 @@ class ConditionalJoinNode(JoinNode):
     def __str__(self) -> str:
         if not self.conditions:
             return f"JOIN [{self.algorithm.value}]"
-        conditions_str = ', '.join([f"{c.left_operand} {c.operator} {c.right_operand}" for c in self.conditions])
+        conditions_str = ', '.join([f"{c.left_operand} {c.operator.value} {c.right_operand}" for c in self.conditions])
         return f"JOIN [{self.algorithm.value}] ON {conditions_str}"
 
 

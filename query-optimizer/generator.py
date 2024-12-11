@@ -6,7 +6,15 @@ from query_plan.query_plan import (
 from typing import List
 from collections import deque
 
-def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules]) -> List['QueryPlan']:
+def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules] = [
+    EquivalenceRules.deconstruct_conjunction, # Rule 1
+    EquivalenceRules.commute_selections, # Rule 2
+    # EquivalenceRules.collapse_projections, # Rule 3
+    EquivalenceRules.combineJoinCondition, # Rule 4
+    EquivalenceRules.switchChildrenJoin, # Rule 5
+    EquivalenceRules.associativeJoins, # Rule 6
+    EquivalenceRules.push_projections_into_join, # Rule 8
+]) -> List['QueryPlan']:
 
 
     initial_plan = query.clone()

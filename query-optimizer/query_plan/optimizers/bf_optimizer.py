@@ -18,6 +18,7 @@ class BFOptimizer(QueryPlanOptimizer):
             EquivalenceRules.combineJoinCondition, # Rule 4
             EquivalenceRules.switchChildrenJoin, # Rule 5
             EquivalenceRules.associativeJoins, # Rule 6
+            EquivalenceRules.push_projections_into_join, # Rule 8
         ])
 
         best_cost = get_cost(best_plan)

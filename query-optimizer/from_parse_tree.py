@@ -148,7 +148,7 @@ def process_conditional_join(join_tree: ParseTree) -> ConditionalJoinNode:
     def process_condition_term(cond_term: ParseTree) -> Optional[Condition]:
         if len(cond_term.childs) >= 3:
             left = extract_field_value(cond_term.childs[0])
-            operator = cond_term.childs[1].childs[0].root.value
+            operator = cond_term.childs[1].childs[0].root
             right = extract_field_value(cond_term.childs[2])
             return Condition(left, right, operator)  
         return None

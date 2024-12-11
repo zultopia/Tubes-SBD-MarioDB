@@ -163,26 +163,26 @@ class EquivalenceRules:
 
         return [new_parent]
     
-    @staticmethod
-    def collapse_projections(node: QueryNode) -> List[QueryNode]:
-        """
-        RULE 3: Only the last projection in a sequence is needed
-        """
-        if not isinstance(node, ProjectNode):
-            return [node]
+    # @staticmethod
+    # def collapse_projections(node: QueryNode) -> List[QueryNode]:
+    #     """
+    #     RULE 3: Only the last projection in a sequence is needed
+    #     """
+    #     if not isinstance(node, ProjectNode):
+    #         return [node]
         
-        # Find the deepest child node
-        current = node
-        while isinstance(current.child, ProjectNode):
-            current = current.child
+    #     # Find the deepest child node
+    #     current = node
+    #     while isinstance(current.child, ProjectNode):
+    #         current = current.child
         
-        if current == node:  # No projection sequence found
-            return [node]
+    #     if current == node:  # No projection sequence found
+    #         return [node]
         
-        # Create new node with original projection but connected to deepest child
-        new_node = node.clone()
-        new_node.set_child(current.child)
-        return [new_node]
+    #     # Create new node with original projection but connected to deepest child
+    #     new_node = node.clone()
+    #     new_node.set_child(current.child)
+    #     return [new_node]
 
     """
     RULE 4: Combine join conditions into ConditionalJoinNode.

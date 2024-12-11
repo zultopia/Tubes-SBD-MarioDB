@@ -47,10 +47,6 @@ class QueryPlan(Prototype):
                     print_node(node.child, level + 1)
             
             elif isinstance(node, (JoinNode, ConditionalJoinNode, NaturalJoinNode)):
-                node_str += f" [{node.algorithm.value}]"
-                if isinstance(node, ConditionalJoinNode) and hasattr(node, 'conditions'):
-                    conditions = [f"{c.left_attr} {c.operator} {c.right_attr}" for c in node.conditions]
-                    node_str += f" ON {' AND '.join(conditions)}"
                 print(node_str)
                 if hasattr(node, 'children') and node.children:
                     print_node(node.children.first, level + 1)

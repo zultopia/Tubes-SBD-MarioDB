@@ -1,6 +1,6 @@
 from typing import List, Dict
 from ..base import QueryNode
-from ..enums import NodeType
+from ..enums import NodeType, Operator
 from ..shared import Condition
 
 
@@ -8,6 +8,9 @@ from ..shared import Condition
 class SelectionNode(QueryNode):
     def __init__(self, conditions: List[Condition]):
         super().__init__(NodeType.SELECTION)
+
+        # Sort the condition based on Operator.EQ first then the other
+        conditions = sorted(conditions, key=lambda c: c.operator != Operator.EQ)
         self.conditions = conditions
         self.child = None  # Single child node
         self.children = None  # Not used in SelectionNode
