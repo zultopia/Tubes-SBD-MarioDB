@@ -1,8 +1,8 @@
 import unittest
 import os
 # # Kalau mau run tanpa harus dari root (tetep dalam /StorageManager)
-# import sys
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import shutil
 from StorageManager.classes import StorageManager, DataWrite, DataRetrieval, DataDeletion, Condition, ConditionGroup
 from StorageManager.HashIndex import Hash
@@ -76,9 +76,8 @@ class TestStorageManager(unittest.TestCase):
 
     def test_index(self):
         # Contoh set_index dan get_index
-        # for future reference, 'Student' gabisa tetapi 'student' bisa => kenapa?
-        self.manager.set_index("student", "name", 'hash')
-        self.assertEqual(self.manager.get_index("student", "name"), 'hash')
+        self.manager.set_index("Student", "name", 'hash') # Perlu comment code bagian error lain biar set_index jalan
+        self.assertEqual(self.manager.get_index("Student", "name"), 'hash') # AssertionError: None != 'hash'?
 
 
 class TestHashIndex(unittest.TestCase):
