@@ -264,7 +264,7 @@ class StorageManager:
         return results
         
     def write_block_to_disk(self, data_write: DataWrite) -> int:
-        """Writes blocks straight to disk.
+        """Writes blocks straight to disk. Automatically syncs index
 
         Args:
             data_write (DataWrite): Data to write
@@ -322,7 +322,7 @@ class StorageManager:
         return num_updated
 
     def write_block(self, data_write: DataWrite) -> int:
-        """Writes to buffer
+        """Writes to buffer. Automatically syncs index
 
         Args:
             data_write (DataWrite): Data to write
@@ -382,7 +382,7 @@ class StorageManager:
         return num_updated
     
     def delete_block_to_disk(self, data_deletion: DataDeletion) -> int:
-        """Deletes block in disk
+        """Deletes block in disk. Automatically syncs index
 
         Args:
             data_deletion (DataDeletion): Data to delete
@@ -412,7 +412,7 @@ class StorageManager:
         return total_deleted
     
     def delete_block(self, data_deletion: DataDeletion) -> int:
-        """Deletes blocks, putting blocks in buffer
+        """Deletes blocks, putting blocks in buffer. Automatically syncs index
 
         Args:
             data_deletion (DataDeletion): Data to delete
@@ -437,8 +437,7 @@ class StorageManager:
                     self.delete_all_column_with_hash(table, self.get_all_relations(table), row, block_id)
                 if not new_block:
                     new_block = None
-                self.buffer.put_buffer(block_id, new_block)
-                
+                self.buffer.put_buffer(table, block_id, new_block)
         return total_deleted
     
     def get_stats(self) -> Dict[str, Statistic]:
@@ -500,7 +499,7 @@ class StorageManager:
                 return True
         return False
     
-    def get_all_relations(self):
+    def get_all_relations(self) -> List[str]:
         """Get all relations in the data."""
         relations = []
         helper_classes = ['Condition', 'ConditionGroup', 'DataDeletion', 'DataRetrieval', 'DataWrite', 'Statistic']
@@ -509,7 +508,7 @@ class StorageManager:
                 relations.append(name)
         return relations
 
-    def get_all_attributes(self, relation: str):
+    def get_all_attributes(self, relation: str) -> List[str]:
         """Get all attributes in the relation."""
         cls = globals()[relation]
         init_method = getattr(cls, "__init__", None)
@@ -529,7 +528,7 @@ class StorageManager:
         """Check if the attribute is in the relation."""
         return attribute in self.get_all_attributes(relation)
 
-    def set_index(self, table: str, column: str, index_type: str):
+    def set_index(self, table: str, column: str, index_type: str) -> None:
         if index_type != "hash" and index_type != "B+":
             raise ValueError("Index yang digunakan adalah hash index.")
         
@@ -555,10 +554,28 @@ class StorageManager:
         else:
             raise NotImplementedError("B+ Not Implemented")
         
-    def read_block_with_hash(self, table: str, column: str, value):
+    def read_block_with_hash(self, table: str, column: str, value) -> List[Dict]:
+        """Get every row in table.column with column equals value
+
+        Args:
+            table (str): Table name
+            column (str): Column name
+            value (_type_): Value to search
+
+        Returns:
+            List[Dict]: All rows with column = value
+        """
         return Hash._get_rows(table, column, value)
     
-    def delete_all_column_with_hash(self, table: str, changed_columns: List[str], old_values: Dict, old_block_id: int):
+    def delete_all_column_with_hash(self, table: str, changed_columns: List[str], old_values: Dict, old_block_id: int) -> None:
+        """Do NOT call from outside this module. Helper function to delete hash 
+
+        Args:
+            table (str): Table name
+            changed_columns (List[str]): Changed columns
+            old_values (Dict): Old values
+            old_block_id (int): Old block id to remove from hash
+        """
         for column in changed_columns:
             hash_exist = False
             for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
@@ -569,7 +586,15 @@ class StorageManager:
                 continue
             Hash._delete_row(table, column, old_block_id, old_values[column])
     
-    def update_all_column_with_hash(self, table: str, changed_columns: List[str], new_values: Dict, new_block_id: int):
+    def update_all_column_with_hash(self, table: str, changed_columns: List[str], new_values: Dict, new_block_id: int) -> None:
+        """Do NOT call from outside this module. Helper function to update hash
+
+        Args:
+            table (str): Table name
+            changed_columns (List[str]): Changed columns
+            new_values (Dict): New values
+            new_block_id (int): New block id to add
+        """
         for column in changed_columns:
             hash_exist = False
             for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
@@ -580,7 +605,16 @@ class StorageManager:
                 continue
             Hash._write_row(table, column, new_block_id, new_values[column])
     
-    def delete_all_column_with_hash_to_disk(self, table: str, changed_columns: List[str], old_values: Dict, old_block_id: int):
+    def delete_all_column_with_hash_to_disk(self, table: str, changed_columns: List[str], old_values: Dict, old_block_id: int) -> None:
+        """Do NOT call from outside this module. 
+        Helper function to delete hash directly from disk
+
+        Args:
+            table (str): Table name
+            changed_columns (List[str]): Changed columns
+            old_values (Dict): Old values
+            old_block_id (int): Old block id to delete 
+        """
         for column in changed_columns:
             hash_exist = False
             for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
@@ -591,7 +625,16 @@ class StorageManager:
                 continue
             Hash._delete_row_to_disk(table, column, old_block_id, old_values[column])
     
-    def update_all_column_with_hash_to_disk(self, table: str, changed_columns: List[str], new_values: Dict, new_block_id: int):
+    def update_all_column_with_hash_to_disk(self, table: str, changed_columns: List[str], new_values: Dict, new_block_id: int) -> None:
+        """Do NOT call from outside this module.
+        Helper function to update hash directly from disk.
+
+        Args:
+            table (str): Table name
+            changed_columns (List[str]): Changed columns
+            new_values (Dict): New values
+            new_block_id (int): New block id to add
+        """
         for column in changed_columns:
             hash_exist = False
             for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
@@ -602,13 +645,31 @@ class StorageManager:
                 continue
             Hash._write_row_to_disk(table, column, new_block_id, new_values[column])
                    
-    def read_block_with_hash(self, table: str, column: str, value):
+    def read_block_with_hash(self, table: str, column: str, value) -> List[Dict]:
+        """Get every row from table.column with column = value
+
+        Args:
+            table (str): Table name
+            column (str): Column name
+            value (_type_): Value to search
+
+        Returns:
+            List[Dict]: Every row that have column = value
+        """
         return Hash._get_rows(table, column, value)
     
-    def write_block_with_hash(self, table: str, column: str, value, new_block_id: int):
+    def write_block_with_hash(self, table: str, column: str, value, new_block_id: int) -> None:
+        """Do NOT call from outside this module.
+        Helper function to update hash 
+
+        Args:
+            table (str): Table name
+            column (str): Column name
+            value (_type_): Value to update
+            new_block_id (int): New block id to add
+        """
         Hash._write_row(table, column, new_block_id, value)
         
-    
     def _evaluate_condition(self, row: Dict, condition: Condition):
         value = row[condition.column]
         operand = condition.operand

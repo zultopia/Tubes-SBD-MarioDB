@@ -1,3 +1,7 @@
+# Kalau mau run tanpa harus dari root (tetep dalam /StorageManager)
+# import sys
+# import os
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from StorageManager.classes import ConditionGroup, StorageManager, DataRetrieval, DataWrite, DataDeletion, Condition
 from FailureRecoveryManager.Buffer import Buffer
 
