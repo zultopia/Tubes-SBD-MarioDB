@@ -131,7 +131,3 @@ class Hash(object):
     @staticmethod
     def _initiate_block(table: str, column: str):
         Hash._save_hash_block(table, column, 0, 0, [])
-        
-    
-    
-    
