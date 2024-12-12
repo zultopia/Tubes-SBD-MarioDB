@@ -422,7 +422,7 @@ class StorageManager:
                 total_deleted += len(block) - len(new_block)
                 if not new_block:
                     new_block = None
-                self.buffer.put_buffer(block_id, new_block)
+                self.buffer.put_buffer(table,block_id, new_block)
         return total_deleted
     
     def get_stats(self) -> Dict[str, Statistic]:

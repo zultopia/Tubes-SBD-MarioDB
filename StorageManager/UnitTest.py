@@ -3,16 +3,25 @@ import os
 import shutil
 from StorageManager.classes import StorageManager, DataWrite, DataRetrieval, DataDeletion, Condition, ConditionGroup
 from StorageManager.HashIndex import Hash
+from FailureRecoveryManager.Buffer import Buffer
 
 class TestStorageManager(unittest.TestCase):
     def setUp(self):
-        self.manager = StorageManager()
-        self.manager.data = {
-            "Student": [
-                {"StudentID": 1, "FullName": "Alice", "GPA": 3.5},
-                {"StudentID": 2, "FullName": "Bob", "GPA": 3.8},
-            ]
-        }
+        self.manager = StorageManager(Buffer(100))
+        write_student = DataWrite(
+            table="Student", 
+            columns=["id", "name", "dept_name"], 
+            new_values=[1, "Alice", "Computer Science"], 
+            level="table"
+        )
+        write_student2 = DataWrite(
+            table="Student", 
+            columns=["id", "name", "dept_name"], 
+            new_values=[2, "Bobiii", "Mathematics"], 
+            level="table"
+        )
+        self.manager.write_block_to_disk(write_student)
+        self.manager.write_block_to_disk(write_student2)
 
     def test_read_block(self):
         conditions = [Condition("GPA", ">", 3.6)]
@@ -27,11 +36,12 @@ class TestStorageManager(unittest.TestCase):
         self.assertEqual(self.manager.data["Student"][0]["GPA"], 4.0)
 
     def test_delete_block(self):
-        data_deletion = DataDeletion("Student", [Condition("GPA", "<", 3.6)])
+        data_deletion = DataDeletion("Student", ConditionGroup([Condition("name", "=", "Bobiii")]), "row")
         removed = self.manager.delete_block(data_deletion)
         self.assertEqual(removed, 1)
-        self.assertEqual(len(self.manager.data["Student"]), 1)
-    
+        # self.assertEqual(len(self.manager.read_block(DataRetrieval("Student","id", ConditionGroup(Condition("id", ">", 0)), "", "row" ))), 1)
+        retrieved = self.manager.read_block(DataRetrieval("Student", ["id"], ConditionGroup([Condition("name", "=", "Bobiii")], "AND"), "sequential", "row"))
+        self.assertEqual(len(retrieved), 0)
     def test_write_block_with_logging(self):
         data_write = DataWrite("Student", ["GPA"], [4.0], [Condition("StudentID", "=", 1)])
         self.manager.write_block(data_write)
@@ -51,7 +61,7 @@ class TestHashIndex(unittest.TestCase):
         
         Hash.change_config(DATA_DIR=self.test_data_dir, HASH_DIR=self.test_hash_dir)
         
-        self.manager = StorageManager()
+        self.manager = StorageManager(Buffer(100))
         
         write_student = DataWrite(
             table="Student", 
@@ -73,7 +83,20 @@ class TestHashIndex(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.test_data_dir)
-
+    
+    def test_hash_read(self):
+        """
+        Test hash index read functionality
+        1. Read a record using hash index
+        2. Verify the record is retrieved correctly
+        """
+        retrieved_records = self.manager.read_block_with_hash("Student", "id", 1)
+        
+        self.assertEqual(len(retrieved_records), 1)
+        self.assertEqual(retrieved_records[0]["id"], 1)
+        self.assertEqual(retrieved_records[0]["name"], "Alice")
+        self.assertEqual(retrieved_records[0]["dept_name"], "Computer Science")
+        
     def test_hash_write(self):
         """
         Test hash index write functionality
