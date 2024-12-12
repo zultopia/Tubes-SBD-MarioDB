@@ -1,5 +1,8 @@
 import unittest
 import os
+# # Kalau mau run tanpa harus dari root (tetep dalam /StorageManager)
+# import sys
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import shutil
 from StorageManager.classes import StorageManager, DataWrite, DataRetrieval, DataDeletion, Condition, ConditionGroup
 from StorageManager.HashIndex import Hash
@@ -50,6 +53,33 @@ class TestStorageManager(unittest.TestCase):
         self.assertIn("old_new_values", last_log["details"])
         self.assertEqual(last_log["details"]["old_new_values"][0]["old"]["GPA"], 3.5)
         self.assertEqual(last_log["details"]["old_new_values"][0]["new"]["GPA"], 4.0)
+
+    def test_schema(self):
+        all_relation = self.manager.get_all_relations()
+        self.assertEqual(['Advisor', 'Classroom', 'Course', 'Department', 'Instructor', 'Prerequisite', 'Section', 'Student', 'Takes', 'Teaches', 'TimeSlot'], all_relation)
+        expected_attributes = {
+            'Advisor': ['s_id', 'i_id'],
+            'Classroom': ['building', 'room_number', 'capacity'],
+            'Course': ['course_id', 'title', 'dept_name', 'credits'],
+            'Department': ['dept_name', 'building', 'budget'],
+            'Instructor': ['id', 'name', 'dept_name', 'salary'],
+            'Prerequisite': ['course_id', 'prereq_id'],
+            'Section': ['course_id', 'sec_id', 'semester', 'year', 'building', 'room_number', 'time_slot_id'],
+            'Student': ['id', 'name', 'dept_name', 'tot_cred'],
+            'Takes': ['id', 'course_id', 'sec_id', 'semester', 'year', 'grade'],
+            'Teaches': ['id', 'course_id', 'sec_id', 'semester', 'year'],
+            'TimeSlot': ['time_slot_id', 'day', 'start_time', 'end_time']
+        }
+        for relation, attributes in expected_attributes.items():
+            with self.subTest(relation=relation):
+                self.assertEqual(attributes, self.manager.get_all_attributes(relation))
+
+    def test_index(self):
+        # Contoh set_index dan get_index
+        # for future reference, 'Student' gabisa tetapi 'student' bisa => kenapa?
+        self.manager.set_index("student", "name", 'hash')
+        self.assertEqual(self.manager.get_index("student", "name"), 'hash')
+
 
 class TestHashIndex(unittest.TestCase):
     def setUp(self):
@@ -145,3 +175,4 @@ class TestHashIndex(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
