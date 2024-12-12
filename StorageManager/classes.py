@@ -155,6 +155,7 @@ class StorageManager:
         os.makedirs(self.DATA_DIR, exist_ok=True)
         os.makedirs(os.path.join(self.DATA_DIR, self.HASH_DIR), exist_ok=True)
         self.buffer = buffer
+        Hash.change_config(buffer=buffer)
         self.indexes = {}
         self.logs = self._load_logs()
         self.action_logs = []
@@ -286,13 +287,14 @@ class StorageManager:
                 if len(block) < self.BLOCK_SIZE:
                     block.append(dict_new_values)
                     self._save_block(table, block_id, block)
-                    self.update_all_column_with_hash(table, columns, dict_new_values, block_id)
+                    self.update_all_column_with_hash_to_disk(table, columns, dict_new_values, block_id)
                     return 1
             # If no space, create a new block
             new_block_id = max(blocks, default=-1) + 1
             new_block = [dict_new_values]
             self._save_block(table, new_block_id, new_block)
-            self.update_all_column_with_hash(table, columns, dict_new_values, new_block_id)
+            self.update_all_column_with_hash_to_disk(table, columns, dict_new_values, new_block_id)
+            # self.update_all_column_with_hash(table, columns, dict_new_values, new_block_id)
             self.log_action("write", table, {"block_id": new_block_id, "data": new_values})
             return 1
         # update operation 
@@ -308,9 +310,9 @@ class StorageManager:
                     data_changed = True
                     new_row = row
                     for column, new_value in dict_new_values.items():
-                        self.delete_all_column_with_hash(table, [column], {column: row[column]}, block_id)
+                        self.delete_all_column_with_hash_to_disk(table, [column], {column: row[column]}, block_id)
                         new_row[column] = new_value
-                        self.update_all_column_with_hash(table, [column], {column: new_row[column]}, block_id)
+                        self.update_all_column_with_hash_to_disk(table, [column], {column: new_row[column]}, block_id)
                     new_block.append(new_row)
                     num_updated += 1
                 else:
@@ -344,11 +346,16 @@ class StorageManager:
                 if len(block) < self.BLOCK_SIZE:
                     block.append(dict_new_values)
                     self.buffer.put_buffer(table, block_id, block)
+                    self.update_all_column_with_hash(table, columns, dict_new_values, block_id)
                     return 1
             # If no space, create a new block
             new_block_id = max(blocks, default=-1) + 1
             new_block = [dict_new_values]
+            
             self.buffer.put_buffer(table, new_block_id, new_block)
+            self.update_all_column_with_hash(table, columns, dict_new_values, new_block_id)
+            # give clue it exists
+            self._save_block(table, new_block_id, [])
             return 1
         # update operation 
         num_updated = 0
@@ -363,7 +370,9 @@ class StorageManager:
                     data_changed = True
                     new_row = row
                     for column, new_value in dict_new_values.items():
+                        self.delete_all_column_with_hash(table, [column], {column: row[column]}, block_id)
                         new_row[column] = new_value
+                        self.update_all_column_with_hash(table, [column], {column: new_row[column]}, block_id)
                     new_block.append(new_row)
                     num_updated += 1
                 else:
@@ -393,10 +402,13 @@ class StorageManager:
                     block = self._load_block(table, block_id)
                 new_block = [row for row in block if not self._evaluate_conditions(row, conditions)]
                 total_deleted += len(block) - len(new_block)
+                deleted_block = [row for row in block if row not in new_block]
+                for row in deleted_block:
+                    self.delete_all_column_with_hash_to_disk(table, self.get_all_relations(table), row, block_id)
                 if not new_block:
                     new_block = None
                 self._save_block(table, block_id, new_block)
-                self.delete_all_column_with_hash(table, self.get_all_attributes(table), block, block_id)
+                # self.delete_all_column_with_hash(table, self.get_all_attributes(table), block, block_id)
         return total_deleted
     
     def delete_block(self, data_deletion: DataDeletion) -> int:
@@ -420,9 +432,13 @@ class StorageManager:
                     block = self._load_block(table, block_id)
                 new_block = [row for row in block if not self._evaluate_conditions(row, conditions)]
                 total_deleted += len(block) - len(new_block)
+                deleted_block = [row for row in block if row not in new_block]
+                for row in deleted_block:
+                    self.delete_all_column_with_hash(table, self.get_all_relations(table), row, block_id)
                 if not new_block:
                     new_block = None
                 self.buffer.put_buffer(block_id, new_block)
+                
         return total_deleted
     
     def get_stats(self) -> Dict[str, Statistic]:
@@ -437,7 +453,9 @@ class StorageManager:
                 parts = file.split("__block__")
                 table_name = parts[0]
                 block_id = int(parts[1].split(".")[0])
-                block = self._load_block(table_name, block_id)
+                block = self.buffer.get_buffer(table_name, block_id)
+                if not block: 
+                    block = self._load_block(table_name, block_id)
                 if table_name not in stats:
                     stats[table_name] = {
                         "n_r": 0, 
@@ -528,12 +546,17 @@ class StorageManager:
             for file in os.listdir(self.DATA_DIR):
                 if file.startswith(f"{table}"):
                     block_id = int(file.split('__')[-1].split('.')[0])
-                    block = self._load_block(table, block_id)
+                    block = self.buffer.get_buffer(table, block_id)
+                    if not block:
+                        self._load_block(table, block_id)
                     for row in block:
                         self.write_block_with_hash(table, column, row[column], block_id)
             print(f"Hash index dibuat pada {table}.{column}")
         else:
             raise NotImplementedError("B+ Not Implemented")
+        
+    def read_block_with_hash(self, table: str, column: str, value):
+        return Hash._get_rows(table, column, value)
     
     def delete_all_column_with_hash(self, table: str, changed_columns: List[str], old_values: Dict, old_block_id: int):
         for column in changed_columns:
@@ -556,12 +579,35 @@ class StorageManager:
             if not hash_exist:
                 continue
             Hash._write_row(table, column, new_block_id, new_values[column])
+    
+    def delete_all_column_with_hash_to_disk(self, table: str, changed_columns: List[str], old_values: Dict, old_block_id: int):
+        for column in changed_columns:
+            hash_exist = False
+            for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
+                if file.startswith(f"{table}__{column}__hash"):
+                    hash_exist = True
+                    break
+            if not hash_exist:
+                continue
+            Hash._delete_row_to_disk(table, column, old_block_id, old_values[column])
+    
+    def update_all_column_with_hash_to_disk(self, table: str, changed_columns: List[str], new_values: Dict, new_block_id: int):
+        for column in changed_columns:
+            hash_exist = False
+            for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
+                if file.startswith(f"{table}__{column}__hash"):
+                    hash_exist = True
+                    break
+            if not hash_exist:
+                continue
+            Hash._write_row_to_disk(table, column, new_block_id, new_values[column])
                    
     def read_block_with_hash(self, table: str, column: str, value):
         return Hash._get_rows(table, column, value)
     
     def write_block_with_hash(self, table: str, column: str, value, new_block_id: int):
         Hash._write_row(table, column, new_block_id, value)
+        
     
     def _evaluate_condition(self, row: Dict, condition: Condition):
         value = row[condition.column]

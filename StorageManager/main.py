@@ -57,12 +57,12 @@ if __name__ == "__main__":
         conditions=ConditionGroup([Condition("name", "=", "Eve")], logic_operator="AND"),
         level="row"
     )
-    manager.write_block(write_action)
-    
+    rows_affected = manager.write_block(write_action)
+    print("ROWS AFFECTED", rows_affected)
     results = manager.read_block(read_action)
     print("RESULT AFTER UPDATING", results)
     
-    data = manager.read_block_with_hash("student", "name", "EVA")
+    data = manager.read_block_with_hash("student", "name", "EvA")
     print("HASH AFTER UPDATING", data)
     
     # results = manager.delete_block(delete_action)
