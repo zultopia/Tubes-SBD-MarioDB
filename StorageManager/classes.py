@@ -262,7 +262,7 @@ class StorageManager:
                         results.append({col: row[col] for col in columns})
         return results
         
-    def write_block_to_disk(self, table: str, block_id: int, block_data: Dict) -> int:
+    def write_block_to_disk(self, table: str, block_id: int, block_data: List[Dict]) -> int:
         """Writes blocks straight to disk. Automatically syncs index
 
         Args:
