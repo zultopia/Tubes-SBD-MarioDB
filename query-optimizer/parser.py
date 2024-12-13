@@ -309,7 +309,7 @@ class SQLGrammar:
 
 def parse(query_string) -> ParseTree:
     tokens = Lexer(query_string).tokenize()
-    # print(tokens)
+    #print(tokens)
     SQL_grammar = SQLGrammar(tokens)
     parse_tree = SQL_grammar.Query()
     return parse_tree

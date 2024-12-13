@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 
 from data import QOData
 from ..base import QueryNode
+from .constants import *
 from ..enums import NodeType
 from data import QOData
 from query_plan.nodes.constants import BLOCK_SIZE
@@ -97,7 +98,10 @@ class ProjectNode(QueryNode):
 
 
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
-        return self.child.estimate_cost()
+        self.estimate_size()
+
+        previous_cost = self.child.estimate_cost()
+        return previous_cost + self.b * t_T
 
 
     def __str__(self) -> str:
