@@ -146,7 +146,7 @@ class SelectionNode(QueryNode):
 class UnionSelectionNode(QueryNode):
     def __init__(self, children: List['SelectionNode']):
         super().__init__(NodeType.UNION_SELECTION)
-        self.children = children  # List of SelectionNode instances
+        self.children: List['SelectionNode'] = children  # List of SelectionNode instances
         self._cached_attributes: Optional[List[str]] = None  # Cache for attributes
 
     def set_child_to_all(self, child: QueryNode):
@@ -160,11 +160,28 @@ class UnionSelectionNode(QueryNode):
         cloned_node.id = self.id
         return cloned_node
 
-    def estimate_size(self, statistics: Dict) -> float:
-        pass
+    def estimate_size(self, statistics: Dict, alias_dict) -> float:
+        assert (len(self.children) > 0)
+        
+        self.n = 0
+        for selection_node in self.children:
+            selection_node.estimate_size()
+            self.n += selection_node.n
+        
+        self.b = self.children[0].b
 
-    def estimate_cost(self, statistics: Dict) -> float:
-        pass
+        self.attributes = self.children[0].attributes
+
+
+
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        # No IO cost
+        self.estimate_size()
+        previous_cost = 0
+        for seletion_node in self.children:
+            previous_cost += seletion_node.estimate_cost()
+
+        return previous_cost + self.b * t_T
 
     def _calculate_operation_cost(self, statistics: Dict) -> float:
         # Placeholder for actual cost calculation

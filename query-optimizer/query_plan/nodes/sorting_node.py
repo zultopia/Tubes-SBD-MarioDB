@@ -1,6 +1,7 @@
 from typing import List, Dict, Optional
 from ..base import QueryNode
 from ..enums import NodeType
+from .constants import *
 import uuid
 from utils import Pair
 
@@ -27,14 +28,18 @@ class SortingNode(QueryNode):
             return
         self.child.estimate_size()
 
-        # Todo: Ganti ID Kl perlu (?)
         self.attributes = self.child.attributes
         self.n = self.child.n
         self.b = self.child.b
 
+
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
         # Sorting tidak memakan IO
-        return self.child.estimate_cost()
+        
+        self.estimate_size()
+        previous_cost = self.child.estimate_cost()
+
+        return previous_cost + self.b * t_T
 
     def __str__(self) -> str:
         order = "ASC" if self.ascending else "DESC"
