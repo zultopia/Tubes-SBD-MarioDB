@@ -30,7 +30,6 @@ class SelectionNode(QueryNode):
     def estimate_size(self, statistics: Dict, alias_dict):
         if not self.child:
             return
-        # self.child.estimate_size()
         self.child.estimate_size(statistics, alias_dict)
 
         self.attributes = self.child.attributes
@@ -57,9 +56,9 @@ class SelectionNode(QueryNode):
 
 
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
-        self.estimate_size()
+        self.estimate_size(statistics, alias_dict)
 
-        previous_cost = self.child.estimate_cost()
+        previous_cost = self.child.estimate_cost(statistics, alias_dict)
 
         is_index = False
         for condition in self.conditions:
@@ -180,7 +179,7 @@ class UnionSelectionNode(QueryNode):
 
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
         # No IO cost
-        self.estimate_size()
+        self.estimate_size(statistics, alias_dict)
         previous_cost = 0
         for seletion_node in self.children:
             previous_cost += seletion_node.estimate_cost()

@@ -38,8 +38,8 @@ class SortingNode(QueryNode):
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
         # Sorting tidak memakan IO
         
-        self.estimate_size()
-        previous_cost = self.child.estimate_cost()
+        self.estimate_size(statistics, alias_dict)
+        previous_cost = self.child.estimate_cost(statistics, alias_dict)
 
         return previous_cost + self.b * t_T
 
