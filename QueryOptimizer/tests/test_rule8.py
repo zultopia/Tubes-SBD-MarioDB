@@ -49,10 +49,10 @@ class TestOptimizerRule8:
         project_course = ProjectNode(["title", "course_id"])
         project_course.set_child(course2)
         
-        project_section = ProjectNode(["course_id", "building"])
+        project_section = ProjectNode(["course_id", "building", "room_no"])
         project_section.set_child(section2)
         
-        project_classroom = ProjectNode(["building", "room_no"])
+        project_classroom = ProjectNode(["building"])
         project_classroom.set_child(classroom2)
         
         join1_2 = ConditionalJoinNode(JoinAlgorithm.HASH, [
@@ -70,6 +70,16 @@ class TestOptimizerRule8:
         plans = generate_possible_plans(original_plan, [
             EquivalenceRules.push_projections_into_join
         ])
+
+        # print("Original plan:")
+        # print(original_plan)
+
+        # print("Expected plan:")
+        # print(expected_plan)
+
+        # print("Generated plans:")
+        # print(plans)
+
 
         
         assert any(p == expected_plan for p in plans), "Course-Section-Classroom projection distribution should exist"
