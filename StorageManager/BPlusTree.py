@@ -54,22 +54,35 @@ class BPlusTreeNode:
             for child in self.children:
                 child.parent = next
             next.children = self.children + next.children
-        else:
-            prev = self.parent.children[-2]
-            prev.keys += [self.parent.keys[-1]] + self.keys
-            for child in self.children:
-                child.parent = prev
-            prev.children += self.children
+            return
+        prev = self.parent.children[-2]
+        prev.keys += [self.parent.keys[-1]] + self.keys
+        for child in self.children:
+            child.parent = prev
+        prev.children += self.children
             
     def take(self, min: int):
         self_index = self.parent.get(self.keys[0])
+        if self_index >= len(self.parent.keys) and self_index != 0:
+            return False
         if self_index < len(self.parent.keys):
             next: BPlusTreeNode = self.parent.children[self_index + 1]
             if len(next.keys) > min:
                 self.keys += [self.parent.keys[self_index]]
                 key_taken = next.children.pop(0)
                 key_taken.parent = self
-
+                self.children += [key_taken]
+                self.parent.keys[self_index] = next.keys.pop(0)
+        elif self_index != 0:
+            prev: BPlusTreeNode = self.parent.children[self_index - 1]
+            if len(prev.keys) > min:
+                self.keys = [self.parent.keys[self_index - 1]] + self.keys
+                key_taken = prev.children.pop()
+                key_taken.parent = self
+                self.children = [key_taken] + self.children
+                self.parent.keys[self_index - 1] = prev.keys.pop()
+        return True
+        
 class BPlusTree:
     def __init__(self, degree):
         self.root = BPlusTreeNode(is_leaf=True)
