@@ -79,7 +79,7 @@ class ProjectNode(QueryNode):
     def estimate_size(self, statistics: Dict, alias_dict):
         if not self.child:
             return
-        self.child.estimate_size()
+        self.child.estimate_size(statistics, alias_dict)
 
 
         self.attributes = []
@@ -93,16 +93,17 @@ class ProjectNode(QueryNode):
 
         record_size = 0
         for i in self.child.attributes:
-            attribute, alias = i.first, i.second
+            attribute, alias = i[0], i[1]
+            assert(alias in alias_dict)
             table = alias_dict[alias]
             record_size += QOData().get_size(attribute, table)
         self.b = int(BLOCK_SIZE / record_size)
 
 
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
-        self.estimate_size()
+        self.estimate_size(statistics, alias_dict)
 
-        previous_cost = self.child.estimate_cost()
+        previous_cost = self.child.estimate_cost(statistics, alias_dict)
         return previous_cost + self.b * t_T
 
 

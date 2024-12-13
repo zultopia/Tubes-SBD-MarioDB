@@ -27,7 +27,7 @@ class LimitNode(QueryNode):
         # n dan b tidak perlu dihitung karena itu step akhir
 
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
-        self.estimate_size()
+        self.estimate_size(statistics, alias_dict)
 
         previous_cost = self.child.estimate_cost()
         

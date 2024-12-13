@@ -33,11 +33,11 @@ class QueryPlan(Prototype):
                 
                 if isinstance(node.children, QueryNode):
                     dfs(node.children)
-                elif isinstance(node.children, Pair[QueryNode, QueryNode]):
+                elif isinstance(node.children, Pair):
                     dfs(node.children.first)
                     dfs(node.children.second)
                 else:
-                    assert (isinstance(node.children, List[QueryNode]))
+                    # assert (isinstance(node.children, List[QueryNode]))
                     for i in node.children:
                         dfs(i)
         

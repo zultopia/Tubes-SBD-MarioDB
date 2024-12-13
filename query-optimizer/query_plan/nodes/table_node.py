@@ -34,7 +34,7 @@ class TableNode(QueryNode):
 
 
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
-        self.estimate_size()
+        self.estimate_size(statistics, alias_dict)
         return 0
 
     def __str__(self) -> str:

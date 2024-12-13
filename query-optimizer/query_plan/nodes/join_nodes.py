@@ -76,12 +76,12 @@ class ConditionalJoinNode(JoinNode):
         return cloned_node
 
     def estimate_size(self, statistics: Dict, alias_dict):
-        assert (isinstance(self.children, Pair[QueryNode, QueryNode]))
+        assert (isinstance(self.children, Pair))
         
         left: QueryNode = self.children.first
         right: QueryNode = self.children.second
-        left.estimate_size()
-        right.estimate_size()
+        left.estimate_size(statistics, alias_dict)
+        right.estimate_size(statistics, alias_dict)
 
         
         left_attributes = left.attributes
@@ -111,12 +111,12 @@ class ConditionalJoinNode(JoinNode):
 
 
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
-        self.estimate_size()
+        self.estimate_size(statistics, alias_dict)
 
         left: QueryNode = self.children.first
         right: QueryNode = self.children.second
 
-        previous_cost = left.estimate_cost() + right.estimate_cost()
+        previous_cost = left.estimate_cost(statistics, alias_dict) + right.estimate_cost(statistics, alias_dict)
 
         
         if self.algorithm == JoinAlgorithm.NESTED_LOOP:
@@ -184,8 +184,8 @@ class NaturalJoinNode(JoinNode):
         
         left: QueryNode = self.children.first
         right: QueryNode = self.children.second
-        left.estimate_size()
-        right.estimate_size()
+        left.estimate_size(statistics, alias_dict)
+        right.estimate_size(statistics, alias_dict)
 
         left_attributes = left.attributes
         right_attributes = right.attributes
@@ -232,12 +232,12 @@ class NaturalJoinNode(JoinNode):
         self.b = int(1 / (1 / left.b + 1 / right.b))
 
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
-        self.estimate_size()
+        self.estimate_size(statistics, alias_dict)
 
         left: QueryNode = self.children.first
         right: QueryNode = self.children.second
 
-        previous_cost = left.estimate_cost() + right.estimate_cost()
+        previous_cost = left.estimate_cost(statistics, alias_dict) + right.estimate_cost(statistics, alias_dict)
 
         left_attributes = left.attributes
         right_attributes = right.attributes

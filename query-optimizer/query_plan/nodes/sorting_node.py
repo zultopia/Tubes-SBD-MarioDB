@@ -27,7 +27,8 @@ class SortingNode(QueryNode):
     def estimate_size(self, statistics: Dict, alias_dict):
         if not self.child:
             return
-        self.child.estimate_size()
+        # self.child.estimate_size()
+        self.child.estimate_size(statistics, alias_dict)
 
         self.attributes = self.child.attributes
         self.n = self.child.n

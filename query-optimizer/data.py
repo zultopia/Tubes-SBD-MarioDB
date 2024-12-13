@@ -1,6 +1,8 @@
 import math
 from typing import Literal, Union
 
+from query_plan.nodes.constants import BLOCK_SIZE
+
 
 
 MOCK_DATA = {
@@ -170,7 +172,7 @@ class QOData:
         record_size = sum(attr['size'] for attr in self.data[relation]['attributes'].values())
         
         # Calculate blocking factor (records per block)
-        bfr = self.BLOCK_SIZE // record_size
+        bfr = BLOCK_SIZE // record_size
         
         # Calculate number of blocks needed (ceiling division)
         num_tuples = self.data[relation]['n']

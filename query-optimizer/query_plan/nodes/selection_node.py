@@ -30,7 +30,8 @@ class SelectionNode(QueryNode):
     def estimate_size(self, statistics: Dict, alias_dict):
         if not self.child:
             return
-        self.child.estimate_size()
+        # self.child.estimate_size()
+        self.child.estimate_size(statistics, alias_dict)
 
         self.attributes = self.child.attributes
         self.n = self.child.n
@@ -168,7 +169,7 @@ class UnionSelectionNode(QueryNode):
         
         self.n = 0
         for selection_node in self.children:
-            selection_node.estimate_size()
+            selection_node.estimate_size(statistics, alias_dict)
             self.n += selection_node.n
         
         self.b = self.children[0].b
