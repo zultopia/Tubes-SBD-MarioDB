@@ -12,7 +12,6 @@ from FailureRecoveryManager.ExecutionResult import ExecutionResult
 from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
 from FailureRecoveryManager.Rows import Rows
 from StorageManager.classes import Condition, DataDeletion, DataWrite, StorageManager
-from ConcurrencyControlManager.utils import TransactionAction, Table, Row, Cell, PrimaryKey
 
 from .Buffer import Buffer
 
@@ -211,6 +210,7 @@ class FailureRecoveryManager:
         """
 
         self.timer = Timer(self._checkpoint_interval, self._run_checkpoint_cron_job)
+        self.timer.daemon = True
         self.timer.start()
 
     def _run_checkpoint_cron_job(self) -> None:
@@ -226,6 +226,7 @@ class FailureRecoveryManager:
             if self.timer:
                 self.timer.cancel()  # Cancel any existing timer
             self.timer = Timer(self._checkpoint_interval, self._run_checkpoint_cron_job)
+            self.timer.daemon = True
             self.timer.start()
 
         except Exception as e:
