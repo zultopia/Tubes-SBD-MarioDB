@@ -141,7 +141,7 @@ class Hash(object):
         # assumes entries fit in one block
         block = Hash.buffer.get_buffer(Hash._get_hash_buffer_block_file(table, column, hash_value), 0)
         if not block:
-            Hash._load_hash_block(table, column, hash_value, 0)
+            block = Hash._load_hash_block(table, column, hash_value, 0)
         new_block = []
         found = False
         for row in block:

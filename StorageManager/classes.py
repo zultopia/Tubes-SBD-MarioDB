@@ -277,6 +277,9 @@ class StorageManager:
         new_values = data_write.new_values
         conditions = data_write.conditions
         dict_new_values = dict(zip(columns, new_values))
+        for column_exist in self.get_all_attributes(table):
+            if column_exist not in dict_new_values.keys():
+                dict_new_values[column_exist] = None
         blocks = sorted(int(file.split('__')[-1].split('.')[0]) for file in os.listdir(self.DATA_DIR) if file.startswith(table))
         if not data_write.conditions:
             # add operation
@@ -336,6 +339,9 @@ class StorageManager:
         new_values = data_write.new_values
         conditions = data_write.conditions
         dict_new_values = dict(zip(columns, new_values))
+        for column_exist in self.get_all_attributes(table):
+            if column_exist not in dict_new_values.keys():
+                dict_new_values[column_exist] = None
         blocks = sorted(int(file.split('__')[-1].split('.')[0]) for file in os.listdir(self.DATA_DIR) if file.startswith(table))
         if not data_write.conditions:
             # add operation
@@ -403,8 +409,9 @@ class StorageManager:
                 new_block = [row for row in block if not self._evaluate_conditions(row, conditions)]
                 total_deleted += len(block) - len(new_block)
                 deleted_block = [row for row in block if row not in new_block]
+                print("DELETED BLOCK", deleted_block)
                 for row in deleted_block:
-                    self.delete_all_column_with_hash_to_disk(table, self.get_all_relations(table), row, block_id)
+                    self.delete_all_column_with_hash_to_disk(table, self.get_all_attributes(table), row, block_id)
                 if not new_block:
                     new_block = None
                 self._save_block(table, block_id, new_block)
@@ -434,7 +441,7 @@ class StorageManager:
                 total_deleted += len(block) - len(new_block)
                 deleted_block = [row for row in block if row not in new_block]
                 for row in deleted_block:
-                    self.delete_all_column_with_hash(table, self.get_all_relations(table), row, block_id)
+                    self.delete_all_column_with_hash(table, self.get_all_attributes(table), row, block_id)
                 if not new_block:
                     new_block = None
                 self.buffer.put_buffer(table, block_id, new_block)
@@ -485,11 +492,12 @@ class StorageManager:
             )
         return stats
     
-    def get_index(self, attribute: str, relation: str) -> Union[Literal["hash", "btree"], None]:
+    def get_index(self, relation: str, attribute: str) -> Union[Literal["hash", "btree"], None]:
         """Get the type of index on the given attribute in the relation."""
         for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
             if file.startswith(f"{relation}__{attribute}__hash"):
                 return "hash"
+            print(file)
         return None
     
     def has_index(self, attribute: str, relation: str) -> bool:
@@ -547,7 +555,8 @@ class StorageManager:
                     block_id = int(file.split('__')[-1].split('.')[0])
                     block = self.buffer.get_buffer(table, block_id)
                     if not block:
-                        self._load_block(table, block_id)
+                        block = self._load_block(table, block_id)
+                    print("IN SET INDEX", block)
                     for row in block:
                         self.write_block_with_hash(table, column, row[column], block_id)
             print(f"Hash index dibuat pada {table}.{column}")
@@ -671,6 +680,8 @@ class StorageManager:
         Hash._write_row(table, column, new_block_id, value)
         
     def _evaluate_condition(self, row: Dict, condition: Condition):
+        if condition.column not in row.keys() or row[condition.column] is None:
+            return False
         value = row[condition.column]
         operand = condition.operand
         operation = condition.operation
