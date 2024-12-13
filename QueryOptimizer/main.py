@@ -62,24 +62,24 @@ if current == 'gana':
     print ("Query is: ")
     print(query_string)
     tree = get_parse_tree(query_string)
-    print(tree)
     query_plan = from_parse_tree(tree)
-    print(query_plan)
-
-    plans = generate_possible_plans(query_plan)
 
     print("Initial plan:")
     print(query_plan)
-    print("\n\n\nGenerated plans:" + str(len(plans)))
+    print(query_plan.clone())
     
-    LIMIT_5 = min(len(plans), 20)
-    for plan in plans[:LIMIT_5]:
-        print(plan)
+    plans = generate_possible_plans(query_plan)
 
-        # Uncomment the below lines if you want to use the optimizer
-        # bf = BFOptimizer()
-        # bestPlan = bf.optimize(query_plan)
-        # bestPlan.print()
+    # print("\n\n\nGenerated plans:" + str(len(plans)))
+    
+    # LIMIT_5 = min(len(plans), 20)
+    # for plan in plans[:LIMIT_5]:
+    #     print(plan)
+
+    bf = BFOptimizer()
+    bestPlan = bf.optimize(query_plan)
+    print("\n\n\nBest plan:")
+    print(bestPlan)
         
     # except Exception as e:
         

@@ -4,9 +4,9 @@ import time
 from ConcurrencyControlManager.utils import *
 
 # Recovery Manager
-# from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
-# from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
-# from FailureRecoveryManager.Buffer import Buffer
+from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
+from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
+from FailureRecoveryManager.Buffer import Buffer
             
 class ConcurrencyControlManager:
     def __init__(self, algorithm: str):
@@ -22,8 +22,7 @@ class ConcurrencyControlManager:
         self.waiting_list : List[TransactionAction] = []
         self.tid = 0
         self.action_log: List[TransactionAction] = []
-        # Recovery Manager
-        # self.failure_recovery = FailureRecoveryManager(Buffer(5))
+        # self.failure_recovery = FailureRecoveryManager(Buffer(5),"./FailureRecoveryManager/log5.log")
     
     def __str__(self):
         return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"

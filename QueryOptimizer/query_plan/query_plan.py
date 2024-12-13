@@ -19,13 +19,22 @@ class QueryPlan(Prototype):
                              # For non-table expressions (result of joins, selections, projections, etc), it is assumed that there is no alias.
          
     def setup(self):
+        is_union = False
         def dfs(node: QueryNode):
+            nonlocal is_union
+            if isinstance(node, UnionSelectionNode):
+                is_union = True
             if node.child == None and node.children == None:
                 assert(isinstance(node, TableNode))
                 assert(node.alias != None and node.table_name != None)
+                if node.alias in self.alias_dict and not is_union:
+                    print("Conflict", node.alias)
+                    # 
+                    raise Exception("Aliases or Tables conflicts")
                 self.alias_dict[node.alias] = node.table_name
             elif node.child != None:
                 assert(node.children == None)
+                
                 dfs(node.child)
             else:
                 assert(node.child == None)
@@ -33,11 +42,11 @@ class QueryPlan(Prototype):
                 
                 if isinstance(node.children, QueryNode):
                     dfs(node.children)
-                elif isinstance(node.children, Pair[QueryNode, QueryNode]):
+                elif isinstance(node.children, Pair):
                     dfs(node.children.first)
                     dfs(node.children.second)
                 else:
-                    assert (isinstance(node.children, List[QueryNode]))
+                    # assert (isinstance(node.children, List[QueryNode]))
                     for i in node.children:
                         dfs(i)
         
@@ -54,6 +63,7 @@ class QueryPlan(Prototype):
         pass
 
     def estimate_cost(self, statistics: Dict) -> float:
+        self.setup()
         return self.root.estimate_cost(statistics, self.alias_dict)
     
 
