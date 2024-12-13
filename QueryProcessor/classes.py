@@ -247,7 +247,7 @@ class QueryProcessor:
         Field_node = ConditionTerm_node.childs[0]
         # jika tidak menggunakan alias
         if len(Field_node.childs) == 1:
-            table = next[iter(conditions)]
+            table = list(schema.keys())[0]
             column = Field_node.childs[0].root.value
         # jika menggunakan alias
         else:
@@ -270,7 +270,7 @@ class QueryProcessor:
         Field_node = ConditionTerm_node.childs[0]
         # jika tidak menggunakan alias
         if len(Field_node.childs) == 1:
-            table = next[iter(conditions)]
+            table = list(schema.keys())[0]
             column = Field_node.childs[0].root.value
         # jika menggunakan alias
         else:
