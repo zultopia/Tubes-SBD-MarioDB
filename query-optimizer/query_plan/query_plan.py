@@ -19,15 +19,22 @@ class QueryPlan(Prototype):
                              # For non-table expressions (result of joins, selections, projections, etc), it is assumed that there is no alias.
          
     def setup(self):
+        is_union = False
         def dfs(node: QueryNode):
+            nonlocal is_union
+            if isinstance(node, UnionSelectionNode):
+                is_union = True
             if node.child == None and node.children == None:
                 assert(isinstance(node, TableNode))
                 assert(node.alias != None and node.table_name != None)
-                if node.alias in self.alias_dict:
+                if node.alias in self.alias_dict and not is_union:
+                    print("Conflict", node.alias)
+                    # 
                     raise Exception("Aliases or Tables conflicts")
                 self.alias_dict[node.alias] = node.table_name
             elif node.child != None:
                 assert(node.children == None)
+                
                 dfs(node.child)
             else:
                 assert(node.child == None)
