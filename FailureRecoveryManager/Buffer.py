@@ -53,6 +53,24 @@ class Buffer:
             cache_key = (table_name, block_id)
             return self._buffer.get(cache_key)
 
+    def get_buffer_hash(
+        self, hashNumber: int, table_name: str, block_id: int, column: str
+    ) -> Union[any, None]:
+        """
+        Get a block from the buffer cache
+
+        Args:
+            table_name (str): The name of the table
+            block_id (int): The block ID
+
+        Returns:
+            any: The block data
+            None: If the block is not found in the buffer
+        """
+        with self._buffer_lock:
+            cache_key = (hashNumber, table_name, block_id, column)
+            return self._buffer.get(cache_key)
+
     def put_buffer(
         self, table_name: str, block_id: int, block_data: any
     ) -> Union[any, None]:
