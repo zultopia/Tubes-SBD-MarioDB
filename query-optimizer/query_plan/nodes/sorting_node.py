@@ -40,12 +40,34 @@ class SortingNode(QueryNode):
         order = "ASC" if self.ascending else "DESC"
         return f"SORT BY {', '.join(self.sort_attributes)} {order}"
 
-    def get_node_attributes(self) -> List[Pair[str, str]]:
-        """
-        Returns the list of attributes from the child node.
-        """
+    def get_node_attributes(self) -> List[str]:
+        print("IN SORTING NODE")
         if not self.child:
             raise ValueError("SortingNode has no child.")
-        if self._cached_attributes is None:
-            self._cached_attributes = self.child.get_node_attributes().copy()
-        return self._cached_attributes
+            
+        child_attrs = self.child.get_node_attributes()
+        
+        for attr in self.attributes:
+        
+            # Find matching attribute from child
+            unqualified_attr = attr
+            matching_attrs = [attr for attr in child_attrs if attr.split('.')[-1] == unqualified_attr]
+
+            print("IN SORTING NODE")
+            print(matching_attrs)
+            print(unqualified_attr)
+            
+            if len(matching_attrs) == 1:
+                # Single match - use its table alias
+                table_alias = matching_attrs[0].split('.')[0]
+                attr = f"{table_alias}.{unqualified_attr}"
+                
+            elif len(matching_attrs) == 2:
+                raise ValueError(f"Ambiguous attribute '{unqualified_attr}' found in child node attributes")
+                
+            elif len(matching_attrs) > 2:
+                raise ValueError(f"Too many matching attributes found for '{unqualified_attr}'")
+            else:
+                raise ValueError(f"Attribute '{unqualified_attr}' not found in child node attributes")
+        
+        return child_attrs

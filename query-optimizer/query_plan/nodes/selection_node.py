@@ -65,13 +65,65 @@ class SelectionNode(QueryNode):
         conditions_str = ' AND '.join([str(c) for c in self.conditions])
         return f"SELECT {conditions_str}"
 
-    def get_node_attributes(self) -> List[Pair[str, str]]:
-        """
-        Returns the list of attributes from the child node.
-        """
+    def get_node_attributes(self) -> List[str]:
         if not self.child:
             raise ValueError("SelectionNode has no child.")
-        return self.child.get_node_attributes()
+            
+        # Get attributes from child node (already in table.attr format)
+        child_attrs = self.child.get_node_attributes()
+        
+        # For each condition with constant comparison, match its attribute with child attributes
+        for condition in self.conditions:
+            if condition.is_constant_comparison():
+                # Find matching attribute from child
+                unqualified_attr = condition.left_attribute
+                matching_attrs = [attr for attr in child_attrs if attr.split('.')[-1] == unqualified_attr]
+                
+                if len(matching_attrs) == 1:
+                    # Single match - use its table alias
+                    table_alias = matching_attrs[0].split('.')[0]
+                    condition.left_table_alias = table_alias
+                    print(condition)
+                    print(self.conditions)
+                    
+                elif len(matching_attrs) == 2:
+                    # Two matches - in case of natural join, use the left table's version
+                    left_match = next(attr for attr in matching_attrs if attr.startswith('student.'))
+                    if left_match:
+                        condition.left_table_alias = 'student'
+                    else:
+                        raise ValueError(f"Ambiguous attribute '{unqualified_attr}' in condition - please qualify with table name")
+                    
+                elif len(matching_attrs) > 2:
+                    raise ValueError(f"Too many matching attributes found for '{unqualified_attr}'")
+                else:
+                    raise ValueError(f"Attribute '{unqualified_attr}' not found in child node attributes")
+            else:
+                #  make both left and right
+                left_unqualified_attr = condition.left_attribute
+                right_unqualified_attr = condition.right_attribute
+
+                left_matching_attrs = [attr for attr in child_attrs if attr.split('.')[-1] == left_unqualified_attr]
+                right_matching_attrs = [attr for attr in child_attrs if attr.split('.')[-1] == right_unqualified_attr]
+
+                if len(left_matching_attrs) == 1:
+                    # Single match - use its table alias
+                    table_alias = left_matching_attrs[0].split('.')[0]
+                    condition.left_table_alias = table_alias
+                else:
+                    raise ValueError(f"Attribute '{left_unqualified_attr}' not found in child node attributes")
+            
+                if len(right_matching_attrs) == 1:
+                    # Single match - use its table alias
+                    table_alias = right_matching_attrs[0].split('.')[0]
+                    condition.right_table_alias = table_alias
+                else:
+                    raise ValueError(f"Attribute '{right_unqualified_attr}' not found in child node attributes")
+                
+        
+        return child_attrs
+                
+
 
 class UnionSelectionNode(QueryNode):
     def __init__(self, children: List['SelectionNode']):

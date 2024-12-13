@@ -7,7 +7,7 @@ class Condition:
     right_table_alias: str
     right_attribute: str
 
-    def __init__(self, left_operand: str, right_operand: str, operator: Operator, left_id: str = None, left_table_name: str = None, left_attribute: str = None):
+    def __init__(self, left_operand: str, right_operand: str, operator: Operator):
         self.left_operand = left_operand
         self.right_operand = right_operand
         self.operator = operator
@@ -18,7 +18,7 @@ class Condition:
             self.left_table_alias = left[0]
             self.left_attribute = left[1]
         else:
-            self.left_table_alias = left_table_name
+            self.left_table_alias = None
             self.left_attribute = left_operand
 
         #  handle 3.14
@@ -37,7 +37,7 @@ class Condition:
                     self.right_table_alias = right[0]
                     self.right_attribute = right[1]
                 else:
-                    self.right_table_alias = left_table_name
+                    self.right_table_alias = None
                     self.right_attribute = right_operand
 
 
@@ -45,7 +45,11 @@ class Condition:
 
 
     def __str__(self) -> str:
-        return f"{self.left_operand} {self.operator.value} {self.right_operand}"
+        left = self.left_table_alias + '.' + self.left_attribute if self.left_table_alias else self.left_attribute
+        right = self.right_table_alias + '.' + self.right_attribute if self.right_table_alias else self.right_attribute
+        if self.is_constant_comparison():
+            right = self.right_operand
+        return f"{left} {self.operator.value} {right}"
     
     def is_constant_comparison(self) -> bool:
         # Check if right_operand is a constant (e.g., number or quoted string)
@@ -58,5 +62,8 @@ class Condition:
             return True
         except ValueError:
             return False
+    
+    def __repr__(self) -> str:
+        return self.__str__()
 
     

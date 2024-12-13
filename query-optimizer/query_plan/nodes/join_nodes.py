@@ -289,10 +289,11 @@ class NaturalJoinNode(JoinNode):
     def __str__(self) -> str:
         return f"NATURAL JOIN [{self.algorithm.value}]"
 
-    def get_node_attributes(self) -> List[Pair[str, str]]:
+    def get_node_attributes(self) -> List[str]:
         """
-        Returns the combined attributes from both child nodes,
-        excluding duplicate common attributes.
+        Returns the combined attributes from both child nodes.
+        For common attributes, keeps only the left table's qualified version.
+        All attributes maintain their table prefixes.
         """
         if not self.children:
             raise ValueError("NaturalJoinNode has no children.")
@@ -300,27 +301,23 @@ class NaturalJoinNode(JoinNode):
         left_attributes = self.children.first.get_node_attributes()
         right_attributes = self.children.second.get_node_attributes()
 
-        # Extract attribute names without table prefixes
-        left_attr_names = {attr.split('.')[-1] for attr in left_attributes}
-        right_attr_names = {attr.split('.')[-1] for attr in right_attributes}
-        common_attrs = left_attr_names.intersection(right_attr_names)
+        # Extract attribute names without table prefixes but keep mapping to full names
+        left_attr_map = {attr.split('.')[-1]: attr for attr in left_attributes}
+        right_attr_map = {attr.split('.')[-1]: attr for attr in right_attributes}
+        
+        # Find common attribute names
+        common_attrs = set(left_attr_map.keys()) & set(right_attr_map.keys())
 
-        # Remove duplicates: include one version without table prefix for common attributes
+        # Build combined attributes list
         combined_attributes = []
-        seen = set()
-
-        for attr in left_attributes:
-            attr_name = attr.split('.')[-1]
-            if attr_name in common_attrs and attr_name not in seen:
-                combined_attributes.append(attr_name)  # Add without table prefix
-                seen.add(attr_name)
-            elif attr_name not in common_attrs:
-                combined_attributes.append(attr)
-
-        for attr in right_attributes:
-            attr_name = attr.split('.')[-1]
+        
+        # Add all left attributes
+        combined_attributes.extend(left_attributes)
+        
+        # Add right attributes that aren't common
+        for attr_name, full_attr in right_attr_map.items():
             if attr_name not in common_attrs:
-                combined_attributes.append(attr)
+                combined_attributes.append(full_attr)
 
         self._cached_attributes = combined_attributes
         return self._cached_attributes

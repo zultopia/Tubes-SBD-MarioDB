@@ -1,1 +1,1 @@
-select * from student natural join takes where id > 500;
+select * from student natural join takes where id > 500 ORDER BY id ASCENDING LIMIT 5;

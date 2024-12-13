@@ -35,8 +35,14 @@ class LimitNode(QueryNode):
             raise ValueError("LimitNode has no child.")
         
         if not self._cached_attributes:
-            self._cached_attributes = self.child.get_node_attributes().copy();
+            self._cached_attributes = self.child.get_node_attributes().copy()
 
         return self._cached_attributes
+    
+    def estimate_size(self, statistics: Dict, alias_dict: Dict[str, str]):
+        #  Todo: Implementasi LimitNode
+        return 0
+    
+    
     
 

@@ -31,4 +31,7 @@ class Pair(Generic[T, U], Prototype):
             second = second.clone()
         
         return Pair(first, second)
+    
+    def __repr__(self):
+        return f"({self.first}, {self.second})"
 
