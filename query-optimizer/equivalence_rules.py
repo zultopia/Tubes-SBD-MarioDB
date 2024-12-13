@@ -342,7 +342,7 @@ class EquivalenceRules:
                 return list(common_attrs)
             return []
 
-        def push_projections_on_join(project_node: ProjectNode, join_node: JoinNode) -> List[QueryNode]:
+        def push_projections_on_join(project_node: ProjectNode, join_node: JoinNode) -> QueryNode:
             """Handles pushing projections into ConditionalJoinNode or NaturalJoinNode."""
             # Get attributes from the projection
             proj_attrs = set(project_node.projected_attributes)
@@ -360,12 +360,10 @@ class EquivalenceRules:
             left_attrs = set(left_child.get_node_attributes())
             right_attrs = set(right_child.get_node_attributes())
 
-
             # Attributes to project on the left child
             L1 = [attr for attr in required_attrs if attr in left_attrs]
             # Attributes to project on the right child
             L2 = [attr for attr in required_attrs if attr in right_attrs]
-
 
             # Create new ProjectNodes for left and right children if necessary
             new_left = left_child.clone()
@@ -387,33 +385,41 @@ class EquivalenceRules:
                     conditions=deepcopy(join_node.conditions),
                 )
                 new_join.set_children(Pair(new_left, new_right))
-
             elif isinstance(join_node, NaturalJoinNode):
                 new_join = NaturalJoinNode(
                     algorithm=join_node.algorithm,
                 )
                 new_join.set_children(Pair(new_left, new_right))
             else:
-                # Unsupported join node type
                 raise TypeError("Unsupported join node type.")
+            print(new_join)
+            return new_join
 
-            return [new_join]
-
+        print("here")
         # Scenario A: Project -> Join
         if isinstance(node.child, JoinNode):
-            join_node = node.child
-            transformed_nodes = push_projections_on_join(node, join_node)
-            return transformed_nodes
+            print("here1")
+
+            transformed_join = push_projections_on_join(node, node.child)
+            return [transformed_join]
 
         # Scenario B: Project -> Selection -> Join
         if isinstance(node.child, SelectionNode) and isinstance(node.child.child, JoinNode):
+            print("here2")
+
             selection_node = node.child
             join_node = selection_node.child
+            
             # Push projections into join
-            transformed_nodes = push_projections_on_join(node, join_node)
-            return transformed_nodes
-
-        # If none of the above, return the node as-is
+            transformed_join = push_projections_on_join(node, join_node)
+            
+            # Clone the selection node and set its child to the transformed join
+            new_selection = selection_node.clone()
+            new_selection.set_child(transformed_join)
+            print(new_selection)
+            
+            return [new_selection]
+    
         return [node]
 
     '''

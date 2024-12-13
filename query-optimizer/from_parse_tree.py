@@ -25,7 +25,7 @@ def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
     first_token = parse_tree.childs[0].root
     if isinstance(first_token, Node):
         if first_token.token_type == Token.SELECT:
-            # Process SELECT query
+            # Process SELECT list
             project_node = process_select_list(parse_tree.childs[1])
 
             # Find the FROM clause
@@ -34,6 +34,9 @@ def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
                 if isinstance(child.root, Node) and child.root.token_type == Token.FROM:
                     table_node = process_from_list(parse_tree.childs[i + 1])
                     break
+
+            # Initialize current_node to table_node
+            current_node = table_node
 
             # Process WHERE clause if present
             where_index = None
@@ -44,24 +47,33 @@ def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
 
             if where_index is not None:
                 condition_node = process_where_clause(parse_tree.childs[where_index + 1])
-
-                # Handle SelectionNode and UnionSelectionNode separately
                 if isinstance(condition_node, SelectionNode):
-                    condition_node.set_child(table_node)
-                    table_node = condition_node
+                    condition_node.set_child(current_node)
+                    current_node = condition_node
                 elif isinstance(condition_node, UnionSelectionNode):
-                    condition_node.set_child_to_all(table_node)
-                    table_node = condition_node
-                else:
-                    raise TypeError("condition_node must be either SelectionNode or UnionSelectionNode")
+                    condition_node.set_child_to_all(current_node)
+                    current_node = condition_node
 
-            # Attach the table_node to the project_node
-            project_node.set_child(table_node)
+            # Attach the current_node to the project_node
+            project_node.set_child(current_node)
+            current_node = project_node
 
-            # Check for ORDER BY clause (if needed)
-            # (Not shown here as it wasn't implemented in the original snippet)
+            # Process ORDER BY clause if present
+            order_by_index = None
+            for i, child in enumerate(parse_tree.childs):
+                if isinstance(child.root, Node) and child.root.token_type == Token.ORDER_BY:
+                    order_by_index = i
+                    break
 
-            # Check for LIMIT clause
+            if order_by_index is not None:
+                # Get the field for ordering
+                order_field = parse_tree.childs[order_by_index + 1]
+                # Check for ASC/DESC (if needed)
+                sorting_node = process_order_by(order_field)
+                sorting_node.set_child(current_node)
+                current_node = sorting_node
+
+            # Process LIMIT clause if present
             limit_index = None
             for i, child in enumerate(parse_tree.childs):
                 if isinstance(child.root, Node) and child.root.token_type == Token.LIMIT:
@@ -69,16 +81,14 @@ def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
                     break
 
             if limit_index is not None:
-                # The next token should be a NUMBER
                 limit_value = float(parse_tree.childs[limit_index + 1].root.value)
                 limit_node = LimitNode(limit_value)
-                limit_node.set_child(project_node)
-                return QueryPlan(limit_node)
-            else:
-                return QueryPlan(project_node)
+                limit_node.set_child(current_node)
+                current_node = limit_node
+
+            return QueryPlan(current_node)
 
         elif first_token.token_type == Token.UPDATE:
-            # Process UPDATE query
             return process_update_query(parse_tree)
 
     raise ValueError(f"Unsupported query type: {first_token}")
@@ -351,15 +361,15 @@ def process_order_by(order_tree: ParseTree) -> SortingNode:
     attributes: List[str] = []
     
     def extract_field(field_tree: ParseTree) -> str:
-        if len(field_tree.childs) == 1:
+        if len(field_tree.childs) == 1:  
             return field_tree.childs[0].root.value
-        else:
+        else:  
             return f"{field_tree.childs[0].root.value}.{field_tree.childs[2].root.value}"
     
     if order_tree.root == "Field":
         attributes.append(extract_field(order_tree))
     
-    return SortingNode(attributes)  
+    return SortingNode(attributes)
 
 def process_update_query(parse_tree: ParseTree) -> QueryPlan:
     """Process UPDATE queries."""
