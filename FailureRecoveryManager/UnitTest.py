@@ -220,11 +220,11 @@ class TestFailureRecoveryManager(unittest.TestCase):
         log_data = [
             'CHECKPOINT|[]',
             '101|START',
-            '101|WRITE|employees|None|[{"id": 1, "name": "Alice", "salary": 5000}]',
+            '101|WRITE|Student|None|[{"StudentID": 1, "FullName": "Alice", "GPA": 4}]',
             "101|COMMIT",
             "102|START",
             "103|START",
-            '103|WRITE|employees|[{"id": 2, "name": "John", "salary": 10100}]|[{"id": 2, "name": "John B", "salary": 8000}]',
+            '103|WRITE|Student|[{"StudentID": 2, "FullName": "John", "GPA": 3}]|[{"StudentID": 2, "FullName": "John B", "GPA": 4}]',
             'CHECKPOINT|[102,103]',
         ]
         
@@ -265,10 +265,10 @@ class TestFailureRecoveryManager(unittest.TestCase):
             storage_manager=mock_storage,
         )
         frm._wa_logs = [
-            '102|WRITE|employees|None|[{"id": 2, "name": "Bob", "salary": 4000}]',
-            '102|WRITE|employees|[{"id": 2, "name": "Bob", "salary": 4000}]|None',
+            '102|WRITE|Student|None|[{"StudentID": 2, "FullName": "Bob", "GPA": 2}]',
+            '102|WRITE|Student|[{"StudentID": 2, "FullName": "Bob", "GPA": 2}]|None',
             "102|ABORT",
-            '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]',
+            '103|WRITE|Student|[{"StudentID": 1, "FullName": "Alice", "GPA": 1}]|[{"StudentID": 1, "FullName": "Alice", "GPA": 2}]',
         ]
 
         criteria = RecoverCriteria(transaction_id=103)
@@ -282,12 +282,12 @@ class TestFailureRecoveryManager(unittest.TestCase):
         self.assertEqual(mock_storage.write_block.call_count, 2)
 
         expected_logs = [
-            '102|WRITE|employees|None|[{"id": 2, "name": "Bob", "salary": 4000}]',
-            '102|WRITE|employees|[{"id": 2, "name": "Bob", "salary": 4000}]|None',
+            '102|WRITE|Student|None|[{"StudentID": 2, "FullName": "Bob", "GPA": 2}]',
+            '102|WRITE|Student|[{"StudentID": 2, "FullName": "Bob", "GPA": 2}]|None',
             "102|ABORT",
-            '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]',
-            '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 6000}]|[{"id": 1, "name": "Alice", "salary": 5000}]',
-            '103|WRITE|employees|[{"id": 2, "name": "John B", "salary": 8000}]|[{"id": 2, "name": "John", "salary": 10100}]',
+            '103|WRITE|Student|[{"StudentID": 1, "FullName": "Alice", "GPA": 1}]|[{"StudentID": 1, "FullName": "Alice", "GPA": 2}]',
+            '103|WRITE|Student|[{"StudentID": 1, "FullName": "Alice", "GPA": 2}]|[{"StudentID": 1, "FullName": "Alice", "GPA": 1}]',
+            '103|WRITE|Student|[{"StudentID": 2, "FullName": "John B", "GPA": 4}]|[{"StudentID": 2, "FullName": "John", "GPA": 3}]',
             "103|ABORT",
         ]
 
@@ -308,18 +308,18 @@ class TestFailureRecoveryManager(unittest.TestCase):
         self, mock_storage_manager, mock_start_checkpoint_cron_job
     ):
         log_data = [
-            "CHECKPOINT|[]",
-            "101|START",
-            '101|WRITE|employees|None|[{"id": 1, "name": "Alice", "salary": 5000}]',
+            'CHECKPOINT|[]',
+            '101|START',
+            '101|WRITE|Student|None|[{"StudentID": 1, "FullName": "Alice", "GPA": 4}]',
             "101|COMMIT",
             "102|START",
             "103|START",
-            '103|WRITE|employees|[{"id": 2, "name": "John", "salary": 10100}]|[{"id": 2, "name": "John B", "salary": 8000}]',
-            "CHECKPOINT|[102,103]",
-            '102|WRITE|employees|None|[{"id": 2, "name": "Bob", "salary": 4000}]',
-            '102|WRITE|employees|[{"id": 2, "name": "Bob", "salary": 4000}]|None',
+            '103|WRITE|Student|[{"StudentID": 2, "FullName": "John", "GPA": 3}]|[{"StudentID": 2, "FullName": "John B", "GPA": 4}]',
+            'CHECKPOINT|[102,103]',
+            '102|WRITE|Student|None|[{"StudentID": 2, "FullName": "Bob", "GPA": 2}]',
+            '102|WRITE|Student|[{"StudentID": 2, "FullName": "Bob", "GPA": 2}]|None',
             "102|ABORT",
-            '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]',
+            '103|WRITE|Student|[{"StudentID": 1, "FullName": "Alice", "GPA": 1}]|[{"StudentID": 1, "FullName": "Alice", "GPA": 2}]',
         ]
 
         with open("./FailureRecoveryManager/test/log_recover_crash.log", "w") as log_file:
@@ -366,8 +366,8 @@ class TestFailureRecoveryManager(unittest.TestCase):
         self.assertEqual(mock_storage.delete_block.call_count, 1)
 
         expected_logs = [
-            '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 6000}]|[{"id": 1, "name": "Alice", "salary": 5000}]',
-            '103|WRITE|employees|[{"id": 2, "name": "John B", "salary": 8000}]|[{"id": 2, "name": "John", "salary": 10100}]',
+            '103|WRITE|Student|[{"StudentID": 1, "FullName": "Alice", "GPA": 2}]|[{"StudentID": 1, "FullName": "Alice", "GPA": 1}]',
+            '103|WRITE|Student|[{"StudentID": 2, "FullName": "John B", "GPA": 4}]|[{"StudentID": 2, "FullName": "John", "GPA": 3}]',
             "103|ABORT",
         ]
 
