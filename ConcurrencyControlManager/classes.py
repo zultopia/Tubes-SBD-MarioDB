@@ -4,9 +4,9 @@ import time
 from ConcurrencyControlManager.utils import *
 
 # Recovery Manager
-# from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
-# from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
-# from FailureRecoveryManager.Buffer import Buffer
+from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
+from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
+from FailureRecoveryManager.Buffer import Buffer
             
 class ConcurrencyControlManager:
     def __init__(self, algorithm: str):

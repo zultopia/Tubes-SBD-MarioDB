@@ -1,8 +1,7 @@
 import json
 from threading import Lock, Timer
 
-from ConcurrencyControlManager.classes import (
-    Cell,
+from ConcurrencyControlManager.utils import (
     PrimaryKey,
     Row,
     Table,
