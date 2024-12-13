@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 from query_plan.base import QueryNode
 from query_plan.enums import NodeType, Operator
 from data import QOData 
+from .constants import *
 from query_plan.shared import Condition 
 from utils import Pair
 
@@ -54,8 +55,25 @@ class SelectionNode(QueryNode):
 
 
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
-        # Karena pipeline, IO cost adalah 0
-        return self.child.estimate_cost()
+        self.estimate_size()
+
+        previous_cost = self.child.estimate_cost()
+
+        is_index = False
+        for condition in self.conditions:
+            left_table_name = alias_dict[condition.left_table_alias]
+            right_table_name = alias_dict[condition.right_table_alias]
+            if (QOData().get_index(condition.left_attribute, left_table_name) == 'btree' or QOData().get_index(condition.right_attribute, right_table_name) == 'btree') and condition.operator != Operator.NEQ:
+                is_index = True
+                break
+        
+        if not is_index:
+            return previous_cost + t_S + self.child.b * t_T + self.b * t_T
+        else:
+            c = 3
+            # TODO: find height of the tree
+            return previous_cost + (c + 1) * (t_T + t_S) + self.b * t_T
+
 
 
     def _calculate_operation_cost(self, statistics: Dict) -> float:
@@ -132,7 +150,7 @@ class SelectionNode(QueryNode):
 class UnionSelectionNode(QueryNode):
     def __init__(self, children: List['SelectionNode']):
         super().__init__(NodeType.UNION_SELECTION)
-        self.children = children  # List of SelectionNode instances
+        self.children: List['SelectionNode'] = children  # List of SelectionNode instances
         self._cached_attributes: Optional[List[str]] = None  # Cache for attributes
 
     def set_child_to_all(self, child: QueryNode):
@@ -146,11 +164,28 @@ class UnionSelectionNode(QueryNode):
         cloned_node.id = self.id
         return cloned_node
 
-    def estimate_size(self, statistics: Dict) -> float:
-        pass
+    def estimate_size(self, statistics: Dict, alias_dict) -> float:
+        assert (len(self.children) > 0)
+        
+        self.n = 0
+        for selection_node in self.children:
+            selection_node.estimate_size()
+            self.n += selection_node.n
+        
+        self.b = self.children[0].b
 
-    def estimate_cost(self, statistics: Dict) -> float:
-        pass
+        self.attributes = self.children[0].attributes
+
+
+
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        # No IO cost
+        self.estimate_size()
+        previous_cost = 0
+        for seletion_node in self.children:
+            previous_cost += seletion_node.estimate_cost()
+
+        return previous_cost + self.b * t_T
 
     def _calculate_operation_cost(self, statistics: Dict) -> float:
         # Placeholder for actual cost calculation
