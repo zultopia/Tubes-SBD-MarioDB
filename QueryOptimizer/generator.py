@@ -12,7 +12,7 @@ def generate_possible_plans(query: 'QueryPlan', rules: List[EquivalenceRules] = 
     # # EquivalenceRules.collapse_projections, # Rule 3
     EquivalenceRules.combineJoinCondition, # Rule 4
     EquivalenceRules.switchChildrenJoin, # Rule 5
-    EquivalenceRules.associativeJoins, # Rule 6
+    # EquivalenceRules.associativeJoins, # Rule 6
     # EquivalenceRules.distributeSelection, #Rule 7
     EquivalenceRules.push_projections_into_join, # Rule 8
     # EquivalenceRules.joinAlgorithmVariation, # Additional Rule

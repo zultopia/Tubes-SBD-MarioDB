@@ -1,0 +1,1 @@
+select student.id from student as s;
