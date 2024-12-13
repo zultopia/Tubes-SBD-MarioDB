@@ -1,19 +1,18 @@
-from StorageManager.classes import StorageManager, DataRetrieval, DataWrite, DataDeletion, Condition
+# semua komponen jadiin satu di sini
+from QueryProcessor.classes import QueryProcessor
 
-if __name__ == "__main__":
-    manager = StorageManager()
-    print("Initial Data:", manager.data)
-    
-    # Contoh
-    # Write
-    manager.write_block(DataWrite("Student", ["StudentID", "FullName", "GPA"], [1, "Charlie", 3.2]))
-    print("Data After Write:", manager.data)
-    
-    # Read
-    results = manager.read_block(DataRetrieval("Student", ["FullName", "GPA"], [Condition("GPA", ">", 3.0)], "sequential"))
-    print("Read Results:", results)
-    
-    # Delete
-    removed = manager.delete_block(DataDeletion("Student", [Condition("StudentID", "=", 1)]))
-    print("Removed Rows:", removed)
-    print("Data After Delete:", manager.data)
+QueryProcessor = QueryProcessor()
+
+while True:
+    try:
+        query_string = input('Please enter your query: ').strip()
+        if query_string == "\\q":
+            print("Exiting...")
+            break
+        elif not query_string:
+            print("Empty query, please enter a valid SQL command or '\\q' to quit.")
+            continue
+        else:
+            QueryProcessor.execute_query(query_string)
+    except Exception as e:
+        print(f"Error: {e}")
