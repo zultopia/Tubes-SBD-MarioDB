@@ -27,7 +27,8 @@ class SortingNode(QueryNode):
     def estimate_size(self, statistics: Dict, alias_dict):
         if not self.child:
             return
-        self.child.estimate_size()
+        # self.child.estimate_size()
+        self.child.estimate_size(statistics, alias_dict)
 
         self.attributes = self.child.attributes
         self.n = self.child.n
@@ -37,8 +38,8 @@ class SortingNode(QueryNode):
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
         # Sorting tidak memakan IO
         
-        self.estimate_size()
-        previous_cost = self.child.estimate_cost()
+        self.estimate_size(statistics, alias_dict)
+        previous_cost = self.child.estimate_cost(statistics, alias_dict)
 
         return previous_cost + self.b * t_T
 
@@ -47,7 +48,6 @@ class SortingNode(QueryNode):
         return f"SORT BY {', '.join(self.sort_attributes)} {order}"
 
     def get_node_attributes(self) -> List[str]:
-        print("IN SORTING NODE")
         if not self.child:
             raise ValueError("SortingNode has no child.")
             
@@ -59,9 +59,6 @@ class SortingNode(QueryNode):
             unqualified_attr = attr
             matching_attrs = [attr for attr in child_attrs if attr.split('.')[-1] == unqualified_attr]
 
-            print("IN SORTING NODE")
-            print(matching_attrs)
-            print(unqualified_attr)
             
             if len(matching_attrs) == 1:
                 # Single match - use its table alias

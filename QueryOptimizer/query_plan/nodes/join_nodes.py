@@ -76,12 +76,12 @@ class ConditionalJoinNode(JoinNode):
         return cloned_node
 
     def estimate_size(self, statistics: Dict, alias_dict):
-        assert (isinstance(self.children, Pair[QueryNode, QueryNode]))
+        assert (isinstance(self.children, Pair))
         
         left: QueryNode = self.children.first
         right: QueryNode = self.children.second
-        left.estimate_size()
-        right.estimate_size()
+        left.estimate_size(statistics, alias_dict)
+        right.estimate_size(statistics, alias_dict)
 
         
         left_attributes = left.attributes
@@ -111,12 +111,12 @@ class ConditionalJoinNode(JoinNode):
 
 
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
-        self.estimate_size()
+        self.estimate_size(statistics, alias_dict)
 
         left: QueryNode = self.children.first
         right: QueryNode = self.children.second
 
-        previous_cost = left.estimate_cost() + right.estimate_cost()
+        previous_cost = left.estimate_cost(statistics, alias_dict) + right.estimate_cost(statistics, alias_dict)
 
         
         if self.algorithm == JoinAlgorithm.NESTED_LOOP:
@@ -180,12 +180,12 @@ class NaturalJoinNode(JoinNode):
         return cloned_node
 
     def estimate_size(self, statistics: Dict, alias_dict):
-        assert (isinstance(self.children, Pair[QueryNode, QueryNode]))
+        assert (isinstance(self.children, Pair))
         
         left: QueryNode = self.children.first
         right: QueryNode = self.children.second
-        left.estimate_size()
-        right.estimate_size()
+        left.estimate_size(statistics, alias_dict)
+        right.estimate_size(statistics, alias_dict)
 
         left_attributes = left.attributes
         right_attributes = right.attributes
@@ -213,17 +213,10 @@ class NaturalJoinNode(JoinNode):
                 self.attributes.append((right_attribute, right_alias))
 
         self.n = left.n * right.n
-        for condition in self.conditions:
-            left_table_name = alias_dict[condition.left_table_alias]
-            right_table_name = alias_dict[condition.right_table_alias]
+        for attr, alias in common:
+            table = alias_dict[alias]
+            self.n *= 1 / QOData().get_V(attr, table) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
 
-            if condition.operator == Operator.EQ:
-                self.n *= min(1 / QOData().get_V(condition.left_attribute, left_table_name), 1 / QOData().get_V(condition.right_attribute, right_table_name)) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
-            if condition.operator in [Operator.LESS, Operator.LESS_EQ]:
-                self.n *= (float(condition.right_operand) - QOData().get_min(condition.left_attribute, left_table_name)) / (QOData().get_max(condition.left_attribute, left_table_name) - QOData().get_min(condition.left_attribute, left_table_name))
-            if condition.operator in [Operator.GREATER,Operator.GREATER_EQ]:
-                self.n *= (QOData().get_max(condition.left_attribute, left_table_name) - float(condition.right_operand) ) / (QOData().get_max(condition.left_attribute, left_table_name) - QOData().get_min(condition.left_attribute, left_table_name))
-        
         self.n = int(self.n)
 
         if self.n < 0:
@@ -232,12 +225,12 @@ class NaturalJoinNode(JoinNode):
         self.b = int(1 / (1 / left.b + 1 / right.b))
 
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
-        self.estimate_size()
+        self.estimate_size(statistics, alias_dict)
 
         left: QueryNode = self.children.first
         right: QueryNode = self.children.second
 
-        previous_cost = left.estimate_cost() + right.estimate_cost()
+        previous_cost = left.estimate_cost(statistics, alias_dict) + right.estimate_cost(statistics, alias_dict)
 
         left_attributes = left.attributes
         right_attributes = right.attributes
