@@ -196,7 +196,7 @@ class NaturalJoinNode(JoinNode):
         for i in left_attributes:
             left_attribute, left_alias = i.first, i.second
             for j in right_attributes: 
-                right_attribute, right_alias = j
+                right_attribute, right_alias = j.first, j.second
                 if left_attribute == right_attribute and not any(left_attribute == attr for attr, _ in common):
                     common.append((left_attribute, left_alias))
                     self.attributes.append((left_attribute, left_alias))
