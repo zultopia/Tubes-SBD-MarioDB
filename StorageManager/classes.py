@@ -271,6 +271,10 @@ class StorageManager:
         Returns:
             int: Number of rows affected
         """
+        for column_exist in self.get_all_attributes(table):
+            for row in block_data:
+                if column_exist not in row.keys():
+                    row[column_exist] = None
         self._save_block(table, block_id, block_data)
 
     def write_block(self, data_write: DataWrite) -> int:
