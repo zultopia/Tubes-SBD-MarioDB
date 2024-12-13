@@ -193,7 +193,6 @@ class ConcurrencyControlManager:
                     self.wait_for_graph.deleteNode(tid)
                     self.wait_for_graph.addEdge(tid, transaction_id)
                     self.transaction_queue.add(tid)
-                # TODO: recovery, append to waiting_list
                 undone_transaction = self.rollback(abort_transaction_id)
                 for t_act in undone_transaction:
                     self.waiting_list.insert(0, t_act)
