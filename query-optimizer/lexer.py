@@ -91,10 +91,10 @@ class Lexer:
     # Operators      
     (Token.GREATER_EQ, r">="),  
     (Token.LESS_EQ, r"<="),
+    (Token.NEQ, r"<>"),
     (Token.GREATER, r">"), 
     (Token.LESS, r"<"),               
-    (Token.EQ, r"="),           
-    (Token.NEQ, r"<>"),
+    (Token.EQ, r"="),
     (Token.ADD,r'\+'),
     (Token.SUBTRACT,r'-'),
     (Token.DIVIDE,r'/'),
