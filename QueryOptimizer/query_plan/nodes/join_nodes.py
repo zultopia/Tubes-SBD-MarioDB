@@ -106,7 +106,7 @@ class ConditionalJoinNode(JoinNode):
 
         self.n = int(self.n)
         
-        self.b = int(1 / (1 / left.b + 1 / right.b))
+        self.b = int(1 / (1 / (left.b + 1) + 1 / (right.b + 1)))
 
 
 
@@ -222,7 +222,7 @@ class NaturalJoinNode(JoinNode):
         if self.n < 0:
             self.n = 0
 
-        self.b = int(1 / (1 / left.b + 1 / right.b))
+        self.b = int(1 / (1 / (left.b + 1) + 1 / (right.b + 1)))
 
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
         self.estimate_size(statistics, alias_dict)

@@ -1,1 +1,1 @@
-select student.id from student as s;
+select * from student join takes on student.id = takes.id natural join advisor join student AS s on s.id = student.id WHERE student.dept_name = 'azmi gans' ORDER BY student.dept_name ASCENDING LIMIT 5; 
