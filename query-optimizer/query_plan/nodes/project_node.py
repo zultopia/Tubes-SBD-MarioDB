@@ -1,14 +1,24 @@
 # project_node.py
 
 from typing import List, Dict, Optional
+
+from data import QOData
 from ..base import QueryNode
 from ..enums import NodeType
+from data import QOData
+from query_plan.nodes.constants import BLOCK_SIZE
+from utils import Pair
 
 class ProjectNode(QueryNode):
     def __init__(self, attributes: List[str]):
         super().__init__(NodeType.PROJECT)
         self.original_attributes = sorted(attributes)  # Store original projection list
         self.projected_attributes = []  # To be populated with fully qualified attributes
+        # Sort the attributes to ensure consistent ordering
+        attributes.sort()
+
+        self.project_list = attributes
+
         self.child = None  # Single child node
         self._attributes = self.projected_attributes.copy()  # Cache the projected attributes
 
@@ -24,7 +34,7 @@ class ProjectNode(QueryNode):
         if not self.child:
             raise ValueError("ProjectNode must have a child node before processing attributes.")
 
-        child_attrs = self.child.attributes()
+        child_attrs = self.child.get_node_attributes()
         if '*' in self.original_attributes:
             # Expand '*' to all child attributes
             self.projected_attributes = sorted(child_attrs)
@@ -58,18 +68,38 @@ class ProjectNode(QueryNode):
         if self.child:
             cloned_node.set_child(self.child.clone())
         return cloned_node
+    
+    def estimate_size(self, statistics: Dict, alias_dict):
+        if not self.child:
+            return
+        self.child.estimate_size()
 
-    def estimate_cost(self, statistics: Dict) -> float:
-        return self._calculate_operation_cost(statistics)
 
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
-        # Placeholder implementation for project cost
-        return 1
+        self.attributes = []
+        for attr in self.project_list:
+            for i in self.child.attributes:
+                child_attribute, child_alias = i
+                if child_attribute == attr:
+                    self.attributes.append((child_attribute, child_alias))
+        
+        self.n = self.child.n
+
+        record_size = 0
+        for i in self.child.attributes:
+            attribute, alias = i.first, i.second
+            table = alias_dict[alias]
+            record_size += QOData().get_size(attribute, table)
+        self.b = int(BLOCK_SIZE / record_size)
+
+
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        return self.child.estimate_cost()
+
 
     def __str__(self) -> str:
         return f"PROJECT {', '.join(self.projected_attributes)}"
 
-    def attributes(self) -> List[str]:
+    def get_node_attributes(self) -> List[Pair[str, str]]:
         """
         Returns the list of fully qualified attributes this ProjectNode projects.
         """

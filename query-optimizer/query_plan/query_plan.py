@@ -1,5 +1,5 @@
 # query_plan.py
-from typing import Optional
+from typing import Dict, Optional
 from .base import QueryNode
 from .nodes.project_node import ProjectNode
 from .nodes.selection_node import SelectionNode, UnionSelectionNode
@@ -13,14 +13,24 @@ from utils import Pair, Prototype
 
 class QueryPlan(Prototype):
     def __init__(self, root: QueryNode):
+        self.alias_dict: Dict[str, str] = {} # Given the alias, returns the original table name.
+                             # For non-table expressions (result of joins, selections, projections, etc), it is assumed that there is no alias.
+         
+
         self.root = root
 
     def optimize(self, optimizer: 'QueryPlanOptimizer'):
-        return optimizer.optimize(self)
+        # Panggil bf di sini?
+        pass
+        
 
     def execute(self):
         # Implementation here
         pass
+
+    def estimate_cost(self, statistics: Dict) -> float:
+        return self.root.estimate_cost(statistics, self.alias_dict)
+    
 
     def __repr__(self):
         def repr_node(node: QueryNode, level: int = 0) -> str:

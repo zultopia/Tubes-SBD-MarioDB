@@ -1,6 +1,6 @@
 # base.py
 from abc import ABC, abstractmethod
-from typing import Dict, Union, List
+from typing import Dict, Tuple, Union, List
 from utils import Pair, Prototype
 from .enums import NodeType
 import uuid
@@ -9,6 +9,13 @@ class QueryNode(ABC, Prototype):
     node_type: NodeType
     children: Union['QueryNode', Pair['QueryNode', 'QueryNode'], None, List['QueryNode']]
     id: str
+
+    alias: str | None # str for table, None for non-table expressions
+    attributes: List[Pair[str, str]] # (attribute name, original table alias). 'attributes' can contain the same attribute names but must have different aliases. 
+    n: int # The exact number of tuples for tables or the approximated number of tuples for the result of the operations.
+    b: int # The blocking factor (the number of records that fit inside a block)
+    # f: int # The number of blocks or n / b
+
 
     def __init__(self, node_type: NodeType):
         self.node_type = node_type
@@ -25,11 +32,11 @@ class QueryNode(ABC, Prototype):
         return self.children is not None and isinstance(self.children, QueryNode)
 
     @abstractmethod
-    def estimate_cost(self, statistics: Dict) -> float:
+    def estimate_size(self, statistics: Dict, alias_dict: Dict[str, str]):
         pass
 
     @abstractmethod
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
+    def estimate_cost(self, statistics: Dict, alias_dict: Dict[str, str]) -> float:
         pass
 
     @abstractmethod
@@ -57,5 +64,5 @@ class QueryNode(ABC, Prototype):
         return hash(self.node_type)  # Extend this in subclasses
 
     @abstractmethod
-    def attributes(self) -> List[str]:
+    def get_node_attributes(self) -> List[Pair[str, str]]:
         raise NotImplementedError

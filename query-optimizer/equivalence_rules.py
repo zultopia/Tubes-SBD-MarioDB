@@ -20,7 +20,7 @@ def get_all_attributes_of_node(node: 'QueryNode') -> List[str]:
     if node is None:
         return []
     
-    return node.attributes()
+    return node.get_node_attributes()
 
 def attribute_belongs_to(node: 'QueryNode', attr: str) -> bool:
     if attr == '*':
@@ -336,8 +336,8 @@ class EquivalenceRules:
                 return attrs
             elif isinstance(join_node, NaturalJoinNode):
                 # Natural joins implicitly join on attributes with the same name
-                left_attrs = set(join_node.children.first.attributes())
-                right_attrs = set(join_node.children.second.attributes())
+                left_attrs = set(join_node.children.first.get_node_attributes())
+                right_attrs = set(join_node.children.second.get_node_attributes())
                 common_attrs = left_attrs.intersection(right_attrs)
                 return list(common_attrs)
             return []
@@ -357,8 +357,8 @@ class EquivalenceRules:
             right_child = join_node.children.second
 
             # Determine which attributes belong to which child
-            left_attrs = set(left_child.attributes())
-            right_attrs = set(right_child.attributes())
+            left_attrs = set(left_child.get_node_attributes())
+            right_attrs = set(right_child.get_node_attributes())
 
 
             # Attributes to project on the left child

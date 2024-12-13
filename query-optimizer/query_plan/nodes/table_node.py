@@ -1,9 +1,8 @@
-# table_node.py
-
 from typing import List, Dict, Optional
 from query_plan.base import QueryNode
 from query_plan.enums import NodeType
 from data import QOData  
+from utils import Pair
 
 class TableNode(QueryNode):
     def __init__(self, table_name: str, alias: Optional[str] = None):
@@ -23,17 +22,25 @@ class TableNode(QueryNode):
             cloned_node.set_child(self.child.clone())
         return cloned_node
 
-    def estimate_cost(self, statistics: Dict) -> float:
-        return self._calculate_operation_cost(statistics)
+    def set_child(self, child: QueryNode):
+        self.child = child
 
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
-        # Placeholder for actual cost calculation
-        return 1.0
+    def estimate_size(self, statistics: Dict, alias_dict):
+        attributes = statistics[self.table_name]['attributes']
+        self.attributes =  [(attr_name, self.alias) for attr_name, _ in attributes.items()]
+        self.n = QOData().get_n(self.table_name)
+        self.b = QOData().get_b(self.table_name)
+
+
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        self.estimate_size()
+
+        return 0
 
     def __str__(self) -> str:
         return f"TABLE {self.table_name}" + (f" AS {self.alias}" if self.alias != self.table_name else "")
 
-    def attributes(self) -> List[str]:
+    def get_node_attributes(self) -> List[Pair[str, str]]:
         """
         Returns a list of attributes for the table, prefixed with the table name or alias.
         Caches the result after the first computation.

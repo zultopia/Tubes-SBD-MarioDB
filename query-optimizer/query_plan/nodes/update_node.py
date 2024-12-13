@@ -1,6 +1,7 @@
 from typing import Dict, List, Tuple, Optional
 from ..base import QueryNode
 from ..enums import NodeType
+from utils import Pair
 
 class UpdateNode(QueryNode):
     def __init__(self, updates: List[Tuple[str, str]]):  # [(column, new_value),...]
@@ -29,8 +30,22 @@ class UpdateNode(QueryNode):
     def __str__(self) -> str:
         updates_str = ', '.join([f"{col} = {val}" for col, val in self.updates])
         return f"UPDATE {updates_str}"
+    
+    def estimate_size(self, statistics, alias_dict) -> float:
+        return 0
+    
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        return 0
 
-    def attributes(self) -> List[str]:
+    def clone(self):
+        cloned_updates = self.updates.copy()
+        cloned_node = UpdateNode(cloned_updates)
+        if self.child:
+            cloned_node.child = self.child.clone()
+        cloned_node.id = self.id
+        return cloned_node
+
+    def get_node_attributes(self) -> List[Pair[str, str]]:
         """
         Returns the list of attributes from the child node.
         """

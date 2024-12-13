@@ -30,7 +30,7 @@ class LimitNode(QueryNode):
         cloned_node.id = self.id
         return cloned_node
 
-    def attributes(self) -> List[str]:
+    def get_node_attributes(self) -> List[str]:
         if not self.child:
             raise ValueError("LimitNode has no child.")
         

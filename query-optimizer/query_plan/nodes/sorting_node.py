@@ -2,6 +2,7 @@ from typing import List, Dict, Optional
 from ..base import QueryNode
 from ..enums import NodeType
 import uuid
+from utils import Pair
 
 class SortingNode(QueryNode):
     def __init__(self, attributes: List[str], ascending: bool = True):
@@ -21,18 +22,25 @@ class SortingNode(QueryNode):
             cloned_node.set_child(self.child.clone())
         return cloned_node
 
-    def estimate_cost(self, statistics: Dict) -> float:
-        return self._calculate_operation_cost(statistics)
+    def estimate_size(self, statistics: Dict, alias_dict):
+        if not self.child:
+            return
+        self.child.estimate_size()
 
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
-        # Placeholder for actual cost calculation based on sorting
-        return 1.0
+        # Todo: Ganti ID Kl perlu (?)
+        self.attributes = self.child.attributes
+        self.n = self.child.n
+        self.b = self.child.b
+
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        # Sorting tidak memakan IO
+        return self.child.estimate_cost()
 
     def __str__(self) -> str:
         order = "ASC" if self.ascending else "DESC"
         return f"SORT BY {', '.join(self.sort_attributes)} {order}"
 
-    def attributes(self) -> List[str]:
+    def get_node_attributes(self) -> List[Pair[str, str]]:
         """
         Returns the list of attributes from the child node.
         """
