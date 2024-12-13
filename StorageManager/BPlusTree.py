@@ -182,12 +182,27 @@ class BPlusReader:
     BLOCK_SIZE = 4096
     BUFFER: Union[None, Buffer] = None
     
+    @staticmethod
+    def _get_block_file(table: str, block_id: int) -> str:
+        return os.path.join(BPlusReader.DATA_DIR, f"{table}__block__{block_id}.blk")
+
+    @staticmethod
+    def _load_block(table: str, block_id: int) -> List[Dict]:
+        block_file = BPlusReader._get_block_file(table, block_id)
+        if os.path.exists(block_file):
+            with open(block_file, "rb") as file:
+                return pickle.load(file)
+        return []
     
     @staticmethod
-    def read_block(table: str, block_id: str):
+    def read_block(table: str, block_id: str) -> List[Dict]:
         block = BPlusReader.BUFFER.get_buffer(table, block_id)
         if not block:
-            return
+            block = BPlusReader._load_block(table, block_id)
+        results = []
+        for row in block:
+            results.append({col: row[col] for col in row.keys()})
+        return results
     
     @staticmethod
     def _get_bplus_block_file(table: str, column: str, block_id: int) -> str:
@@ -230,9 +245,9 @@ class BPlusReader:
     @staticmethod
     def _resolve_leaf(table: str, column: str, block_id: int, identifier: Union[str, int]) -> Dict:
         block = BPlusReader.read_block(table, column, block_id)
-        for node in block:
-            if node.uuid == uuid:
-                return node
+        for row in block:
+            if row['column'] == identifier:
+                return row
         return None
     
     @staticmethod
@@ -308,7 +323,6 @@ class BPlusTree:
         if not leaf:
             leaf = self.find(key)
         
-
     def insert(self, key, value):
         leaf = self.find(key)
         if key in leaf.keys:
