@@ -3,14 +3,13 @@ import unittest
 from unittest.mock import MagicMock, patch
 import json
 
-from FailureRecoveryManager.ExecutionResult import ExecutionResult
-from FailureRecoveryManager.Rows import Rows
+# from FailureRecoveryManager.Rows import Rows
 from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
 from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
 from FailureRecoveryManager.LRUCache import LRUCache
 from FailureRecoveryManager.Buffer import Buffer
 from StorageManager.classes import StorageManager, DataWrite, DataDeletion, Condition
-
+from ConcurrencyControlManager.classes import TransactionAction, Table, Row, Cell, PrimaryKey
 
 
 class TestFailureRecoveryManager(unittest.TestCase):
@@ -74,14 +73,21 @@ class TestFailureRecoveryManager(unittest.TestCase):
             '102|ABORT',
             '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]',
         ]
-        execution_result = ExecutionResult(
-            transaction_id=102,
-            data_before=Rows(None),
-            data_after=Rows([{"id": 2, "name": "Bob", "salary": 4000}]),
-            status="WRITE",
-            table="employees",
-        )
-        self.frm.write_log(execution_result)
+        # execution_result = ExecutionResult(
+        #     transaction_id=102,
+        #     data_before=Rows(None),
+        #     data_after=Rows([{"id": 2, "name": "Bob", "salary": 4000}]),
+        #     status="WRITE",
+        #     table="employees",
+        # )
+        table = Table("employees")
+            
+        before_states = Row(table, PrimaryKey(None), None)
+        after_states = Row(table, PrimaryKey(None), {"id": 2, "name": "Bob", "salary": 4000})
+
+        transaction_action = TransactionAction(102,"WRITE", "row", after_states, before_states)
+
+        self.frm.write_log(transaction_action)
         self.assertEqual(int((self.frm._wa_logs[4]).split("|")[0]), 102)
         self.assertEqual(self.frm._wa_logs[4].split("|")[1], "WRITE")
         self.assertEqual(self.frm._wa_logs[4].split("|")[2], "employees")
@@ -99,22 +105,17 @@ class TestFailureRecoveryManager(unittest.TestCase):
     def test_save_checkpoint(self):
         """Test to ensure checkpoint can be saved and contains correct log entries"""
         self.frm._wa_logs.append("102|COMMIT")
-        execution_result_1 = ExecutionResult(
-            transaction_id=102,
-            data_before=Rows(None),
-            data_after=Rows([{"id": 2, "name": "Bob", "salary": 4000}]),
-            status="WRITE",
-            table="employees",
-        )
-        execution_result_2 = ExecutionResult(
-            transaction_id=102,
-            data_before=Rows(None),
-            data_after=Rows(None),
-            status="ABORT",
-            table=None,
-        )
-        self.frm.write_log(execution_result_1)
-        self.frm.write_log(execution_result_2)
+
+        table = Table("employees")
+            
+        before_states = Row(table, PrimaryKey(None), None)
+        after_states = Row(table, PrimaryKey(None), {"id": 2, "name": "Bob", "salary": 4000})
+
+        transaction_action_1 = TransactionAction(102,"WRITE", "row", after_states, before_states)
+        transaction_action_2 = TransactionAction(102,"ABORT", "row", None, None)
+
+        self.frm.write_log(transaction_action_1)
+        self.frm.write_log(transaction_action_2)
         self.frm._save_checkpoint()
         self.assertEqual(self.frm._wa_logs, [])
 

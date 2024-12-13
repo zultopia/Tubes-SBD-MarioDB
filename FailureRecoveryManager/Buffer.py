@@ -1,3 +1,4 @@
+import copy
 from threading import Lock
 from typing import Union
 
@@ -26,6 +27,15 @@ class Buffer:
 
         # Buffer mutex
         self._buffer_lock = Lock()
+
+    def is_empty(self) -> bool:
+        """
+        Checks if the buffer is empty
+
+        Returns:
+        bool: True if buffer is empty, False otherwise
+        """
+        return self._buffer.is_empty()
 
     def get_buffer(self, table_name: str, block_id: int) -> Union[any, None]:
         """
@@ -98,7 +108,7 @@ class Buffer:
         with self._buffer_lock:
             return self._buffer.get_cache()
 
-    def clear_buffer(self) -> None:
+    def clear_buffer(self) -> Union[None, dict[any, any]]:
         """
         Clear all the entries in the buffer cache
 
@@ -106,5 +116,11 @@ class Buffer:
         previous buffer
         """
         with self._buffer_lock:
+            # Check if buffer is empty
+            if self._buffer.is_empty():
+                return None
+
+            # If not empty, copy the buffer and clear it
+            copied_dict = copy.deepcopy(self._buffer.get_cache())
             self._buffer.clear()
-            # print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
+            return copied_dict

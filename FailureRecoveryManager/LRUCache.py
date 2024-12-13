@@ -73,6 +73,16 @@ class LRUCache:
         node.next = next
         node.prev = prev
 
+    def is_empty(self) -> bool:
+        """
+        Checks if the cache is empty
+
+        Returns
+        -------
+        bool: True if the cache is empty, False otherwise
+        """
+        return len(self.cache) == 0
+
     def get(self, key: any) -> Union[any, None]:
         """
         Gets the value of a key in the cache
