@@ -8,6 +8,7 @@ from FailureRecoveryManager.LRUCache import LRUCache
 from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
 from FailureRecoveryManager.Rows import Rows
 from StorageManager.classes import Condition, DataDeletion, DataWrite, StorageManager
+from ConcurrencyControlManager.classes import TransactionAction, Table, Row, Cell, PrimaryKey
 
 from . import Buffer
 
@@ -63,7 +64,7 @@ class FailureRecoveryManager:
         # print("Destroy Failure Recovery Manager...")
         self._stop_checkpoint_cron_job()
 
-    def write_log(self, execution_result: ExecutionResult) -> None:
+    def write_log(self, transaction_action: TransactionAction) -> None:
         # This method accepts execution result object as input and appends
         # an entry in a write-ahead log based on execution info object.
 
@@ -73,17 +74,21 @@ class FailureRecoveryManager:
 
         log_entry = None
 
-        if execution_result.status == "WRITE":
+
+        if transaction_action.action == "WRITE":
+            table = transaction_action.data_item.get_table()
+            old_value = transaction_action.old_data_item.map
+            new_value = transaction_action.data_item.map
             log_entry = (
-                f"{execution_result.transaction_id}|"
-                f"{execution_result.status}|"
-                f"{execution_result.table}|"
-                f"{process_rows(execution_result.data_before.data) if execution_result.data_before.data else None}|"
-                f"{process_rows(execution_result.data_after.data) if execution_result.data_after.data else None}"
+                f"{transaction_action.id}|"
+                f"{transaction_action.action}|"
+                f"{table}|"
+                f"{process_rows(old_value) if old_value else None}|"
+                f"{process_rows(new_value) if new_value else None}"
             )
         else:
             log_entry = (
-                f"{execution_result.transaction_id}|" f"{execution_result.status}"
+                f"{transaction_action.id}|" f"{transaction_action.action}"
             )
 
         # Must write wal to stable storage if the write-ahead log is full
@@ -100,7 +105,7 @@ class FailureRecoveryManager:
         self._wa_log_lock.release()
 
         # Must write wal to stable storage if transaction commited or aborted to ensure consistency
-        if execution_result.status == "COMMIT" or execution_result.status == "ABORT":
+        if transaction_action.action == "COMMIT" or transaction_action.action == "ABORT":
             # self._save_checkpoint()
             self._flush_wal()
 
@@ -365,25 +370,34 @@ class FailureRecoveryManager:
                         exit()
 
             # Write recovery log
-            exec_result = ExecutionResult(
-                transaction_id,
-                Rows(after_states),
-                Rows(before_states),
-                "WRITE",
-                table,
-            )
+            # exec_result = ExecutionResult(
+            #     transaction_id,
+            #     Rows(after_states),
+            #     Rows(before_states),
+            #     "WRITE",
+            #     table,
+            # )
+
+            table = Table(table)
+            
+            before_states = Row(table, PrimaryKey(None), before_states)
+            after_states = Row(table, PrimaryKey(None), after_states)
+
+            transaction_action = TransactionAction(transaction_id,"WRITE", "row", after_states, before_states)
             # print("write log: ", exec_result.__dict__)
-            self.write_log(exec_result)
+            self.write_log(transaction_action)
         # Close rollback process
-        abort_result = ExecutionResult(
-            criteria.transaction_id,
-            Rows(None),
-            Rows(None),
-            "ABORT",
-            "",
-        )
+        # abort_result = ExecutionResult(
+        #     criteria.transaction_id,
+        #     Rows(None),
+        #     Rows(None),
+        #     "ABORT",
+        #     "",
+        # )
+
+        transaction_abort = TransactionAction(criteria.transaction_id,"ABORT", None, None, None)
         # print("write log: ", exec_result.__dict__)
-        self.write_log(abort_result)
+        self.write_log(transaction_abort)
 
     def recover_system_crash(self):
         """
@@ -463,7 +477,7 @@ class FailureRecoveryManager:
                             # print(f"[FRM | {str(datetime.now())}]: failed delete block for rollback query.")
                             exit()
 
-                # udpdate case
+                # update case
                 elif before_states != None and after_states != None:
                     for i in range(len(before_states)):
                         conditions = []
@@ -498,15 +512,16 @@ class FailureRecoveryManager:
                 if status == "START":
                     active_transactions.remove(transaction_id)
                     # Close rollback process
-                    abort_result = ExecutionResult(
-                        transaction_id,
-                        Rows(None),
-                        Rows(None),
-                        "ABORT",
-                        "",
-                    )
-                    # print("write log: ", abort_result.__dict__)
-                    self.write_log(abort_result)
+                    # abort_result = ExecutionResult(
+                    #     transaction_id,
+                    #     Rows(None),
+                    #     Rows(None),
+                    #     "ABORT",
+                    #     "",
+                    # )
+                    transaction_abort = TransactionAction(transaction_id,"ABORT", None, None, None)
+                    # print("write log: ", exec_result.__dict__)
+                    self.write_log(transaction_abort)
                     continue
                 # rollback processs
                 before_states = None
@@ -582,15 +597,21 @@ class FailureRecoveryManager:
                             exit()
 
                 # Write recovery log
-                exec_result = ExecutionResult(
-                    transaction_id,
-                    Rows(after_states),
-                    Rows(before_states),
-                    "WRITE",
-                    table,
-                )
+                # exec_result = ExecutionResult(
+                #     transaction_id,
+                #     Rows(after_states),
+                #     Rows(before_states),
+                #     "WRITE",
+                #     table,
+                # )
+                table = Table(table)
+            
+                before_states = Row(table, PrimaryKey(None), before_states)
+                after_states = Row(table, PrimaryKey(None), after_states)
+
+                transaction_action = TransactionAction(transaction_id,"WRITE", "row", after_states, before_states)
                 # print("write log: ", exec_result.__dict__)
-                self.write_log(exec_result)
+                self.write_log(transaction_action)
             if len(active_transactions) == 0:
                 break
             if len(active_transactions) == 0:
