@@ -298,7 +298,7 @@ class QueryProcessor:
                 {"StudentID": 50, "CourseID": 20},
             ],
         }
-    
+
     def execute_query(self, query_string: str) -> ExecutionResult:
         query_tree: ParseTree = get_parse_tree(query_string)
         # cek child pertama untuk menentukan jenis query (lengkapnya cek komentar dari fungsi di bawah ini)
@@ -430,12 +430,12 @@ class QueryProcessor:
         # jika ada klausa berikutnya
         if len(query_tree.childs) >= 6:
             # jika ada klausa WHERE
-                if query_tree.childs[5].root == "Condition":
-                    self.execute_WHERE(retrieval_schema, alias, conditions, query_tree)
-                    for table, conditions in conditions.items():
-                        print(f"Table: {table}")
-                        for condition in conditions:
-                            print(f"  - {condition.column} {condition.operation} {condition.operand}")    
+            if query_tree.childs[5].root == "Condition":
+                self.execute_WHERE(retrieval_schema, alias, conditions, query_tree)
+                for table, conditions in conditions.items():
+                    print(f"Table: {table}")
+                    for condition in conditions:
+                        print(f"  - {condition.column} {condition.operation} {condition.operand}")
         # Mengambil dari StorageManager
         rows = []
         for table, attributes in retrieval_schema.items() :
@@ -445,8 +445,20 @@ class QueryProcessor:
             data_retrieval = DataRetrieval(table, attributes, conditions, None, None)
             rows.append(self.storage_manager.read_block(data_retrieval))
         
+        # jika ada klausa berikutnya
+        if len(query_tree.childs) >= 6:
+            # jika ada klausa LIMIT
+            if query_tree.childs[4].root.value == "LIMIT":
+                limit_value = float(query_tree.childs[5].root.value)
+                limit_value = int(limit_value)
+                rows = [row[:limit_value] for row in rows]
+            elif query_tree.childs[6].root.value == "LIMIT":
+                limit_value = float(query_tree.childs[7].root.value)
+                limit_value = int(limit_value)
+                rows = [row[:limit_value] for row in rows]
+
         print(rows)
-        print("\n")    
+        print("\n")
 
     def add_condition_from_AndConditionTail(self, schema: Dict[str, List[str]], alias: Dict[str, str], conditions: Dict[str, List[Condition]], AndConditionTail_node: ParseTree):
         ConditionTerm_node = AndConditionTail_node.childs[1]
@@ -493,26 +505,14 @@ class QueryProcessor:
             self.add_condition_from_AndConditionTail(schema, alias, conditions, AndConditionTail_node)
         return conditions
 
-    # TODO (sekarang)
-    # fungsi untuk ORDER BY dan LIMIT
-    def apply_order_by_and_limit(self, data: List[Dict[str, Union[int, str]]], 
-                                order_by: Optional[Dict[str, str]], 
-                                limit: Optional[int]) -> List[Dict[str, Union[int, str]]]:
-        # :param data: daftar/list berisi baris hasil query yang tiap baris direpresentasikan sbg dictionary
-        # :param order_by: dictionary -> column: nama kolom yg ingin diurutkan, direction: ascending/descendingDictionary with 'column' and 'direction' for ordering.
-                        # contoh: order_by = {"column": "age", "direction": "DESC"}.
-        # :param limit: jumlah max baris yang diinginkan pada hasil query
-        # :return: mengembalikan daftar/list order by dan limit
-        if order_by:
-            column = order_by.get("column")
-            direction = order_by.get("direction", "ASC").upper()
-            reverse = direction == "DESC"
-            # mengurutkan daftar data
-            data.sort(key=lambda x: x.get(column, None), reverse=reverse)
-        if limit is not None:
-            # mengambil jumlah elemen sesuai limit dari daftar data
-            data = data[:limit]
-        return data
+    # fungsi untuk ORDER BY
+    def execute_ORDER_BY(self, rows: List[Dict[str, Union[int, str]]], order_by_attr: str, descending: bool = False) -> List[Dict[str, Union[int, str]]]:
+        def get_sort_key(row):
+            value = row.get(order_by_attr, None)
+            if isinstance(value, str):
+                return tuple(ord(char) for char in value)
+            return value
+        return sorted(rows, key=get_sort_key, reverse=descending)
 
     # TODO (menunggu kelompok query optimizer)
     # handle query UPDATE, menerima input node query tree
