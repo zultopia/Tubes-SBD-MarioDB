@@ -47,7 +47,6 @@ class SortingNode(QueryNode):
         return f"SORT BY {', '.join(self.sort_attributes)} {order}"
 
     def get_node_attributes(self) -> List[str]:
-        print("IN SORTING NODE")
         if not self.child:
             raise ValueError("SortingNode has no child.")
             
@@ -59,9 +58,6 @@ class SortingNode(QueryNode):
             unqualified_attr = attr
             matching_attrs = [attr for attr in child_attrs if attr.split('.')[-1] == unqualified_attr]
 
-            print("IN SORTING NODE")
-            print(matching_attrs)
-            print(unqualified_attr)
             
             if len(matching_attrs) == 1:
                 # Single match - use its table alias

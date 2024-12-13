@@ -40,7 +40,6 @@ class TestOptimizerRule8:
         project.set_child(join2)
         original_plan = QueryPlan(project)
 
-        print(original_plan)
 
         # Expected: Push projections down keeping join attributes
         course2 = TableNode("course")
@@ -71,8 +70,6 @@ class TestOptimizerRule8:
         plans = generate_possible_plans(original_plan, [
             EquivalenceRules.push_projections_into_join
         ])
-        print(expected_plan)
-        print(plans)
 
         
         assert any(p == expected_plan for p in plans), "Course-Section-Classroom projection distribution should exist"

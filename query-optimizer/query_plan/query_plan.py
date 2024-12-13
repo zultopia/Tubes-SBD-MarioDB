@@ -54,6 +54,7 @@ class QueryPlan(Prototype):
         pass
 
     def estimate_cost(self, statistics: Dict) -> float:
+        self.setup()
         return self.root.estimate_cost(statistics, self.alias_dict)
     
 

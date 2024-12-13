@@ -70,16 +70,16 @@ if current == 'gana':
 
     print("Initial plan:")
     print(query_plan)
-    print("\n\n\nGenerated plans:" + str(len(plans)))
+    # print("\n\n\nGenerated plans:" + str(len(plans)))
     
-    LIMIT_5 = min(len(plans), 20)
-    for plan in plans[:LIMIT_5]:
-        print(plan)
+    # LIMIT_5 = min(len(plans), 20)
+    # for plan in plans[:LIMIT_5]:
+    #     print(plan)
 
-        # Uncomment the below lines if you want to use the optimizer
-        # bf = BFOptimizer()
-        # bestPlan = bf.optimize(query_plan)
-        # bestPlan.print()
+    bf = BFOptimizer()
+    bestPlan = bf.optimize(query_plan)
+    print("\n\n\nBest plan:")
+    print(bestPlan)
         
     # except Exception as e:
         

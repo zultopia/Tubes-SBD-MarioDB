@@ -94,8 +94,6 @@ class SelectionNode(QueryNode):
         
         # For each condition with constant comparison, match its attribute with child attributes
         for condition in self.conditions:
-            print("IN SELECTION NODE")
-            print(condition)
             if condition.is_constant_comparison():
                 # Find matching attribute from child
                 unqualified_attr = condition.left_attribute
@@ -122,7 +120,6 @@ class SelectionNode(QueryNode):
                 #  make both left and right
                 left_unqualified_attr = condition.left_attribute
                 right_unqualified_attr = condition.right_attribute
-                print( "condition is not constant", condition)
 
                 left_matching_attrs = [attr for attr in child_attrs if attr.split('.')[-1] == left_unqualified_attr]
                 right_matching_attrs = [attr for attr in child_attrs if attr.split('.')[-1] == right_unqualified_attr]

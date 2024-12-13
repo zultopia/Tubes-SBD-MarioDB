@@ -392,7 +392,6 @@ class EquivalenceRules:
                 new_join.set_children(Pair(new_left, new_right))
             else:
                 raise TypeError("Unsupported join node type.")
-            print(new_join)
             return new_join
 
         # Scenario A: Project -> Join
@@ -413,7 +412,6 @@ class EquivalenceRules:
             # Clone the selection node and set its child to the transformed join
             new_selection = selection_node.clone()
             new_selection.set_child(transformed_join)
-            print(new_selection)
             
             return [new_selection]
     

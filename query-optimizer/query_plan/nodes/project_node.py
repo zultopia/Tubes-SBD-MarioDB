@@ -40,8 +40,6 @@ class ProjectNode(QueryNode):
         
         # Reset projected attributes
         self.projected_attributes = []
-        print (self.original_attributes)
-        print (child_attrs)
 
         if '*' in self.original_attributes:
             # Expand '*' to all child attributes
