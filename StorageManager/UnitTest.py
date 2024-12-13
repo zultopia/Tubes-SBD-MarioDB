@@ -4,7 +4,7 @@ import unittest
 # import sys
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import shutil
-from StorageManager.classes import StorageManager, DataWrite, DataRetrieval, DataDeletion, Condition, ConditionGroup
+from StorageManager.classes import Statistic, StorageManager, DataWrite, DataRetrieval, DataDeletion, Condition, ConditionGroup
 from StorageManager.HashIndex import Hash
 from FailureRecoveryManager.Buffer import Buffer
 
@@ -150,6 +150,10 @@ class TestStorageManager(unittest.TestCase):
         self.manager.set_index("Departement", "building", 'hash')
         self.assertEqual(self.manager.get_index("Student", "name"), 'hash')
         self.assertEqual(self.manager.get_index("Departement", "building"), 'hash')
+
+    def test_stats(self):
+        statistic = self.manager.get_stats()
+        print("STATS", statistic["Student"].n_r)
 
     def tearDown(self):
             shutil.rmtree(self.test_data_dir)
