@@ -8,6 +8,7 @@ class UpdateNode(QueryNode):
         super().__init__(NodeType.UPDATE)
         self.updates = sorted(updates, key=lambda u: u[0])  # Sort updates by column name
         self.child = None  # Single child node
+        self.children = None
         self._cached_attributes: Optional[List[str]] = None  # Cache for attributes
 
     def set_child(self, child: QueryNode):

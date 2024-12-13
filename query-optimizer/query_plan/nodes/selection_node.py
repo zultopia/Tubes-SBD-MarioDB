@@ -13,6 +13,7 @@ class SelectionNode(QueryNode):
         super().__init__(NodeType.SELECTION)
         self.conditions = sorted(conditions, key=lambda c: (c.operator != 'EQ', c.left_operand, c.right_operand))
         self.child = None  # Single child node
+        self.children = None
 
     def set_child(self, child: QueryNode):
         self.child = child
@@ -147,6 +148,7 @@ class UnionSelectionNode(QueryNode):
     def __init__(self, children: List['SelectionNode']):
         super().__init__(NodeType.UNION_SELECTION)
         self.children: List['SelectionNode'] = children  # List of SelectionNode instances
+        self.child = None
         self._cached_attributes: Optional[List[str]] = None  # Cache for attributes
 
     def set_child_to_all(self, child: QueryNode):

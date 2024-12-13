@@ -11,6 +11,7 @@ class SortingNode(QueryNode):
         self.sort_attributes = sorted(attributes)  # Sort for consistency
         self.ascending = ascending
         self.child = None  # Single child node
+        self.children = None
         self._cached_attributes: Optional[List[str]] = None  # Cache for attributes
 
     def set_child(self, child: QueryNode):

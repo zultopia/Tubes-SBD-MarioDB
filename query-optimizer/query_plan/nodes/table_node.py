@@ -10,6 +10,7 @@ class TableNode(QueryNode):
         self.table_name = table_name
         self.alias = alias if alias else table_name  # Use alias if provided
         self.child = None  # Single child node
+        self.children = None
         self._cached_attributes: Optional[List[str]] = None  # Cache for attributes
 
     def set_child(self, child: QueryNode):

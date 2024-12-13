@@ -12,6 +12,7 @@ class JoinNode(QueryNode):
         super().__init__(NodeType.JOIN)
         self.algorithm = algorithm
         self.children: Pair[QueryNode, QueryNode] = None  # Should be of type Pair[QueryNode, QueryNode]
+        self.child = None # Join tidak pakai child
         self.table_name = None
         self._cached_attributes: Optional[List[str]] = None  # Cache for attributes
 

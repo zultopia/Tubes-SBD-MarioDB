@@ -20,6 +20,8 @@ class QueryNode(ABC, Prototype):
     def __init__(self, node_type: NodeType):
         self.node_type = node_type
         self.id = str(uuid.uuid4())
+        self.child = None
+        self.children = None
 
     def switchChildren(self) -> None:
         if isinstance(self.children, Pair):

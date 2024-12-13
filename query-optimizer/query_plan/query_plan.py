@@ -1,5 +1,5 @@
 # query_plan.py
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from .base import QueryNode
 from .nodes.project_node import ProjectNode
 from .nodes.selection_node import SelectionNode, UnionSelectionNode
@@ -13,11 +13,35 @@ from utils import Pair, Prototype
 
 class QueryPlan(Prototype):
     def __init__(self, root: QueryNode):
+        self.root = root
+
         self.alias_dict: Dict[str, str] = {} # Given the alias, returns the original table name.
                              # For non-table expressions (result of joins, selections, projections, etc), it is assumed that there is no alias.
          
+        def dfs(node: QueryNode):
+            if node.child == None and node.children == None:
+                assert(isinstance(node, TableNode))
+                assert(node.alias != None and node.table_name != None)
+                self.alias_dict[node.alias] = node.table_name
+            elif node.child != None:
+                assert(node.children == None)
+                dfs(node.child)
+            else:
+                assert(node.child == None)
+                assert(node.children != None)
+                
+                if isinstance(node.children, QueryNode):
+                    dfs(node.children)
+                elif isinstance(node.children, Pair[QueryNode, QueryNode]):
+                    dfs(node.children.first)
+                    dfs(node.children.second)
+                else:
+                    assert (isinstance(node.children, List[QueryNode]))
+                    for i in node.children:
+                        dfs(i)
+        
+        dfs(root)            
 
-        self.root = root
 
     def optimize(self, optimizer: 'QueryPlanOptimizer'):
         # Panggil bf di sini?

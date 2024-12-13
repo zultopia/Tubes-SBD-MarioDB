@@ -9,11 +9,12 @@ class LimitNode(QueryNode):
         super().__init__(NodeType.LIMIT)
         self.limit = int(limit)
         self._cached_attributes: List[str] = []
-
+        self.children = None
+        
     
     def set_child(self, child: QueryNode):
         self.child = child
-    
+
     def __str__(self) -> str:
         return f"LIMIT {self.limit}"
     

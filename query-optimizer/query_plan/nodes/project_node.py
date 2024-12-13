@@ -21,6 +21,7 @@ class ProjectNode(QueryNode):
         self.project_list = attributes
 
         self.child = None  # Single child node
+        self.children = None
         self._attributes = self.projected_attributes.copy()  # Cache the projected attributes
 
     def set_child(self, child: QueryNode):
