@@ -1,11 +1,11 @@
-from data import QOData
-from query_plan.nodes.selection_node import SelectionNode
-from query_plan.nodes.table_node import TableNode
-from query_plan.nodes.project_node import ProjectNode
-from query_plan.shared import Condition, Operator
-from query_plan.query_plan import QueryPlan
-from generator import generate_possible_plans
-from equivalence_rules import EquivalenceRules
+from QueryOptimizer.data import QOData
+from QueryOptimizer.query_plan.nodes.selection_node import SelectionNode
+from QueryOptimizer.query_plan.nodes.table_node import TableNode
+from QueryOptimizer.query_plan.nodes.project_node import ProjectNode
+from QueryOptimizer.query_plan.shared import Condition, Operator
+from QueryOptimizer.query_plan.query_plan import QueryPlan
+from QueryOptimizer.generator import generate_possible_plans
+from QueryOptimizer.equivalence_rules import EquivalenceRules
 
 class TestOptimizerRule1:
     def test_1(self):

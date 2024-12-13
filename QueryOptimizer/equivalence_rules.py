@@ -1,15 +1,15 @@
-from query_plan.base import QueryNode
-from query_plan.nodes.selection_node import SelectionNode, UnionSelectionNode
-from query_plan.nodes.join_nodes import ConditionalJoinNode,NaturalJoinNode, JoinNode
-from query_plan.nodes.table_node import TableNode
-from query_plan.nodes.project_node import ProjectNode
-from query_plan.nodes.sorting_node import SortingNode
-from query_plan.enums import NodeType
+from QueryOptimizer.query_plan.base import QueryNode
+from QueryOptimizer.query_plan.nodes.selection_node import SelectionNode, UnionSelectionNode
+from QueryOptimizer.query_plan.nodes.join_nodes import ConditionalJoinNode,NaturalJoinNode, JoinNode
+from QueryOptimizer.query_plan.nodes.table_node import TableNode
+from QueryOptimizer.query_plan.nodes.project_node import ProjectNode
+from QueryOptimizer.query_plan.nodes.sorting_node import SortingNode
+from QueryOptimizer.query_plan.enums import NodeType
 from typing import List, Union
-from query_plan.shared import Condition
-from data import QOData
-from query_plan.enums import JoinAlgorithm
-from utils import Pair
+from QueryOptimizer.query_plan.shared import Condition
+from QueryOptimizer.data import QOData
+from QueryOptimizer.query_plan.enums import JoinAlgorithm
+from QueryOptimizer.utils import Pair
 from copy import deepcopy
 
 

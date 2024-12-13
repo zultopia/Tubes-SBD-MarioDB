@@ -1,11 +1,11 @@
 import sys
 sys.setrecursionlimit(1000) # tambahin jika perlu
-from parse_tree import ParseTree
-from query_optimizer import get_parse_tree
-from from_parse_tree import from_parse_tree
-from query_plan.optimizers.bf_optimizer import BFOptimizer
-from generator import generate_possible_plans
-from equivalence_rules import EquivalenceRules
+from QueryOptimizer.parse_tree import ParseTree
+from QueryOptimizer.query_optimizer import get_parse_tree
+from QueryOptimizer.from_parse_tree import from_parse_tree
+from QueryOptimizer.query_plan.optimizers.bf_optimizer import BFOptimizer
+from QueryOptimizer.generator import generate_possible_plans
+from QueryOptimizer.equivalence_rules import EquivalenceRules
 
 
 

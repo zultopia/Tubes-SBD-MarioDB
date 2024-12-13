@@ -1,6 +1,6 @@
 from typing import Dict, List, Tuple
-from ..base import QueryNode
-from ..enums import NodeType
+from QueryOptimizer.query_plan.base import QueryNode
+from QueryOptimizer.query_plan.enums import NodeType
 
 class LimitNode(QueryNode):
     limit: int

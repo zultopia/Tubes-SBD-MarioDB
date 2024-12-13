@@ -1,5 +1,5 @@
 from typing import Generic, TypeVar, List
-from data import QOData
+from QueryOptimizer.data import QOData
 
 T = TypeVar('T')
 U = TypeVar('U')

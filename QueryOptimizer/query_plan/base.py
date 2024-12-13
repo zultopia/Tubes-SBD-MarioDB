@@ -1,7 +1,7 @@
 # base.py
 from abc import ABC, abstractmethod
 from typing import Dict, Tuple, Union, List
-from utils import Pair, Prototype
+from QueryOptimizer.utils import Pair, Prototype
 from .enums import NodeType
 import uuid
 

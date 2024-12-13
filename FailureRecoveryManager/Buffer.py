@@ -1,3 +1,4 @@
+import copy
 from threading import Lock
 from typing import Union
 
@@ -27,6 +28,15 @@ class Buffer:
         # Buffer mutex
         self._buffer_lock = Lock()
 
+    def is_empty(self) -> bool:
+        """
+        Checks if the buffer is empty
+
+        Returns:
+        bool: True if buffer is empty, False otherwise
+        """
+        return self._buffer.is_empty()
+
     def get_buffer(self, table_name: str, block_id: int) -> Union[any, None]:
         """
         Get a block from the buffer cache
@@ -41,6 +51,24 @@ class Buffer:
         """
         with self._buffer_lock:
             cache_key = (table_name, block_id)
+            return self._buffer.get(cache_key)
+
+    def get_buffer_hash(
+        self, hashNumber: int, table_name: str, block_id: int, column: str
+    ) -> Union[any, None]:
+        """
+        Get a block from the buffer cache
+
+        Args:
+            table_name (str): The name of the table
+            block_id (int): The block ID
+
+        Returns:
+            any: The block data
+            None: If the block is not found in the buffer
+        """
+        with self._buffer_lock:
+            cache_key = (hashNumber, table_name, block_id, column)
             return self._buffer.get(cache_key)
 
     def put_buffer(
@@ -60,6 +88,30 @@ class Buffer:
         """
         with self._buffer_lock:
             cache_key = (table_name, block_id)
+            return self._buffer.put(cache_key, block_data)
+
+    def put_buffer_hash(
+        self,
+        hashNumber: int,
+        table_name: str,
+        block_id: int,
+        column: str,
+        block_data: any,
+    ):
+        """
+        Put a block to the buffer cache
+
+        Args:
+            table_name (str): The name of the table
+            block_id (int): The block ID
+            block_data (any): The block data
+
+        Returns:
+            None: if the buffer still has space or old block is overwritten
+            Any: the block data that is overwritten
+        """
+        with self._buffer_lock:
+            cache_key = (hashNumber, table_name, block_id, column)
             return self._buffer.put(cache_key, block_data)
 
     def delete_buffer(self, table_name: str, block_id: int) -> bool:
@@ -98,7 +150,7 @@ class Buffer:
         with self._buffer_lock:
             return self._buffer.get_cache()
 
-    def clear_buffer(self) -> None:
+    def clear_buffer(self) -> Union[None, dict[any, any]]:
         """
         Clear all the entries in the buffer cache
 
@@ -106,5 +158,11 @@ class Buffer:
         previous buffer
         """
         with self._buffer_lock:
+            # Check if buffer is empty
+            if self._buffer.is_empty():
+                return None
+
+            # If not empty, copy the buffer and clear it
+            copied_dict = copy.deepcopy(self._buffer.get_cache())
             self._buffer.clear()
-            # print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
+            return copied_dict

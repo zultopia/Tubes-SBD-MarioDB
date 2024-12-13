@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple, Optional
-from ..base import QueryNode
-from ..enums import NodeType
-from utils import Pair
+from QueryOptimizer.query_plan.base import QueryNode
+from QueryOptimizer.query_plan.enums import NodeType
+from QueryOptimizer.utils import Pair
 
 class UpdateNode(QueryNode):
     def __init__(self, updates: List[Tuple[str, str]]):  # [(column, new_value),...]

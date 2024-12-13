@@ -1,11 +1,11 @@
-from tests.test_rule1 import TestOptimizerRule1
-from tests.test_rule2 import TestOptimizerRule2
-from tests.test_rule4 import TestOptimizerRule4
-from tests.test_rule5 import TestOptimizerRule5
-from tests.test_rule6 import TestOptimizerRule6
-from tests.test_rule7 import TestOptimizerRule7
-from tests.test_rule8 import TestOptimizerRule8
-from tests.test_query_plan_tree import TestQueryPlanGeneration
+from QueryOptimizer.tests.test_rule1 import TestOptimizerRule1
+from QueryOptimizer.tests.test_rule2 import TestOptimizerRule2
+from QueryOptimizer.tests.test_rule4 import TestOptimizerRule4
+from QueryOptimizer.tests.test_rule5 import TestOptimizerRule5
+from QueryOptimizer.tests.test_rule6 import TestOptimizerRule6
+from QueryOptimizer.tests.test_rule7 import TestOptimizerRule7
+from QueryOptimizer.tests.test_rule8 import TestOptimizerRule8
+from QueryOptimizer.tests.test_query_plan_tree import TestQueryPlanGeneration
         
 if __name__ == '__main__':
     print("=============================================================")

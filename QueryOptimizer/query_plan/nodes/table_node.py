@@ -1,8 +1,8 @@
 from typing import List, Dict, Optional
-from query_plan.base import QueryNode
-from query_plan.enums import NodeType
-from data import QOData  
-from utils import Pair
+from QueryOptimizer.query_plan.base import QueryNode
+from QueryOptimizer.query_plan.enums import NodeType
+from QueryOptimizer.data import QOData  
+from QueryOptimizer.utils import Pair
 
 class TableNode(QueryNode):
     def __init__(self, table_name: str, alias: Optional[str] = None):

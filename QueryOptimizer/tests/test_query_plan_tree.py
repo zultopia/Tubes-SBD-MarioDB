@@ -1,19 +1,19 @@
-from query_plan.query_plan import QueryPlan
-from query_plan.nodes.table_node import TableNode
-from query_plan.nodes.project_node import ProjectNode
-from query_plan.nodes.join_nodes import ConditionalJoinNode, NaturalJoinNode, JoinNode
-from query_plan.nodes.update_node import UpdateNode
-from query_plan.nodes.selection_node import SelectionNode
-from query_plan.nodes.sorting_node import SortingNode
-from query_plan.nodes.limit_node import LimitNode
-from query_plan.enums import JoinAlgorithm, Operator
-from query_plan.shared import Condition
-from utils import Pair
+from QueryOptimizer.query_plan.query_plan import QueryPlan
+from QueryOptimizer.query_plan.nodes.table_node import TableNode
+from QueryOptimizer.query_plan.nodes.project_node import ProjectNode
+from QueryOptimizer.query_plan.nodes.join_nodes import ConditionalJoinNode, NaturalJoinNode, JoinNode
+from QueryOptimizer.query_plan.nodes.update_node import UpdateNode
+from QueryOptimizer.query_plan.nodes.selection_node import SelectionNode
+from QueryOptimizer.query_plan.nodes.sorting_node import SortingNode
+from QueryOptimizer.query_plan.nodes.limit_node import LimitNode
+from QueryOptimizer.query_plan.enums import JoinAlgorithm, Operator
+from QueryOptimizer.query_plan.shared import Condition
+from QueryOptimizer.utils import Pair
 
-from query_optimizer import get_parse_tree
-from from_parse_tree import from_parse_tree
+from QueryOptimizer.query_optimizer import get_parse_tree
+from QueryOptimizer.from_parse_tree import from_parse_tree
 from time import time
-from data import QOData
+from QueryOptimizer.data import QOData
 
 
 class TestQueryPlanGeneration():

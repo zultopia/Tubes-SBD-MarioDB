@@ -1,7 +1,7 @@
 import math
 from typing import Literal, Union
 
-from query_plan.nodes.constants import BLOCK_SIZE
+from QueryOptimizer.query_plan.nodes.constants import BLOCK_SIZE
 
 
 

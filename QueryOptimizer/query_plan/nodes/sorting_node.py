@@ -1,9 +1,9 @@
 from typing import List, Dict, Optional
-from ..base import QueryNode
-from ..enums import NodeType
-from .constants import *
+from QueryOptimizer.query_plan.base import QueryNode
+from QueryOptimizer.query_plan.enums import NodeType
+from QueryOptimizer.query_plan.nodes.constants import *
 import uuid
-from utils import Pair
+from QueryOptimizer.utils import Pair
 
 class SortingNode(QueryNode):
     def __init__(self, attributes: List[str], ascending: bool = True):

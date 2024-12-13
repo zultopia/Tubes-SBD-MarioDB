@@ -1,14 +1,14 @@
 # query_plan.py
 from typing import Dict, List, Optional
-from .base import QueryNode
-from .nodes.project_node import ProjectNode
-from .nodes.selection_node import SelectionNode, UnionSelectionNode
-from .nodes.table_node import TableNode
-from .nodes.join_nodes import JoinNode, ConditionalJoinNode, NaturalJoinNode
-from .nodes.sorting_node import SortingNode
-from .nodes.update_node import UpdateNode
-from .nodes.limit_node import LimitNode
-from utils import Pair, Prototype
+from QueryOptimizer.query_plan.base import QueryNode
+from QueryOptimizer.query_plan.nodes.project_node import ProjectNode
+from QueryOptimizer.query_plan.nodes.selection_node import SelectionNode, UnionSelectionNode
+from QueryOptimizer.query_plan.nodes.table_node import TableNode
+from QueryOptimizer.query_plan.nodes.join_nodes import JoinNode, ConditionalJoinNode, NaturalJoinNode
+from QueryOptimizer.query_plan.nodes.sorting_node import SortingNode
+from QueryOptimizer.query_plan.nodes.update_node import UpdateNode
+from QueryOptimizer.query_plan.nodes.limit_node import LimitNode
+from QueryOptimizer.utils import Pair, Prototype
 
 
 class QueryPlan(Prototype):

@@ -1,5 +1,5 @@
 from typing import List
-from .optimizer import QueryPlanOptimizer
+from QueryOptimizer.query_plan.nodes.optimizers.optimizer import QueryPlanOptimizer
 
 class DPOptimizer(QueryPlanOptimizer):
     def optimize(self, query: 'QueryPlan') -> 'QueryPlan':

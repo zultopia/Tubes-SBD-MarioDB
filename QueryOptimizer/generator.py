@@ -1,5 +1,5 @@
-from equivalence_rules import EquivalenceRules
-from query_plan.query_plan import (
+from QueryOptimizer.equivalence_rules import EquivalenceRules
+from QueryOptimizer.query_plan.query_plan import (
     QueryPlan, QueryNode, ProjectNode, UnionSelectionNode, SelectionNode,
     JoinNode, ConditionalJoinNode, NaturalJoinNode, SortingNode, TableNode, Pair, LimitNode
 )

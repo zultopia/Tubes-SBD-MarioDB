@@ -5,3 +5,37 @@ CHECKPOINT|[]
 102|START
 103|START
 CHECKPOINT|[102,103]
+102|COMMIT
+CHECKPOINT|[]
+"id": 2, "name": "Bob", "salary": 4000}]
+102|WRITE|employees|[{"id": 2, "name": "Bob", "salary": 4000}]|None
+102|ABORT
+103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]
+CHECKPOINT|["103"]
+102|COMMIT
+CHECKPOINT|[]
+"id": 2, "name": "Bob", "salary": 4000}]
+102|WRITE|employees|[{"id": 2, "name": "Bob", "salary": 4000}]|None
+102|ABORT
+103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]
+CHECKPOINT|["103"]
+102|WRITE|employees|None|[{"id": 2, "name": "Bob", "salary": 4000}]
+102|WRITE|employees|[{"id": 2, "name": "Bob", "salary": 4000}]|None
+102|ABORT
+103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]
+CHECKPOINT|["103"]
+102|COMMIT
+CHECKPOINT|[]
+102|COMMIT
+102|WRITE|employees|None|{"id": 2, "name": "Bob", "salary": 4000}
+102|ABORT
+102|COMMIT
+102|WRITE|employees|None|{"id": 2, "name": "Bob", "salary": 4000}
+102|ABORT
+CHECKPOINT|[]
+102|WRITE|employees|None|[{"id": 2, "name": "Bob", "salary": 4000}]
+102|WRITE|employees|[{"id": 2, "name": "Bob", "salary": 4000}]|None
+102|ABORT
+103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]
+102|WRITE|employees|None|{"id": 2, "name": "Bob", "salary": 4000}
+CHECKPOINT|["103", "102"]

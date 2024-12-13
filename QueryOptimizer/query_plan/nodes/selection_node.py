@@ -1,12 +1,12 @@
 # selection_node.py
 
 from typing import List, Dict, Optional
-from query_plan.base import QueryNode
-from query_plan.enums import NodeType, Operator
-from data import QOData 
-from .constants import *
-from query_plan.shared import Condition 
-from utils import Pair
+from QueryOptimizer.query_plan.base import QueryNode
+from QueryOptimizer.query_plan.enums import NodeType, Operator
+from QueryOptimizer.data import QOData 
+from QueryOptimizer.query_plan.nodes.constants import *
+from QueryOptimizer.query_plan.shared import Condition 
+from QueryOptimizer.utils import Pair
 
 class SelectionNode(QueryNode):
     def __init__(self, conditions: List['Condition']):

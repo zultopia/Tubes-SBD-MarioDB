@@ -1,6 +1,6 @@
 
 
-from query_plan.query_plan import QueryPlan
+from QueryOptimizer.query_plan.query_plan import QueryPlan
 
 # Total Cost = (IO_cost × io_weight) + 
             #  (CPU_cost × cpu_weight) + 

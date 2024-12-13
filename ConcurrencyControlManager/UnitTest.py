@@ -20,8 +20,8 @@ class TestConcurrencyControlManager(unittest.TestCase):
     
     def test_validate_object(self):
         # [Tes-MainMethod] validate_object
-        row_tes = Row('table', PrimaryKey(1), {'col1': 1, 'col2': 'SBD'})
-        row_tes2 = Row('table', PrimaryKey(1), {'col1': 1, 'col2': 'WBD'})
+        row_tes = Row(Table('table'), PrimaryKey(1), {'col1': 1, 'col2': 'SBD'})
+        row_tes2 = Row(Table('table'), PrimaryKey(1), {'col1': 1, 'col2': 'WBD'})
         tid1 = self.ccm.begin_transaction()
         tid2 = self.ccm.begin_transaction()
         
@@ -123,14 +123,10 @@ class TestConcurrencyControlManager(unittest.TestCase):
         self.assertFalse(res2.allowed)
         self.assertEqual(res2.transaction_id, tid2)
     
-    def test_log_object(self):
-        # [Tes-MainMethod] log_object
-        pass
-    
     def test_end_transaction(self):
         # [Tes-MainMethod] end_transaction
-        row_tes = Row('table', PrimaryKey(1), {'col1': 1, 'col2': 'SBD'})
-        row_tes2 = Row('table', PrimaryKey(1), {'col1': 1, 'col2': 'WBD'})
+        row_tes = Row(Table('table'), PrimaryKey(1), {'col1': 1, 'col2': 'SBD'})
+        row_tes2 = Row(Table('table'), PrimaryKey(1), {'col1': 1, 'col2': 'WBD'})
         ccm5 = ConcurrencyControlManager(algorithm="Tes")
         tid1 = ccm5.begin_transaction()
         tid2 = ccm5.begin_transaction()
@@ -171,8 +167,6 @@ class TestConcurrencyControlManager(unittest.TestCase):
         self.assertTrue(res3.allowed)
         self.assertTrue(res4.allowed)
         
-    # #     pass
-    
     def test_susah(self):
         table1 = Table('table1')
         table2 = Table('table2')
@@ -197,22 +191,6 @@ class TestConcurrencyControlManager(unittest.TestCase):
         tid3 = ccm.begin_transaction()
         tid4 = ccm.begin_transaction()
         tid5 = ccm.begin_transaction()
-        
-        # res1 = ccm.validate_object(TransactionAction(tid1, "read", "table", table1, None))
-        # res2 = ccm.validate_object(TransactionAction(tid1, "write", "row", row1_table1, None))
-        # res3 = ccm.validate_object(TransactionAction(tid1, "write", "row", row1_table2, None))
-        
-        # self.assertTrue(res1.allowed)
-        # self.assertTrue(res2.allowed)
-        # self.assertTrue(res3.allowed)
-        
-        # res4 = ccm.validate_object(TransactionAction(tid1, "write", "cell", cell1_row1_table1, None))
-        # res5 = ccm.validate_object(TransactionAction(tid2, "write", "cell", cell2_row1_table1, None))
-        # res6 = ccm.validate_object(TransactionAction(tid3, "write", "cell", cell1_row2_table1, None))
-        
-        # self.assertTrue(res4.allowed)
-        # self.assertFalse(res5.allowed)
-        # self.assertTrue(res6.allowed)
         
         res1 = ccm.validate_object(TransactionAction(tid1, "read", "table", table1, None))
         res2 = ccm.validate_object(TransactionAction(tid2, "write", "row", row1_table1, None))
@@ -352,131 +330,6 @@ class TestConcurrencyControlManager(unittest.TestCase):
         self.assertFalse(res22.allowed)
         self.assertTrue(res23.allowed)
         self.assertTrue(res24.allowed)
-        
-        
-        
-    # # Helper Methods
-    
-    # # Helper Functionality
-    
-    # def test_eq_PrimaryKey(self):
-    #     # [Tes-Helper] compare equal Primary Key
-    #     pass
-    
-    # def test_ne_PrimaryKey(self):
-    #     # [Tes-Helper] compare not equal Primary Key
-    #     pass
-    
-    # def test_eq_Row(self):
-    #     # [Tes-Helper] compare equal Row
-    #     pass
-    
-    # def test_ne_Row(self):
-    #     # [Tes-Helper] compare not equal Row
-    #     pass
-    
-    # def test_deadlock_detection(self):
-    #     wfg = WaitForGraph()
-    #     wfg.addEdge(1, 2)
-    #     wfg.addEdge(4, 1)
-    #     wfg.addEdge(2, 3)
-    #     wfg.addEdge(3, 5)
-        
-    #     # Tes: No Deadlock
-    #     isDeadlock = wfg.isCyclic()
-    #     self.assertFalse(isDeadlock)
-        
-    #     wfg.addEdge(5, 1)
-        
-    #     # Tes: Deadlock
-    #     isDeadlock = wfg.isCyclic()
-    #     self.assertTrue(isDeadlock)
-        
-    #     # Tes: delete node 5, transaction id 5 sudah commit
-    #     wfg.deleteEdge(5, 1)
-    #     wfg.deleteEdge(4, 1)
-    #     wfg.addEdge(4, 5)
-    #     wfg.deleteNode(5)
-    #     lenWaitFor = len(wfg.waitfor)
-    #     self.assertEqual(lenWaitFor, 2)
-
-    # def test_validate_object_read(self):
-    #     tid1 = self.ccm.begin_transaction()
-    #     table_tes = Table('table')
-    #     row_tes = Row(table_tes, PrimaryKey(1), {'col1': 1, 'col2': 'SBD'})
-    #     t_action1_read = TransactionAction(tid1,"read","row", row_tes, None)
-    #     response = ccm.validate_object(t_action1_read)
-    #     self.assertTrue(response.allowed)
-    #     self.assertEqual(response.transaction_id, tid1)
-    #     self.assertIn(row_tes, self.ccm.lock_S)
-    #     self.assertIn(tid1, self.ccm.lock_S[row_tes])
-
-    # def test_validate_object_write(self):
-    #     tid1 = self.ccm.begin_transaction()
-    #     table_tes = Table('table')
-    #     row_tes = Row(table_tes, PrimaryKey(1), {'col1': 1, 'col2': 'SBD'})
-    #     row_tes2 = Row(table_tes, PrimaryKey(1), {'col1': 1, 'col2': 'WBD'})
-    #     t_action1_write = TransactionAction(tid1,"write","row", row_tes, row_tes2)
-    #     response = ccm.validate_object(t_action1_write)
-    #     self.assertTrue(response.allowed)
-    #     self.assertEqual(response.transaction_id, tid1)
-    #     self.assertIn(row_tes, self.ccm.lock_X)
-    #     self.assertEqual(self.ccm.lock_X[row_tes], {tid1})
-
-    # def test_validate_object_conflict(self):
-    #     tid1 = self.ccm.begin_transaction()
-    #     table_tes = Table('table')
-    #     row_tes = Row(table_tes, PrimaryKey(1), {'col1': 1, 'col2': 'SBD'})
-    #     row_tes2 = Row(table_tes, PrimaryKey(1), {'col1': 1, 'col2': 'WBD'})
-    #     t_action1_read = TransactionAction(tid1,"read","table", table_tes, None)
-    #     t_action1_write = TransactionAction(tid1,"write","row", row_tes, row_tes2)
-    #     self.ccm.validate_object(t_action1_write)
-    #     response = self.ccm.validate_object(t_action1_read)
-    #     self.assertTrue(response.allowed)
-    #     self.assertEqual(response.transaction_id, tid1)
-        
-    #     tid2 = self.ccm.begin_transaction()
-    #     t_action1_read = TransactionAction(tid2,"read","row", row_tes, None)
-    #     response = self.ccm.validate_object(t_action1_read)
-    #     self.assertFalse(response.allowed)
-    #     self.assertEqual(response.transaction_id, tid2)
-        
-
-    # def test_apply_lock_with_hierarchy_read(self):
-    #     tid = ccm.begin_transaction()
-    #     row_tes = Row('table', PrimaryKey(1), {'col1': 1, 'col2': 'SBD'})
-    #     response = ccm.apply_lock_with_hierarchy(DataItem("Row", self.row), tid, "S")
-    #     self.assertTrue(response.allowed)
-    #     self.assertIn(self.row, ccm.lock_S)
-    #     self.assertIn(tid, ccm.lock_S[self.row])
-
-    # def test_apply_lock_with_hierarchy_write(self):
-    #     tid = ccm.begin_transaction()
-    #     response = ccm.apply_lock_with_hierarchy(DataItem("Row", self.row), tid, "X")
-    #     self.assertTrue(response.allowed)
-    #     self.assertIn(self.row, ccm.lock_X)
-    #     self.assertEqual(ccm.lock_X[self.row], tid)
-
-    # def test_apply_lock_with_hierarchy_conflict(self):
-    #     tid1 = ccm.begin_transaction()
-    #     tid2 = ccm.begin_transaction()
-    #     ccm.apply_lock_with_hierarchy(DataItem("Row", self.row), tid1, "X")
-    #     response = ccm.apply_lock_with_hierarchy(DataItem("Row", self.row), tid2, "S")
-    #     self.assertFalse(response.allowed)
-
-    # def test_check_lock_conflict_no_conflict(self):
-    #     tid = ccm.begin_transaction()
-    #     ccm.apply_lock_with_hierarchy(DataItem("Row", self.row), tid, "S")
-    #     allowed, message = ccm.check_lock_conflict(self.row, "S")
-    #     self.assertTrue(allowed)
-    #     self.assertIsNone(message)
-
-    # def test_check_lock_conflict_with_conflict(self):
-    #     tid = ccm.begin_transaction()
-    #     ccm.apply_lock_with_hierarchy(DataItem("Row", self.row), tid, "X")
-    #     allowed, message = ccm.check_lock_conflict(self.row, "S")
-    #     self.assertFalse(allowed)
-    #     self.assertIsNotNone(message)
     
 if __name__ == "__main__":
     unittest.main(verbosity=2)

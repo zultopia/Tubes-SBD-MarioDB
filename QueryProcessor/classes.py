@@ -93,6 +93,15 @@ class QueryProcessor:
                 {"ID": 103, "name": "Dr. Lee", "dept_name": "Physics", "salary": 87000},
             ],
         }
+
+    # buat testing, sudah ada query plan
+    def test(self, query_string):
+        query_tree = get_parse_tree(query_string)
+        print(query_tree)
+        query_plan = from_parse_tree(query_tree)
+        print(query_plan)
+    
+    # currently working, belum pakai query plan, masih pakai query tree
     def execute_query(self, query_string: str) -> ExecutionResult:
         query_tree: ParseTree = get_parse_tree(query_string)
         # cek child pertama untuk menentukan jenis query (lengkapnya cek komentar dari fungsi di bawah ini)
@@ -237,7 +246,8 @@ class QueryProcessor:
         if len(query_tree.childs) >= 6:
             # jika diikuti klausa WHERE
             if query_tree.childs[5].root == "Condition":
-                self.execute_WHERE(retrieval_schema, alias, conditions, query_tree.childs[5])
+                # self.execute_WHERE(retrieval_schema, alias, conditions, query_tree.childs[5])
+                pass
             # jika diikuti klausa ORDER BY
             elif query_tree.childs[5].root == "ORDER_BY":
                 order_by_node = query_tree.childs[6]
@@ -262,8 +272,15 @@ class QueryProcessor:
         print(rows)
         print("\n")
     
-    def execute_WHERE(self, schema: Dict[str, List[str]], alias: Dict[str, str], conditions: ConditionGroup, query_tree: ParseTree):
-        pass
+    def execute_WHERE(self, schema: Dict[str, List[str]], alias: Dict[str, str], conditionGroup: ConditionGroup, Condition_node: ParseTree):
+        # inisialisasi conditions
+        conditions = []
+        # klausa "AND"
+        if len(Condition_node.childs) == 1:
+            logic_operator = "AND"
+            AndCondition_node = Condition_node.childs[0]
+            ConditionTerm_node = AndCondition_node.childs[0]
+            AndConditionTail_node = AndCondition_node.childs[1]
         
     # TODO (menunggu kelompok query optimizer)
     # handle query UPDATE, menerima input node query tree

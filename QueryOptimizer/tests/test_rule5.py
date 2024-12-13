@@ -1,13 +1,13 @@
 from time import time
-from query_plan.query_plan import QueryPlan
-from query_plan.nodes.table_node import TableNode
-from query_plan.nodes.join_nodes import ConditionalJoinNode, NaturalJoinNode
-from query_plan.nodes.selection_node import SelectionNode
-from query_plan.nodes.join_nodes import Condition
-from query_plan.enums import Operator, JoinAlgorithm
-from utils import Pair
-from generator import generate_possible_plans
-from equivalence_rules import EquivalenceRules
+from QueryOptimizer.query_plan.query_plan import QueryPlan
+from QueryOptimizer.query_plan.nodes.table_node import TableNode
+from QueryOptimizer.query_plan.nodes.join_nodes import ConditionalJoinNode, NaturalJoinNode
+from QueryOptimizer.query_plan.nodes.selection_node import SelectionNode
+from QueryOptimizer.query_plan.nodes.join_nodes import Condition
+from QueryOptimizer.query_plan.enums import Operator, JoinAlgorithm
+from QueryOptimizer.utils import Pair
+from QueryOptimizer.generator import generate_possible_plans
+from QueryOptimizer.equivalence_rules import EquivalenceRules
 
 class TestOptimizerRule5:
     def test_simple_join_commutativity(self):

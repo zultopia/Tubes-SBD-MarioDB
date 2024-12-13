@@ -2,13 +2,13 @@
 
 from typing import List, Dict, Optional
 
-from data import QOData
-from ..base import QueryNode
-from .constants import *
-from ..enums import NodeType
-from data import QOData
-from query_plan.nodes.constants import BLOCK_SIZE
-from utils import Pair
+from QueryOptimizer.data import QOData
+from QueryOptimizer.query_plan.base import QueryNode
+from QueryOptimizer.query_plan.nodes.constants import *
+from QueryOptimizer.query_plan.enums import NodeType
+from QueryOptimizer.data import QOData
+from QueryOptimizer.query_plan.nodes.constants import BLOCK_SIZE
+from QueryOptimizer.utils import Pair
 
 class ProjectNode(QueryNode):
     def __init__(self, attributes: List[str]):

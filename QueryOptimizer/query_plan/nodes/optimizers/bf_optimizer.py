@@ -1,8 +1,7 @@
 from typing import List
-from .optimizer import QueryPlanOptimizer
-from generator import generate_possible_plans
-from equivalence_rules import EquivalenceRules
-from data import MOCK_DATA
+from QueryOptimizer.query_plan.nodes.optimizers.optimizer import QueryPlanOptimizer
+from QueryOptimizer.generator import generate_possible_plans
+from QueryOptimizer.equivalence_rules import EquivalenceRules
 import random
 
 # Only mock

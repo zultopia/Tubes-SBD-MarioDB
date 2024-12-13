@@ -1,11 +1,11 @@
 from typing import List, Literal, Dict, Optional
-from ..base import QueryNode
-from ..enums import NodeType, JoinAlgorithm
-from utils import Pair
-from ..shared import Condition
-from ..enums import Operator
-from .constants import *
-from data import QOData
+from QueryOptimizer.query_plan.base import QueryNode
+from QueryOptimizer.query_plan.enums import NodeType, JoinAlgorithm
+from QueryOptimizer.utils import Pair
+from QueryOptimizer.query_plan.shared import Condition
+from QueryOptimizer.query_plan.enums import Operator
+from QueryOptimizer.query_plan.nodes.constants import *
+from QueryOptimizer.data import QOData
 
 class JoinNode(QueryNode):
     def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP):

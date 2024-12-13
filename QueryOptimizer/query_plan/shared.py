@@ -1,4 +1,4 @@
-from .enums import Operator
+from QueryOptimizer.query_plan.enums import Operator
 
 
 

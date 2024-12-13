@@ -1,6 +1,6 @@
 from typing import Any, List, Tuple
 import pytest
-from lexer import Lexer, Token
+from QueryOptimizer.lexer import Lexer, Token
 
 def test_tokenize():
     assert Lexer("select name from person;").tokenize() == [

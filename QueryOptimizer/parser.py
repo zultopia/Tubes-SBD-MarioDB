@@ -1,6 +1,6 @@
 from typing import Any, List, Tuple
-from lexer import Token, Lexer
-from parse_tree import Node, ParseTree
+from QueryOptimizer.lexer import Token, Lexer
+from QueryOptimizer.parse_tree import Node, ParseTree
 
 
 class SQLGrammar:

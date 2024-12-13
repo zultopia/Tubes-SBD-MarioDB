@@ -1,1 +1,0 @@
-SELECT s.id FROM student AS s JOIN instructor AS l ON s.id = l.id;
