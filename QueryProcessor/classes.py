@@ -3,7 +3,7 @@
 from typing import List, Union, Dict, Optional
 
 # Storage Manager
-from StorageManager.classes import StorageManager, DataRetrieval, DataWrite, DataDeletion, Condition
+from StorageManager.classes import StorageManager, DataRetrieval, DataWrite, DataDeletion, Condition, ConditionGroup
 from ConcurrencyControlManager.classes import ConcurrencyControlManager
 
 # Query Optimizer
@@ -14,7 +14,7 @@ from QueryOptimizer.parse_tree import Node, ParseTree
 # mengubah string query menjadi parse tree
 from QueryOptimizer.query_optimizer import get_parse_tree
 # mengubah parse tree menjadi query plan
-from QueryOptimizer.from_parse_tree import from_parse_tree
+from QueryOptimizer.query_optimizer import from_parse_tree
 
 # Kita buat class interface untuk objek-objek yang digunakan
 class Rows:
@@ -132,7 +132,7 @@ class QueryProcessor:
             return self.add_schema_from_SelectListTail(SelectListTail_node.childs[2], schema)
 
     # menambahkan key dan value ke sebuah dictionary
-    def add_to_dictionary(self, dictionary: Union[Dict[str, List[str]] | Dict[str, List[Condition]]], key: str, value: Union[str | Condition]):
+    def add_to_dictionary(self, dictionary: Union[Dict[str, List[str]]], key: str, value: str):
         # jika key sudah ada di dalam dictionary
         if key in dictionary:
             dictionary[key].append(value)
@@ -226,8 +226,8 @@ class QueryProcessor:
             retrieval_schema = self.add_schema_from_SelectListTail(SelectList_node.childs[1], retrieval_schema)
         # inisialisasi dictionary untuk menyimpan alias tabel
         alias = {}
-        # dictionary untuk menyimpan kondisi setiap tabel
-        conditions: Dict[str, List[Condition]] = {}
+        # objek ConditionGroup untuk menyimpan semua kondisi
+        conditions = ConditionGroup([], "")
         # tambahkan nama tabel ke dalam skema dari node FromList
         self.execute_FROM(retrieval_schema, alias, query_tree)
         # Testing (DELETE LATER)
@@ -235,25 +235,20 @@ class QueryProcessor:
         print("alias =", alias, "\n")
         # jika ada klausa berikutnya
         if len(query_tree.childs) >= 6:
-            # jika ada klausa WHERE
-                if query_tree.childs[5].root == "Condition":
-                    self.execute_WHERE(retrieval_schema, alias, conditions, query_tree)
-                    for table, conditions in conditions.items():
-                        print(f"Table: {table}")
-                        for condition in conditions:
-                            print(f"  - {condition.column} {condition.operation} {condition.operand}")
-        # Jika ada klausa ORDER BY
-        if len(query_tree.childs) >= 7 and query_tree.childs[6].root == "ORDER_BY":
-            order_by_node = query_tree.childs[6]
-            order_by_attr = order_by_node.childs[1].root.value
-            descending = len(order_by_node.childs) > 2 and order_by_node.childs[2].root.value.upper() == "DESC"
-            rows = self.execute_ORDER_BY(rows, order_by_attr, descending)
-            
-        # Jika ada klausa LIMIT
-        if len(query_tree.childs) >= 8 and query_tree.childs[7].root == "LIMIT":
-            limit_node = query_tree.childs[7]
-            limit_value = int(limit_node.childs[1].root.value)
-            rows = self.execute_LIMIT(rows, limit_value)    
+            # jika diikuti klausa WHERE
+            if query_tree.childs[5].root == "Condition":
+                self.execute_WHERE(retrieval_schema, alias, conditions, query_tree.childs[5])
+            # jika diikuti klausa ORDER BY
+            elif query_tree.childs[5].root == "ORDER_BY":
+                order_by_node = query_tree.childs[6]
+                order_by_attr = order_by_node.childs[1].root.value
+                descending = len(order_by_node.childs) > 2 and order_by_node.childs[2].root.value.upper() == "DESC"
+                rows = self.execute_ORDER_BY(rows, order_by_attr, descending)
+            # jika diikuti klausa LIMIT
+            elif query_tree.childs[5].root == "LIMIT":
+                limit_node = query_tree.childs[7]
+                limit_value = int(limit_node.childs[1].root.value)
+                rows = self.execute_LIMIT(rows, limit_value)
     
         # Mengambil dari StorageManager
         rows = []
@@ -265,53 +260,11 @@ class QueryProcessor:
             rows.append(self.storage_manager.read_block(data_retrieval))
         
         print(rows)
-        print("\n")    
-
-    def add_condition_from_AndConditionTail(self, schema: Dict[str, List[str]], alias: Dict[str, str], conditions: Dict[str, List[Condition]], AndConditionTail_node: ParseTree):
-        ConditionTerm_node = AndConditionTail_node.childs[1]
-        Field_node = ConditionTerm_node.childs[0]
-        # jika tidak menggunakan alias
-        if len(Field_node.childs) == 1:
-            table = next[iter(conditions)]
-            column = Field_node.childs[0].root.value
-        # jika menggunakan alias
-        else:
-            table_alias = Field_node.childs[0].root.value
-            table = alias[table_alias]
-            column = Field_node.childs[2].root.value
-        operation = ConditionTerm_node.childs[1].childs[0].root.value
-        operand = ConditionTerm_node.childs[2].root.value
-        # tambahkan kondisi ke dictionary
-        self.add_to_dictionary(conditions, table, Condition(column, operation, operand))
-        # jika ada kondisi lain
-        if len(AndConditionTail_node.childs) == 3:
-            AndConditionTail_node = AndConditionTail_node.childs[2]
-            self.add_condition_from_AndConditionTail(schema, alias, conditions, AndConditionTail_node)
-
-    def execute_WHERE(self, schema: Dict[str, List[str]], alias: Dict[str, str], conditions: Dict[str, List[Condition]], query_tree: ParseTree) -> Dict[str, List[Condition]]:
-        Condition_node = query_tree.childs[5]
-        AndCondition_node = Condition_node.childs[0]
-        ConditionTerm_node = AndCondition_node.childs[0]
-        Field_node = ConditionTerm_node.childs[0]
-        # jika tidak menggunakan alias
-        if len(Field_node.childs) == 1:
-            table = next[iter(conditions)]
-            column = Field_node.childs[0].root.value
-        # jika menggunakan alias
-        else:
-            table_alias = Field_node.childs[0].root.value
-            table = alias[table_alias]
-            column = Field_node.childs[2].root.value
-        operation = ConditionTerm_node.childs[1].childs[0].root.value
-        operand = ConditionTerm_node.childs[2].root.value
-        # tambahkan kondisi ke dictionary
-        self.add_to_dictionary(conditions, table, Condition(column, operation, operand))
-        # jika ada kondisi lain
-        if len(AndCondition_node.childs) == 2:
-            AndConditionTail_node = AndCondition_node.childs[1]
-            self.add_condition_from_AndConditionTail(schema, alias, conditions, AndConditionTail_node)
-        return conditions
-
+        print("\n")
+    
+    def execute_WHERE(self, schema: Dict[str, List[str]], alias: Dict[str, str], conditions: ConditionGroup, query_tree: ParseTree):
+        pass
+        
     # TODO (menunggu kelompok query optimizer)
     # handle query UPDATE, menerima input node query tree
     def execute_UPDATE(self, query_tree: ParseTree):

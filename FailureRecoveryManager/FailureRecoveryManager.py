@@ -22,6 +22,7 @@ class FailureRecoveryManager:
         buffer: Buffer,
         log_file="./FailureRecoveryManager/log.log",
         checkpoint_interval=5,
+        storage_manager=StorageManager()
     ):
         """
         Dependency injection
@@ -49,7 +50,7 @@ class FailureRecoveryManager:
         """
         STORAGE MANAGER CLASS
         """
-        self.storage = StorageManager()
+        self.storage = storage_manager
 
         """
         SAVE CHECKPOINT CRON JOB
@@ -68,7 +69,7 @@ class FailureRecoveryManager:
 
         # Create log entry
         def process_rows(rows):
-            return ", ".join([str(item) for item in rows])
+            return json.dumps(rows)
 
         log_entry = None
 
@@ -136,7 +137,7 @@ class FailureRecoveryManager:
         # TODO: Write all the buffer to the disk . Need to inject storage manager
 
         # Clear the buffer
-        self.clear_buffer()
+        self.buffer.clear_buffer()
         # print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
 
         self._wa_log_lock.acquire()
@@ -316,7 +317,7 @@ class FailureRecoveryManager:
             # insert case
             if before_states == None and after_states != None:
                 for state in after_states:
-                    data_write = DataWrite(table, state.keys(), state.values())
+                    data_write = DataWrite(table, state.keys(), state.values(), "")
                     affected = self.storage.write_block(data_write)
                     if affected == 1:
                         # print(f"[FRM | {str(datetime.now())}]: success write block for rollback query.")
@@ -332,7 +333,7 @@ class FailureRecoveryManager:
                     for column, value in state.items():
                         new_condition = Condition(column, "=", value)
                         conditions.append(new_condition)
-                    data_deletion = DataDeletion(table, conditions)
+                    data_deletion = DataDeletion(table, conditions, "")
                     affected = self.storage.delete_block(data_deletion)
                     if affected == 1:
                         # print(f"[FRM | {str(datetime.now())}]: success delete block for rollback query.")
@@ -352,6 +353,7 @@ class FailureRecoveryManager:
                         table,
                         after_states[i].keys(),
                         after_states[i].values(),
+                        "",
                         conditions=conditions,
                     )
                     affected = self.storage.write_block(data_write)
@@ -437,7 +439,7 @@ class FailureRecoveryManager:
                 # insert case
                 if before_states == None and after_states != None:
                     for state in after_states:
-                        data_write = DataWrite(table, state.keys(), state.values())
+                        data_write = DataWrite(table, state.keys(), state.values(), "")
                         affected = self.storage.write_block(data_write)
                         # if (affected == 1):
                         # print(f"[FRM | {str(datetime.now())}]: success write block for rollback query.")
@@ -452,7 +454,7 @@ class FailureRecoveryManager:
                         for column, value in state.items():
                             new_condition = Condition(column, "=", value)
                             conditions.append(new_condition)
-                        data_deletion = DataDeletion(table, conditions)
+                        data_deletion = DataDeletion(table, conditions, "")
                         affected = self.storage.delete_block(data_deletion)
                         if affected == 1:
                             # print(f"[FRM | {str(datetime.now())}]: success delete block for rollback query.")
@@ -472,6 +474,7 @@ class FailureRecoveryManager:
                             table,
                             after_states[i].keys(),
                             after_states[i].values(),
+                            "",
                             conditions=conditions,
                         )
                         affected = self.storage.write_block(data_write)
@@ -530,7 +533,7 @@ class FailureRecoveryManager:
                 # insert case
                 if before_states == None and after_states != None:
                     for state in after_states:
-                        data_write = DataWrite(table, state.keys(), state.values())
+                        data_write = DataWrite(table, state.keys(), state.values(), "")
                         affected = self.storage.write_block(data_write)
                         if affected == 1:
                             # print(f"[FRM | {str(datetime.now())}]: success write block for rollback query.")
@@ -546,7 +549,7 @@ class FailureRecoveryManager:
                         for column, value in state.items():
                             new_condition = Condition(column, "=", value)
                             conditions.append(new_condition)
-                        data_deletion = DataDeletion(table, conditions)
+                        data_deletion = DataDeletion(table, conditions, "")
                         affected = self.storage.delete_block(data_deletion)
                         if affected == 1:
                             # print(f"[FRM | {str(datetime.now())}]: success delete block for rollback query.
@@ -566,6 +569,7 @@ class FailureRecoveryManager:
                             table,
                             after_states[i].keys(),
                             after_states[i].values(),
+                            "",
                             conditions=conditions,
                         )
                         affected = self.storage.write_block(data_write)
