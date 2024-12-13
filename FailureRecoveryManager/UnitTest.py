@@ -15,56 +15,53 @@ class TestFailureRecoveryManager(unittest.TestCase):
     # Go to root directory (\Tubes-SBD-MarioDB>)
     # Run python -m unittest -v  "FailureRecoveryManager.UnitTest"
     def setUp(self):
-        self.lru = LRUCache(5)
-        self.buffer = Buffer(5)
-        self.frm = FailureRecoveryManager(
-            buffer=self.buffer, log_file="./FailureRecoveryManager/log2.log"
-        )
+        pass
 
     def test_lru_cache(self):
         """
         Method for testing the LRU Cache class
         """
+        lru = LRUCache(5)
         # Test case 1: Inserting a new value into the cache
-        self.lru.put("1", "Alice")
-        self.assertEqual(self.lru.get("1"), "Alice")
-        self.lru.put("2", "Bob")
-        self.assertEqual(self.lru.get("2"), "Bob")
-        self.lru.put("3", "Charlie")
-        self.assertEqual(self.lru.get("3"), "Charlie")
-        self.lru.put("4", "David")
-        self.assertEqual(self.lru.get("4"), "David")
-        self.lru.put("5", "Eve")
-        self.assertEqual(self.lru.get("5"), "Eve")
+        lru.put("1", "Alice")
+        self.assertEqual(lru.get("1"), "Alice")
+        lru.put("2", "Bob")
+        self.assertEqual(lru.get("2"), "Bob")
+        lru.put("3", "Charlie")
+        self.assertEqual(lru.get("3"), "Charlie")
+        lru.put("4", "David")
+        self.assertEqual(lru.get("4"), "David")
+        lru.put("5", "Eve")
+        self.assertEqual(lru.get("5"), "Eve")
 
         # Test case 2: Inserting a value into the cache that exceeds the cache size
-        self.lru.put("6", "Frank")
-        self.assertEqual(self.lru.get("6"), "Frank")
-        self.assertEqual(self.lru.get("1"), None)
+        lru.put("6", "Frank")
+        self.assertEqual(lru.get("6"), "Frank")
+        self.assertEqual(lru.get("1"), None)
 
-        self.lru.put("7", "Grace")
-        self.assertEqual(self.lru.get("7"), "Grace")
-        self.assertEqual(self.lru.get("2"), None)
+        lru.put("7", "Grace")
+        self.assertEqual(lru.get("7"), "Grace")
+        self.assertEqual(lru.get("2"), None)
 
         # Test case 3: deleting a value from the cache
-        self.lru.delete("3")
-        self.assertEqual(self.lru.get("3"), None)
+        lru.delete("3")
+        self.assertEqual(lru.get("3"), None)
 
-        self.lru.delete("4")
-        self.assertEqual(self.lru.get("4"), None)
+        lru.delete("4")
+        self.assertEqual(lru.get("4"), None)
 
         # Test case 4: Inserting a value into the cache that already exists
-        self.lru.put("5", "Paul")
-        self.assertEqual(self.lru.get("5"), "Paul")
+        lru.put("5", "Paul")
+        self.assertEqual(lru.get("5"), "Paul")
 
         # Test case 5: Accessing a value that does not exist in the cache
-        self.assertEqual(self.lru.get("-1"), None)
-        self.assertEqual(self.lru.get("69"), None)
+        self.assertEqual(lru.get("-1"), None)
+        self.assertEqual(lru.get("69"), None)
 
         # Test case 6: clearing the cache
-        self.lru.clear()
+        lru.clear()
         for i in range(1, 8):
-            self.assertEqual(self.lru.get(str(i)), None)
+            self.assertEqual(lru.get(str(i)), None)
 
     @patch.object(FailureRecoveryManager, "_start_checkpoint_cron_job")
     def test_write_log(self, _):
