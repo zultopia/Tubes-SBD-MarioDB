@@ -3,7 +3,10 @@ from typing import Optional, List  # kalo gaboleh dihapus aja
 import time
 from ConcurrencyControlManager.utils import *
 
+# Recovery Manager
 # from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
+# from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
+# from FailureRecoveryManager.Buffer import Buffer
             
 class ConcurrencyControlManager:
     def __init__(self, algorithm: str):
@@ -19,7 +22,8 @@ class ConcurrencyControlManager:
         self.waiting_list : List[TransactionAction] = []
         self.tid = 0
         self.action_log: List[TransactionAction] = []
-        # self.failure_recovery = FailureRecoveryManager()
+        # Recovery Manager
+        # self.failure_recovery = FailureRecoveryManager(Buffer(5))
     
     def __str__(self):
         return f"===== ConcurrencyControlManager =====\nalgorithm: {self.algorithm}\n=====================================\n"
@@ -38,9 +42,9 @@ class ConcurrencyControlManager:
         return transaction_id
 
     def log_object(self, transactionAction: TransactionAction):
+        # Recovery Manager
         # self.failure_recovery.write_log(transactionAction)
         self.action_log.insert(0, transactionAction)
-        # pass
     
     def rollback(self, transaction_ids: set):
         # Unlock
@@ -64,8 +68,9 @@ class ConcurrencyControlManager:
                     self.lock_SIX[data_item].remove(transaction_id)
             
             self.transaction_dataitem_map[transaction_id] = {}
+            # Recovery Manager
+            # self.failure_recovery.recover(RecoverCriteria(None, transaction_id))
         
-        # Panggil recovery dari FCM
         rollback_t_actions = []
         for t_action in self.action_log:
             if(t_action.id in transaction_ids):
