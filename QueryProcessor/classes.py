@@ -470,6 +470,8 @@ class QueryProcessor:
                 descending = False
             rows = [item for sublist in rows for item in sublist]
             self.execute_ORDER_BY(rows, order_by_attr, descending)
+        else:
+            rows = [item for sublist in rows for item in sublist]
         
         return Rows(rows)
 
