@@ -76,6 +76,8 @@ class FailureRecoveryManager:
             table = transaction_action.data_item.get_table()
             old_value = transaction_action.old_data_item.map
             new_value = transaction_action.data_item.map
+            # print("ik1: ",type(old_value))
+            # print("ik2: ", type(new_value),"  gg\n", new_value)
             log_entry = (
                 f"{transaction_action.id}|"
                 f"{transaction_action.action}|"
@@ -323,9 +325,6 @@ class FailureRecoveryManager:
                 exit()
             # send before and after data to storage manager to process
 
-            # print("table:", table)
-            # print("send before to storage manager: ", before_states)
-            # print("send after to storage manager: ", after_states)
 
             # insert case
             if before_states == None and after_states != None:
@@ -390,9 +389,8 @@ class FailureRecoveryManager:
             
             before_states = Row(table, PrimaryKey(None), before_states)
             after_states = Row(table, PrimaryKey(None), after_states)
-
-            transaction_action = TransactionAction(transaction_id,"WRITE", "row", after_states, before_states)
-            # print("write log: ", exec_result.__dict__)
+           
+            transaction_action = TransactionAction(transaction_id,"WRITE", "row", before_states, after_states)
             self.write_log(transaction_action)
         # Close rollback process
         # abort_result = ExecutionResult(
@@ -402,7 +400,6 @@ class FailureRecoveryManager:
         #     "ABORT",
         #     "",
         # )
-
         transaction_abort = TransactionAction(criteria.transaction_id,"ABORT", None, None, None)
         # print("write log: ", exec_result.__dict__)
         self.write_log(transaction_abort)
@@ -617,7 +614,7 @@ class FailureRecoveryManager:
                 before_states = Row(table, PrimaryKey(None), before_states)
                 after_states = Row(table, PrimaryKey(None), after_states)
 
-                transaction_action = TransactionAction(transaction_id,"WRITE", "row", after_states, before_states)
+                transaction_action = TransactionAction(transaction_id,"WRITE", "row", before_states, after_states)
                 # print("write log: ", exec_result.__dict__)
                 self.write_log(transaction_action)
             if len(active_transactions) == 0:

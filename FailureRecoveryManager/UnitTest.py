@@ -66,38 +66,37 @@ class TestFailureRecoveryManager(unittest.TestCase):
         for i in range(1, 8):
             self.assertEqual(self.lru.get(str(i)), None)
 
-    def test_write_log(self):
-        self.frm._wa_logs = [
+    @patch.object(FailureRecoveryManager, "_start_checkpoint_cron_job")
+    def test_write_log(self, _):
+        with open("./FailureRecoveryManager/log5.log", 'w') as file:
+            pass
+
+        frm = FailureRecoveryManager(buffer=Buffer(5), log_file="./FailureRecoveryManager/log5.log")
+        frm._wa_logs = [
             '102|WRITE|employees|None|[{"id": 2, "name": "Bob", "salary": 4000}]',
             '102|WRITE|employees|[{"id": 2, "name": "Bob", "salary": 4000}]|None',
             '102|ABORT',
             '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]',
         ]
-        # execution_result = ExecutionResult(
-        #     transaction_id=102,
-        #     data_before=Rows(None),
-        #     data_after=Rows([{"id": 2, "name": "Bob", "salary": 4000}]),
-        #     status="WRITE",
-        #     table="employees",
-        # )
+      
         table = Table("employees")
             
         before_states = Row(table, PrimaryKey(None), None)
-        after_states = Row(table, PrimaryKey(None), {"id": 2, "name": "Bob", "salary": 4000})
+        after_states = Row(table, PrimaryKey(None), [{"id": 2, "name": "Bob", "salary": 4000}])
 
         transaction_action = TransactionAction(102,"WRITE", "row", after_states, before_states)
 
-        self.frm.write_log(transaction_action)
-        self.assertEqual(int((self.frm._wa_logs[4]).split("|")[0]), 102)
-        self.assertEqual(self.frm._wa_logs[4].split("|")[1], "WRITE")
-        self.assertEqual(self.frm._wa_logs[4].split("|")[2], "employees")
-        self.assertEqual(self.frm._wa_logs[4].split("|")[3], "None")
+        frm.write_log(transaction_action)
+        self.assertEqual(int((frm._wa_logs[4]).split("|")[0]), 102)
+        self.assertEqual(frm._wa_logs[4].split("|")[1], "WRITE")
+        self.assertEqual(frm._wa_logs[4].split("|")[2], "employees")
+        self.assertEqual(frm._wa_logs[4].split("|")[3], "None")
         self.assertEqual(
-            self.frm._wa_logs[4].split("|")[4],
+            frm._wa_logs[4].split("|")[4],
             json.dumps([{"id": 2, "name": "Bob", "salary": 4000}]),
         )
 
-
+        
     def test_is_wa_log_full_no_spare(self):
         self.frm._wa_logs = ["log"] * self.frm._max_size_log
         self.assertTrue(self.frm.is_wa_log_full())
@@ -109,7 +108,7 @@ class TestFailureRecoveryManager(unittest.TestCase):
         table = Table("employees")
             
         before_states = Row(table, PrimaryKey(None), None)
-        after_states = Row(table, PrimaryKey(None), {"id": 2, "name": "Bob", "salary": 4000})
+        after_states = Row(table, PrimaryKey(None), [{"id": 2, "name": "Bob", "salary": 4000}])
 
         transaction_action_1 = TransactionAction(102,"WRITE", "row", after_states, before_states)
         transaction_action_2 = TransactionAction(102,"ABORT", "row", None, None)
@@ -120,7 +119,14 @@ class TestFailureRecoveryManager(unittest.TestCase):
         self.assertEqual(self.frm._wa_logs, [])
 
     # test_recover 
-    @patch.object(FailureRecoveryManager, "_read_lines_from_end", return_value=[
+    @patch.object(FailureRecoveryManager, "_start_checkpoint_cron_job")
+    @patch("StorageManager.classes.StorageManager")
+    def test_recover(self, mock_storage_manager, mock_start_checkpoint_cron_job):
+        
+        with open("./FailureRecoveryManager/log3.log", 'w') as file:
+            pass
+        
+        log_data = [
             'CHECKPOINT|[]',
             '101|START',
             '101|WRITE|employees|None|[{"id": 1, "name": "Alice", "salary": 5000}]',
@@ -129,12 +135,11 @@ class TestFailureRecoveryManager(unittest.TestCase):
             '103|START',
             '103|WRITE|employees|[{"id": 2, "name": "John", "salary": 10100}]|[{"id": 2, "name": "John B", "salary": 8000}]',
             'CHECKPOINT|[102,103]',
-        ][::-1])
-    @patch.object(FailureRecoveryManager, "_start_checkpoint_cron_job")
-    @patch("StorageManager.classes.StorageManager")
-    def test_recover(self, mock_storage_manager, mock_start_checkpoint_cron_job, mock_read_lines_from_end):
-        with open("./FailureRecoveryManager/log3.log", 'w') as file:
-            pass
+        ]
+        
+        with open("./FailureRecoveryManager/log3.log", "w") as log_file:
+            log_file.write("\n".join(log_data))
+            log_file.write("\n")
         mock_start_checkpoint_cron_job.return_value = None
         mock_storage = mock_storage_manager
         mock_storage.write_block = MagicMock(
@@ -182,7 +187,7 @@ class TestFailureRecoveryManager(unittest.TestCase):
         
         
         self.assertEqual(len(frm._wa_logs), 7)
-        mock_read_lines_from_end.assert_called_once()
+        # mock_read_lines_from_end.assert_called_once()
         self.assertEqual(mock_storage.write_block.call_count, 2)
         
         
@@ -201,13 +206,10 @@ class TestFailureRecoveryManager(unittest.TestCase):
         with open("./FailureRecoveryManager/log3.log", "r") as f:
             actual_content = f.read()
             
-        self.assertEqual(actual_content.strip(), "\n".join(expected_logs))
+        self.assertEqual(actual_content.strip(), "\n".join(log_data + expected_logs))
         with open("./FailureRecoveryManager/log3.log", 'w') as file:
             pass
 
-    
-        
-        
     
     # recover_system_crash
     @patch.object(FailureRecoveryManager, "_start_checkpoint_cron_job")
