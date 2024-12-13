@@ -457,6 +457,20 @@ class QueryProcessor:
                 limit_value = int(limit_value)
                 rows = [row[:limit_value] for row in rows]
 
+        order_by = str(input("Mau menggunakan klausa ORDER BY? (Y/N) "))
+        while (order_by != "Y" and order_by != "N"):
+            print("Pilihan tidak valid")
+            order_by = str(input("Mau menggunakan klausa ORDER BY? (Y/N) "))
+        if order_by == "Y":
+            order_by_attr = str(input("Masukkan nama atribut acuan: "))
+            ordering = int(input("Skema pengurutan (1 untuk ASC, 2 UNTUK DESC): "))
+            if ordering == 2:
+                descending = True
+            else:
+                descending = False
+            rows = [item for sublist in rows for item in sublist]
+            self.execute_ORDER_BY(rows, order_by_attr, descending)
+        
         print(rows)
         print("\n")
 
