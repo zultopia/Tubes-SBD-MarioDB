@@ -1,24 +1,31 @@
 import os
 import pickle
 from typing import Union, List, Dict
-import uuid
+import uuid as UUID
+
+from FailureRecoveryManager.Buffer import Buffer
 
 class BPlusBlock:
     def __init__(self, block_id: int, uuid: str):
         self.block_id = block_id
         self.uuid = uuid
+        
+class BPlusLeaf:
+    def __init__(self, block_id: int, identifier: Union[str, int]):
+        self.block_id = block_id
+        self.identifier = identifier
     
 class BPlusTreeNode:
     def __init__(self, parent: Union[None, BPlusBlock]=None, is_leaf=False, prev: Union[None, BPlusBlock]=None,
-                 next: Union[None, BPlusBlock]=None, table='', column=''):
-        self.uuid = str(uuid.uuid4())
+                 next: Union[None, BPlusBlock]=None, table='', column='', uuid: Union[str, None]=None):
+        self.uuid = str(UUID.uuid4()) if uuid is None else uuid
         self.table = table
         self.column = column
         self.prev = prev
         self.next = next
         self.is_leaf = is_leaf
         self.keys: List[Union[str, int]] = []
-        self.children: List[BPlusBlock] = []
+        self.children: List[BPlusBlock | BPlusLeaf] = []
         self.parent: BPlusBlock = parent
         if self.is_leaf and self.prev:
             prev_node = BPlusReader._resolve_node(table, column, prev.block_id, prev.uuid)
@@ -46,6 +53,7 @@ class BPlusTreeNode:
             self.keys.pop(key_index)
         else:
             self.keys.pop(key_index - 1)
+        BPlusReader._update_bplus_block(self.table, self.column, self.block_id, self.uuid, self)
     
     def merge(self):
         next = None if not self.next else BPlusReader._resolve_node(self.table, self.column, self.next.block_id, self.next.uuid)
@@ -63,52 +71,81 @@ class BPlusTreeNode:
         if self.is_leaf:
             if next:
                 BPlusReader._update_bplus_block(self.table, self.column, next.block_id, next.uuid, next)
+            if prev:
+                BPlusReader._update_bplus_block(self.table, self.column, prev.block_id, prev.uuid, prev)
             return
-        self_index = self.parent._find(self.keys[0])
-        if self_index < len(self.parent.keys):
-            next = self.parent.children[self_index + 1]
-            next.keys = self.keys + [self.parent.keys[self_index]] + next.keys
-            for child in self.children:
-                child.parent = next
+        parent = BPlusReader._resolve_node(self.table, self.column, self.parent.block_id, self.parent.uuid)
+        self_index = parent._find(self.keys[0])
+        if self_index < len(parent.keys):
+            next = parent.children[self_index + 1]
+            next = BPlusReader._resolve_node(self.table, self.column, next.block_id, next.uuid)
+            next.keys = self.keys + [parent.keys[self_index]] + next.keys
+            for child_identifier in self.children:
+                child = BPlusReader._resolve_node(self.table, self.column, child_identifier.block_id, child_identifier.uuid)
+                child.parent = BPlusBlock(next.block_id, next.uuid)
+                BPlusReader._update_bplus_block(self.table, self.column, child.block_id, child.uuid, child)
             next.children = self.children + next.children
+            BPlusReader._update_bplus_block(self.table, self.column, next.block_id, next.uuid, next)
             return
-        prev = self.parent.children[-2]
-        prev.keys += [self.parent.keys[-1]] + self.keys
-        for child in self.children:
-            child.parent = prev
+        prev = parent.children[-2]
+        prev = BPlusReader._resolve_node(self.table, self.column, prev.block_id, prev.uuid)
+        prev.keys += [parent.keys[-1]] + self.keys
+        for child_identifier in self.children:
+            child = BPlusReader._resolve_node(self.table, self.column, child_identifier.block_id, child_identifier.uuid)
+            child.parent = BPlusBlock(prev.block_id, prev.uuid)
+            BPlusReader._update_bplus_block(self.table, self.column, child.block_id, child.uuid, child)
         prev.children += self.children
+        BPlusReader._update_bplus_block(self.table, self.column, prev.block_id, prev.uuid, prev)
             
     def take(self, min: int):
-        self_index = self.parent.get(self.keys[0])
-        if self.is_leaf and self_index < len(self.parent.keys) and \
-            len(self.next.keys) > min:
-            self.keys += [self.next.keys.pop(0)]
-            self.children += [self.next.children.pop(0)]
-            self.parent.keys[self_index] = self.next.keys[0]
+        parent = None if not self.parent else BPlusReader._resolve_node(self.table, self.column, self.parent.block_id, self.parent.uuid)
+        next = None if not self.next else BPlusReader._resolve_node(self.table, self.column, self.next.block_id, self.next.uuid)
+        prev = None if not self.prev else BPlusReader._resolve_node(self.table, self.column, self.prev.block_id, self.prev.uuid)
+        self_index = parent.get(self.keys[0])
+        if self.is_leaf and self_index < len(parent.keys) and \
+            len(next.keys) > min:
+            self.keys += [next.keys.pop(0)]
+            self.children += [next.children.pop(0)]
+            parent.keys[self_index] = next.keys[0]
+            BPlusReader._update_bplus_block(self.table, self.column, parent.block_id, parent.uuid, parent)
+            BPlusReader._update_bplus_block(self.table, self.column, next.block_id, next.uuid, next)
+            BPlusReader._update_bplus_block(self.table, self.column, self.block_id, self.uuid, self)
             return True
-        elif self.is_leaf and self_index != 0 and len(self.prev.keys) > min:
-            self.keys = [self.prev.keys.pop()] + self.keys
-            self.children = [self.prev.children.pop()] + self.children
-            self.parent.keys[self_index - 1] = self.keys[0]
+        elif self.is_leaf and self_index != 0 and len(prev.keys) > min:
+            self.keys = [prev.keys.pop()] + self.keys
+            self.children = [prev.children.pop()] + self.children
+            parent.keys[self_index - 1] = self.keys[0]
+            BPlusReader._update_bplus_block(self.table, self.column, parent.block_id, parent.uuid, parent)
+            BPlusReader._update_bplus_block(self.table, self.column, prev.block_id, prev.uuid, prev)
+            BPlusReader._update_bplus_block(self.table, self.column, self.block_id, self.uuid, self)
             return True
-        if self.is_leaf or (self_index >= len(self.parent.keys) and self_index != 0):
+        if self.is_leaf or (self_index >= len(parent.keys) and self_index != 0):
             return False
-        if self_index < len(self.parent.keys):
-            next: BPlusTreeNode = self.parent.children[self_index + 1]
+        if self_index < len(parent.keys):
+            next: BPlusBlock = parent.children[self_index + 1]
+            next: BPlusTreeNode = BPlusReader._resolve_node(self.table, self.column, next.block_id, next.uuid)
             if len(next.keys) > min:
-                self.keys += [self.parent.keys[self_index]]
+                self.keys += [parent.keys[self_index]]
                 key_taken = next.children.pop(0)
+                key_taken = BPlusReader._resolve_node(self.table, self.column, key_taken.block_id, key_taken.uuid)
                 key_taken.parent = self
-                self.children += [key_taken]
-                self.parent.keys[self_index] = next.keys.pop(0)
+                self.children += [BPlusBlock(key_taken.block_id, key_taken.uuid)]
+                parent.keys[self_index] = next.keys.pop(0)
+                BPlusReader._update_bplus_block(self.table, self.column, next.block_id, next.uuid, next)
+                BPlusReader._update_bplus_block(self.table, self.column, key_taken.block_id, key_taken.uuid, key_taken)
+                BPlusReader._update_bplus_block(self.table, self.column, self.block_id, self.uuid, self)
         elif self_index != 0:
-            prev: BPlusTreeNode = self.parent.children[self_index - 1]
+            prev: BPlusTreeNode = parent.children[self_index - 1]
             if len(prev.keys) > min:
-                self.keys = [self.parent.keys[self_index - 1]] + self.keys
+                self.keys = [parent.keys[self_index - 1]] + self.keys
                 key_taken = prev.children.pop()
-                key_taken.parent = self
-                self.children = [key_taken] + self.children
-                self.parent.keys[self_index - 1] = prev.keys.pop()
+                key_taken = BPlusReader._resolve_node(self.table, self.column, key_taken.block_id, key_taken.uuid)
+                key_taken.parent = BPlusBlock(self.block_id, self.uuid)
+                self.children = [BPlusBlock(key_taken.block_id, key_taken.uuid)] + self.children
+                parent.keys[self_index - 1] = prev.keys.pop()
+                BPlusReader._update_bplus_block(self.table, self.column, prev.block_id, prev.uuid, prev)
+                BPlusReader._update_bplus_block(self.table, self.column, key_taken.block_id, key_taken.uuid, key_taken)
+                BPlusReader._update_bplus_block(self.table, self.column, self.block_id, self.uuid, self)
         return True
     
     def split(self):
@@ -143,6 +180,14 @@ class BPlusReader:
     HASH_DIR = "hash/"
     BPLUS_DIR = "bplus/"
     BLOCK_SIZE = 4096
+    BUFFER: Union[None, Buffer] = None
+    
+    
+    @staticmethod
+    def read_block(table: str, block_id: str):
+        block = BPlusReader.BUFFER.get_buffer(table, block_id)
+        if not block:
+            return
     
     @staticmethod
     def _get_bplus_block_file(table: str, column: str, block_id: int) -> str:
@@ -175,8 +220,16 @@ class BPlusReader:
             pickle.dump(block_data, file)
     
     @staticmethod
-    def _resolve_node(table: str, column: str, block_id: int, uuid: int) -> BPlusTreeNode:
+    def _resolve_node(table: str, column: str, block_id: int, uuid: str) -> BPlusTreeNode:
         block = BPlusReader.read_bplus_block(table, column, block_id)
+        for node in block:
+            if node.uuid == uuid:
+                return node
+        return None
+    
+    @staticmethod
+    def _resolve_leaf(table: str, column: str, block_id: int, identifier: Union[str, int]) -> Dict:
+        block = BPlusReader.read_block(table, column, block_id)
         for node in block:
             if node.uuid == uuid:
                 return node
@@ -211,11 +264,31 @@ class BPlusReader:
         return new_block_id
     
     @staticmethod
-    def change_config(DATA_DIR="data_blocks/", BPLUS_DIR="bplus/"):
+    def change_config(DATA_DIR="data_blocks/", BPLUS_DIR="bplus/", BUFFER=None):
         BPlusReader.DATA_DIR = DATA_DIR
         BPlusReader.BPLUS_DIR = BPLUS_DIR
+        BPlusReader.BUFFER = BUFFER
 
 class BPlusTree:
+    DATA_DIR = "data_blocks/"
+    HASH_DIR = "hash/"
+    BPLUS_DIR = "bplus/"
+    DEGREE = 8
+    DEGREE_MIN = 4
+    
+    @staticmethod
+    def initialize_bplus(table, column):
+        root = BPlusTreeNode(is_leaf=True, parent=None, table=table, column=column, uuid='0')
+        BPlusReader._add_bplus_block(table, column, root)
+
+    @staticmethod
+    def find(table: str, column: str, key) -> BPlusTreeNode:
+        node = BPlusReader._resolve_node(table, column, 0, '0')
+        while not node.is_leaf:
+            node = node.get(key)
+            node = BPlusReader._resolve_node(table, column, node.block_id, node.uuid)
+        return node
+    
     def __init__(self, table, column, degree):
         self.degree = max(degree, 2)
         self.degree_min = self.degree // 2
@@ -223,17 +296,12 @@ class BPlusTree:
         self.column = column
         self.root = BPlusTreeNode(is_leaf=True, table=self.table, column=self.column)
 
-    def find(self, key):
-        node = self.root
-        while not node.is_leaf:
-            node = node.get(key)
-        return node
-
-    def get(self, key):
-        leaf = self.find(key)
+    @staticmethod
+    def get(table: str, column: str, key):
+        leaf = BPlusTree.find(table, column, key)
         for i, item in enumerate(leaf.keys):
             if item == key:
-                return leaf.children[i]
+                return BPlusReader._resolve_leaf(table, column, leaf.children[i].identifier)
         return None
     
     def set(self, key, value, leaf=None):
@@ -301,3 +369,120 @@ class BPlusTree:
         parent.children.insert(index + 1, child)
         if len(parent.keys) == self.degree:
             self._split_node(parent)
+            
+    def query(self, key):
+        """Returns a value for a given key, and None if the key does not exist."""
+        leaf = self.find(key)
+        return leaf[key] if key in leaf.keys else None
+
+    def change(self, key, value):
+        """change the value
+        Returns:
+            (bool,Leaf): the leaf where the key is. return False if the key does not exist
+        """
+        leaf = self.find(key)
+        if key not in leaf.keys:
+            return False, leaf
+        else:
+            leaf[key] = value
+            return True, leaf
+
+    def __setitem__(self, key, value, leaf=None):
+        """Inserts a key-value pair after traversing to a leaf node. If the leaf node is full, split
+              the leaf node into two.
+              """
+        if leaf is None:
+            leaf = self.find(key)
+        leaf[key] = value
+        if len(leaf.keys) > self.maximum:
+            self.insert_index(*leaf.split())
+
+    def insert(self, key, value):
+        """
+        Returns:
+            (bool,Leaf): the leaf where the key is inserted. return False if already has same key
+        """
+        leaf = self.find(key)
+        if key in leaf.keys:
+            return False, leaf
+        else:
+            self.__setitem__(key, value, leaf)
+            return True, leaf
+
+    def insert_index(self, key, values: list[Node]):
+        """For a parent and child node,
+                    Insert the values from the child into the values of the parent."""
+        parent = values[1].parent
+        if parent is None:
+            values[0].parent = values[1].parent = self.root = Node()
+            self.depth += 1
+            self.root.keys = [key]
+            self.root.values = values
+            return
+
+        parent[key] = values
+        # If the node is full, split the  node into two.
+        if len(parent.keys) > self.maximum:
+            self.insert_index(*parent.split())
+        # Once a leaf node is split, it consists of a internal node and two leaf nodes.
+        # These need to be re-inserted back into the tree.
+
+    def delete(self, key, node: Node = None):
+        if node is None:
+            node = self.find(key)
+        del node[key]
+
+        if len(node.keys) < self.minimum:
+            if node == self.root:
+                if len(self.root.keys) == 0 and len(self.root.values) > 0:
+                    self.root = self.root.values[0]
+                    self.root.parent = None
+                    self.depth -= 1
+                return
+
+            elif not node.borrow_key(self.minimum):
+                node.fusion()
+                self.delete(key, node.parent)
+        # Change the left-most key in node
+        # if i == 0:
+        #     node = self
+        #     while i == 0:
+        #         if node.parent is None:
+        #             if len(node.keys) > 0 and node.keys[0] == key:
+        #                 node.keys[0] = self.keys[0]
+        #             return
+        #         node = node.parent
+        #         i = node.index(key)
+        #
+        #     node.keys[i - 1] = self.keys[0]
+
+    def show(self, node=None, file=None, _prefix="", _last=True):
+        """Prints the keys at each level."""
+        if node is None:
+            node = self.root
+        print(_prefix, "`- " if _last else "|- ", node.keys, sep="", file=file)
+        _prefix += "   " if _last else "|  "
+
+        if type(node) is Node:
+            # Recursively print the key of child nodes (if these exist).
+            for i, child in enumerate(node.values):
+                _last = (i == len(node.values) - 1)
+                self.show(child, file, _prefix, _last)
+
+    def output(self):
+        return splits, parent_splits, fusions, parent_fusions, self.depth
+
+    def readfile(self, reader):
+        i = 0
+        for i, line in enumerate(reader):
+            s = line.decode().split(maxsplit=1)
+            self[s[0]] = s[1]
+            if i % 1000 == 0:
+                print('Insert ' + str(i) + 'items')
+        return i + 1
+
+    def leftmost_leaf(self) -> Leaf:
+        node = self.root
+        while type(node) is not Leaf:
+            node = node.values[0]
+        return node

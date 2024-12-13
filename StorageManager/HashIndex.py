@@ -76,8 +76,8 @@ class Hash(object):
     
     @staticmethod
     def _save_hash_block(table: str, column: str, hash_value: int, block_id: int, block_data: List[Dict]):
-        block_file = Hash._get_hash_buffer_block_file(table, column, hash_value)
-        Hash.buffer.put_buffer(block_file, block_id, block_data)
+        # block_file = Hash._get_hash_buffer_block_file(table, column, hash_value)
+        Hash.buffer.put_buffer_hash(hash_value, table, block_id, column, block_data)
         # with open(block_file, "wb") as file:
         #    pickle.dump(block_data, file)
         
@@ -131,11 +131,12 @@ class Hash(object):
                 found = True
         # assumes entries fit in one block
         if not new_block and hash_value != 0:
-            Hash.buffer.put_buffer(Hash._get_hash_buffer_block_file(table, column, hash_value), 0, None)
+            Hash.buffer.put_buffer_hash(hash_value, table, 0, column, new_block)
             # if os.path.exists(Hash._get_hash_block_file(table, column, hash_value, old_block_id)):
             #    os.remove(Hash._get_hash_block_file(table, column, hash_value, old_block_id))
         else:
-            Hash.buffer.put_buffer(Hash._get_hash_buffer_block_file(table, column, hash_value), 0, new_block)
+            Hash.buffer.put_buffer_hash(hash_value, table, 0, column, new_block)
+            # Hash.buffer.put_buffer(Hash._get_hash_buffer_block_file(table, column, hash_value), 0, new_block)
             # Hash._save_hash_block(table, column, hash_value, 0, new_block)
         print("HASH UPDATED")
         return
