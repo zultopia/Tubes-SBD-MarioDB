@@ -481,12 +481,12 @@ class StorageManager:
                 stats[table_name]["n_r"] += len(block)
                 stats[table_name]["b_r"] += 1
                 if block:
-                    row_length = len(block[0])
-                    stats[table_name]["l_r"] = row_length
-                    for col in block[0].keys():
-                        if col not in stats[table_name]["V_a_r"]:
-                            stats[table_name]["V_a_r"][col] = set()
-                        stats[table_name]["V_a_r"][col].update(row[col] for row in block)
+                    for row in block:
+                        for col in row.keys():
+                            if col not in stats[table_name]["V_a_r"]:
+                                stats[table_name]["V_a_r"][col] = set()
+                            stats[table_name]["V_a_r"][col].update(row[col] for row in block)
+                    # row_length = len(block[0])
         for table_name, table_stats in stats.items():
             if table_stats["l_r"] > 0:
                 table_stats["f_r"] = math.floor(self.BLOCK_SIZE / table_stats["l_r"])
