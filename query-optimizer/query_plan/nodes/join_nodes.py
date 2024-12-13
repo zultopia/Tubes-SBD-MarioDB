@@ -128,11 +128,11 @@ class ConditionalJoinNode(JoinNode):
                     break
             
             if not is_index:
-                return previous_cost + (left.b + right.b) * t_T + 2 * t_S
+                return previous_cost + (left.b + right.b) * t_T + 2 * t_S + self.b * t_T
             else:
                 # TODO: Height dari tree perlu dicari
                 c = 3
-                return previous_cost + left.b * (t_T + t_S) + left.n * c
+                return previous_cost + left.b * (t_T + t_S) + left.n * c + self.b * t_T
         elif self.algorithm == JoinAlgorithm.HASH:
             is_index = False
             for condition in self.conditions:
@@ -144,10 +144,10 @@ class ConditionalJoinNode(JoinNode):
             if not is_index:
                 return Exception("The index does not exist")
             else:
-                return previous_cost + (left.b + right.b) * t_T + 2 * t_S
+                return previous_cost + (left.b + right.b) * t_T + 2 * t_S + self.b * t_T
         elif self.algorithm == JoinAlgorithm.MERGE:
             # No seeks required because b_b -> infinity implies seeks -> 0 
-            return previous_cost + (left.b + right.b) * t_T
+            return previous_cost + (left.b + right.b) * t_T + self.b * t_T
         
 
 
@@ -248,7 +248,7 @@ class NaturalJoinNode(JoinNode):
             for i in left_attributes:
                 left_attribute, left_alias = i
                 for j in right_attributes: 
-                    right_attribute, right_alias = j
+                    right_attribute, _ = j
                     if left_attribute == right_attribute and not any(left_attribute == attr for attr, _ in common):
                         common.append((left_attribute, left_alias))
             for attr, alias in common:
@@ -258,11 +258,11 @@ class NaturalJoinNode(JoinNode):
                     break
 
             if not is_index:
-                return previous_cost + (left.b + right.b) * t_T + 2 * t_S
+                return previous_cost + (left.b + right.b) * t_T + 2 * t_S + self.b * t_T
             else:
                 # Todo: Height dari tree perlu dicari
                 c = 3
-                return previous_cost + left.b * (t_T + t_S) + left.n * c
+                return previous_cost + left.b * (t_T + t_S) + left.n * c + self.b * t_T
         elif self.algorithm == JoinAlgorithm.HASH:
             is_index = False
             common = []
@@ -280,10 +280,10 @@ class NaturalJoinNode(JoinNode):
             if not is_index:
                 return Exception("The index does not exist")
             else:
-                return previous_cost + (left.b + right.b) * t_T + 2 * t_S
+                return previous_cost + (left.b + right.b) * t_T + 2 * t_S + self.b * t_T
         elif self.algorithm == JoinAlgorithm.MERGE:
             # No seeks required because b_b -> infinity implies seeks -> 0 
-            return previous_cost + (left.b + right.b) * t_T
+            return previous_cost + (left.b + right.b) * t_T + self.b * t_T
     
 
     def __str__(self) -> str:
