@@ -179,66 +179,73 @@ class EquivalenceRules:
     def associativeJoins(node: QueryNode) -> List[QueryNode]:
         if not isinstance(node, (NaturalJoinNode, ConditionalJoinNode)):
             return [node]
-
         if not isinstance(node.children, Pair) or not node.children.first or not node.children.second:
             return [node]
 
         left_child = node.children.first
         right_child = node.children.second
         ret = []
-
+        conditionLeft = []
         def filter_conditions(conditions: List[Condition], left: QueryNode, right: QueryNode) -> List[Condition]:
             """
             Filter conditions to include only those relevant to the given children.
             """
             relevant_conditions = []
             for condition in conditions:
-                if checkRelevance(condition, left) or checkRelevance(condition, right):
+                if checkRelevance(condition,left) or checkRelevance(condition,right):
                     relevant_conditions.append(condition)
+                else:
+                    if(len(conditionLeft)<3):
+                        conditionLeft.append(condition)
             return relevant_conditions
 
         def create_associative_node(parent: QueryNode, outer: QueryNode, inner: QueryNode, is_left: bool) -> QueryNode:
-            """Create a new join node with associativity applied."""
-            if isinstance(inner, (ConditionalJoinNode, NaturalJoinNode)):
+            """Semua logic sebenearnya di sini"""
+            if hasattr(inner, 'children') and isinstance(inner.children, Pair):
                 grandchild_left = inner.children.first.clone() if inner.children.first else None
                 grandchild_right = inner.children.second.clone() if inner.children.second else None
-
-                # Extract conditions from the parent join node
-                if isinstance(parent, ConditionalJoinNode):
-                    parent_conditions = parent.conditions.copy()
-                else:
-                    parent_conditions = []
-
-                # Extract conditions from the inner join node
-                if isinstance(inner, ConditionalJoinNode):
-                    inner_conditions = inner.conditions.copy()
-                else:
-                    inner_conditions = []
-
-                # Combine conditions
-                combined_conditions = parent_conditions + inner_conditions
-                if isinstance(inner, ConditionalJoinNode):
-                    new_inner = ConditionalJoinNode(
+                # takes the class of input, assign the condition if it has the attribute else bakal jadi natural join
+                filteredConditions=[]
+                if isinstance(inner, ConditionalJoinNode)and isinstance(parent,ConditionalJoinNode) and is_left:
+                    relevantConditions1 = filter_conditions(inner.conditions,grandchild_right,outer.clone())
+                    relevantConditions2 = filter_conditions(parent.conditions,grandchild_right,outer.clone())
+                    filteredConditions += relevantConditions1 + relevantConditions2
+                    associated_inner = ConditionalJoinNode(
                         algorithm=inner.algorithm,
-                        conditions=combined_conditions
+                        conditions=filteredConditions
+                    )
+                elif isinstance(inner, ConditionalJoinNode) and not is_left:
+                    relevantConditions1 = filter_conditions(inner.conditions,outer.clone(),grandchild_left)
+                    relevantConditions2 = filter_conditions(parent.conditions,outer.clone(),grandchild_left)
+                    associated_inner = ConditionalJoinNode(
+                        algorithm=inner.algorithm,
+                        conditions=filteredConditions
                     )
                 elif isinstance(inner, NaturalJoinNode):
-                    new_inner = NaturalJoinNode(
-                        algorithm=inner.algorithm
-                    )
-
-                # Set children
-                new_inner.set_children(Pair(grandchild_left, grandchild_right))
-
-                # Depending on the direction, set children appropriately
+                    associated_inner = NaturalJoinNode(algorithm=inner.algorithm)
                 if is_left:
-                    new_inner.set_children(Pair(grandchild_right, outer.clone()))
+                    associated_inner.set_children(Pair(grandchild_right, outer.clone()))
+                    if isinstance(parent, ConditionalJoinNode):
+                        new_node = ConditionalJoinNode(
+                            algorithm=parent.algorithm,
+                            conditions=conditionLeft
+                        )
+                    elif isinstance(parent, NaturalJoinNode):
+                        new_node = NaturalJoinNode(algorithm=parent.algorithm)
+                    new_node.set_children(Pair(grandchild_left, associated_inner))
                 else:
-                    new_inner.set_children(Pair(outer.clone(), grandchild_left))
-
-                return new_inner
-
-            return parent.clone()
+                    associated_inner.set_children(Pair(outer.clone(), grandchild_left))
+                    if isinstance(parent, ConditionalJoinNode):
+                        new_node = ConditionalJoinNode(
+                            algorithm=parent.algorithm,
+                            conditions=conditionLeft
+                        )
+                    elif isinstance(parent, NaturalJoinNode):
+                        new_node = NaturalJoinNode(algorithm=parent.algorithm)
+                    new_node.set_children(Pair(associated_inner, grandchild_right))
+                return new_node
+            
+            return parent.clone() 
 
         # Handle (left ⋈ middle) ⋈ right
         if isinstance(left_child, (NaturalJoinNode, ConditionalJoinNode)):

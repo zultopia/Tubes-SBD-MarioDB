@@ -48,15 +48,15 @@ if __name__ == '__main__':
 
     print("\n\n=============================================================")
 
-    # instance = TestOptimizerRule6()
-    # print("Testing for rule 6")
-    # # For each method that starts with "test_"
-    # for method_name in dir(instance):
-    #     if method_name.startswith("test_"):
-    #         method = getattr(instance, method_name)
-    #         method()
+    instance = TestOptimizerRule6()
+    print("Testing for rule 6")
+    # For each method that starts with "test_"
+    for method_name in dir(instance):
+        if method_name.startswith("test_"):
+            method = getattr(instance, method_name)
+            method()
 
-    # print("\n\n=============================================================")
+    print("\n\n=============================================================")
 
     instance = TestOptimizerRule7()
     print("Testing for rule 7")
