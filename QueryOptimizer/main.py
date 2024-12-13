@@ -46,6 +46,7 @@ current = 'gana'
 
 
 if current == 'gana':
+    print("something new")
     query_string = ""
     print("Please enter your query (end with a semicolon ';'):")
 

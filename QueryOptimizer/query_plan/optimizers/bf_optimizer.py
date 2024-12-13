@@ -1,4 +1,5 @@
 from typing import List
+from QueryOptimizer.data import MOCK_DATA
 from QueryOptimizer.query_plan.optimizers.optimizer import QueryPlanOptimizer
 from QueryOptimizer.generator import generate_possible_plans
 from QueryOptimizer.equivalence_rules import EquivalenceRules

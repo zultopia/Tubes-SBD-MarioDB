@@ -1,5 +1,6 @@
 # project_node.py
 
+import copy
 from typing import List, Dict, Optional
 
 from QueryOptimizer.data import QOData
@@ -36,24 +37,27 @@ class ProjectNode(QueryNode):
         if not self.child:
             raise ValueError("ProjectNode must have a child node before processing attributes.")
 
-        child_attrs = self.child.get_node_attributes()
-        
+        child_attrs = copy.deepcopy(self.child.get_node_attributes())
         # Reset projected attributes
         self.projected_attributes = []
 
         if '*' in self.original_attributes:
             # Expand '*' to all child attributes
-            self.projected_attributes = child_attrs
+            self.projected_attributes = copy.deepcopy(child_attrs)
             return
-
         # Process each attribute in the original list
         for attr in self.original_attributes:
+            
             if '.' in attr:  # Fully qualified attribute (e.g., "s.name")
-                # Add directly if it's in child attributes
-                if attr in child_attrs:
-                    self.projected_attributes.append(attr)
-                else:
-                    raise ValueError(f"Qualified attribute '{attr}' is not a valid attribute.")
+                query_alias, query_attribute = attr.split('.')
+                
+                for leave in child_attrs:
+                    leave_alias, leave_attribute = leave.split('.')
+                    assert (leave_alias != '.')
+                    if query_attribute == leave_attribute:
+                        self.projected_attributes.append(leave_alias + "." + leave_attribute)
+                        break
+
             else:  # Unqualified attribute (e.g., "name")
                 # Find matching attributes in child attributes
                 matches = [child_attr for child_attr in child_attrs 
@@ -85,7 +89,7 @@ class ProjectNode(QueryNode):
         self.attributes = []
         for attr in self.project_list:
             for i in self.child.attributes:
-                child_attribute, child_alias = i
+                child_attribute, child_alias = i.first, i.second
                 if child_attribute == attr:
                     self.attributes.append((child_attribute, child_alias))
         

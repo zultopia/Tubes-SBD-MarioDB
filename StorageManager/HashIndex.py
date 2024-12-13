@@ -101,7 +101,7 @@ class Hash(object):
         # assumes entries fit in one block
         # Hash.buffer.put_buffer(Hash._get_hash_buffer_block_file(table, column, hash_value), 0, block)
         Hash._save_hash_block(table, column, hash_value, 0, block)
-        print("HASH SAVED IN BUFFER")
+        # print("HASH SAVED IN BUFFER")
         return
     
     @staticmethod
@@ -113,7 +113,7 @@ class Hash(object):
         block.append({'id': new_block_id})
         # assumes entries fit in one block
         Hash._save_hash_block_to_disk(table, column, hash_value, 0, block)
-        print("HASH SAVED IN DISK")
+        # print("HASH SAVED IN DISK")
         return
     
     @staticmethod
@@ -137,7 +137,7 @@ class Hash(object):
         else:
             Hash.buffer.put_buffer_hash(hash_value, table, 0, column, new_block)
             # Hash._save_hash_block(table, column, hash_value, 0, new_block)
-        print("HASH UPDATED")
+        # print("HASH UPDATED")
         return
     
     @staticmethod
@@ -159,7 +159,7 @@ class Hash(object):
                os.remove(Hash._get_hash_block_file(table, column, hash_value, old_block_id))
         else:
             Hash._save_hash_block_to_disk(table, column, hash_value, 0, new_block)
-        print("HASH UPDATED")
+        # print("HASH UPDATED")
         return
 
     @staticmethod
@@ -184,25 +184,25 @@ class Hash(object):
     @staticmethod
     def _write_row(table: str, column: str, new_block_id: int, value):
         hash_value = Hash._hash_function(value)
-        print("HASH", hash_value)
+        # print("HASH", hash_value)
         Hash._write_hash_block(table, column, hash_value, new_block_id)
             
     @staticmethod
     def _delete_row(table: str, column: str, old_block_id: int, value):
         hash_value = Hash._hash_function(value)
-        print("HASH", hash_value)
+        # print("HASH", hash_value)
         Hash._delete_hash_block(table, column, hash_value, old_block_id)
         
     @staticmethod
     def _write_row_to_disk(table: str, column: str, new_block_id: int, value):
         hash_value = Hash._hash_function(value)
-        print("HASH", hash_value)
+        # print("HASH", hash_value)
         Hash._write_hash_block_to_disk(table, column, hash_value, new_block_id)
             
     @staticmethod
     def _delete_row_to_disk(table: str, column: str, old_block_id: int, value):
         hash_value = Hash._hash_function(value)
-        print("HASH", hash_value)
+        # print("HASH", hash_value)
         Hash._delete_hash_block_to_disk(table, column, hash_value, old_block_id)
 
     @staticmethod
