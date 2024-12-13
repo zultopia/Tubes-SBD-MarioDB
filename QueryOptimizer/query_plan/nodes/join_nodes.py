@@ -240,9 +240,9 @@ class NaturalJoinNode(JoinNode):
             is_index = False
             common = []
             for i in left_attributes:
-                left_attribute, left_alias = i
+                left_attribute, left_alias = i.first, i.second
                 for j in right_attributes: 
-                    right_attribute, _ = j
+                    right_attribute, _ = j.first, j.second
                     if left_attribute == right_attribute and not any(left_attribute == attr for attr, _ in common):
                         common.append((left_attribute, left_alias))
             for attr, alias in common:
@@ -261,9 +261,9 @@ class NaturalJoinNode(JoinNode):
             is_index = False
             common = []
             for i in left_attributes:
-                left_attribute, left_alias = i
+                left_attribute, left_alias = i.first, i.second
                 for j in right_attributes: 
-                    right_attribute, right_alias = j
+                    right_attribute, right_alias = j.first, j.second
                     if left_attribute == right_attribute and not any(left_attribute == attr for attr, _ in common):
                         common.append((left_attribute, left_alias))
             for attr, alias in common:
