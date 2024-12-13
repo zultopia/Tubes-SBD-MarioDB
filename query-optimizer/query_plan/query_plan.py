@@ -18,6 +18,7 @@ class QueryPlan(Prototype):
         self.alias_dict: Dict[str, str] = {} # Given the alias, returns the original table name.
                              # For non-table expressions (result of joins, selections, projections, etc), it is assumed that there is no alias.
          
+    def setup(self):
         def dfs(node: QueryNode):
             if node.child == None and node.children == None:
                 assert(isinstance(node, TableNode))
@@ -40,7 +41,7 @@ class QueryPlan(Prototype):
                     for i in node.children:
                         dfs(i)
         
-        dfs(root)            
+        dfs(self.root)            
 
 
     def optimize(self, optimizer: 'QueryPlanOptimizer'):
