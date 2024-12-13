@@ -186,7 +186,7 @@ class EquivalenceRules:
         right_child = node.children.second
         ret = []
         conditionLeft = []
-        def filter_conditions(conditions: List[Condition], left: QueryNode, right: QueryNode) -> List[Condition]:
+        def filter_conditions(conditions: List[Condition], left: QueryNode, right: QueryNode,condLen:int) -> List[Condition]:
             """
             Filter conditions to include only those relevant to the given children.
             """
@@ -195,7 +195,7 @@ class EquivalenceRules:
                 if checkRelevance(condition,left) or checkRelevance(condition,right):
                     relevant_conditions.append(condition)
                 else:
-                    if(len(conditionLeft)<3):
+                    if(len(conditionLeft)<condLen):
                         conditionLeft.append(condition)
             return relevant_conditions
 
@@ -207,16 +207,18 @@ class EquivalenceRules:
                 # takes the class of input, assign the condition if it has the attribute else bakal jadi natural join
                 filteredConditions=[]
                 if isinstance(inner, ConditionalJoinNode)and isinstance(parent,ConditionalJoinNode) and is_left:
-                    relevantConditions1 = filter_conditions(inner.conditions,grandchild_right,outer.clone())
-                    relevantConditions2 = filter_conditions(parent.conditions,grandchild_right,outer.clone())
+                    conditionLen = len(inner.conditions) + len(parent.conditions)
+                    relevantConditions1 = filter_conditions(inner.conditions,grandchild_right,outer.clone(),conditionLen)
+                    relevantConditions2 = filter_conditions(parent.conditions,grandchild_right,outer.clone(),conditionLen)
                     filteredConditions += relevantConditions1 + relevantConditions2
                     associated_inner = ConditionalJoinNode(
                         algorithm=inner.algorithm,
                         conditions=filteredConditions
                     )
-                elif isinstance(inner, ConditionalJoinNode) and not is_left:
-                    relevantConditions1 = filter_conditions(inner.conditions,outer.clone(),grandchild_left)
-                    relevantConditions2 = filter_conditions(parent.conditions,outer.clone(),grandchild_left)
+                elif isinstance(inner, ConditionalJoinNode) and isinstance(parent,ConditionalJoinNode) and not is_left:
+                    conditionLen = len(inner.conditions) + len(parent.conditions)
+                    relevantConditions1 = filter_conditions(inner.conditions,outer.clone(),grandchild_left,conditionLen)
+                    relevantConditions2 = filter_conditions(parent.conditions,outer.clone(),grandchild_left,conditionLen)
                     associated_inner = ConditionalJoinNode(
                         algorithm=inner.algorithm,
                         conditions=filteredConditions
