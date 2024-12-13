@@ -92,10 +92,14 @@ class ConditionalJoinNode(JoinNode):
         self.n = left.n * right.n
         for condition in self.conditions:
             left_table_name = alias_dict[condition.left_table_alias]
-            right_table_name = alias_dict[condition.right_table_alias]
+            
 
             if condition.operator == Operator.EQ:
-                self.n *= min(1 / QOData().get_V(condition.left_attribute, left_table_name), 1 / QOData().get_V(condition.right_attribute, right_table_name)) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
+                if "'" in condition.right_operand:
+                    self.n *= 1 / QOData().get_V(condition.left_attribute, left_table_name)
+                else:
+                    right_table_name = alias_dict[condition.right_table_alias]
+                    self.n *= min(1 / QOData().get_V(condition.left_attribute, left_table_name), 1 / QOData().get_V(condition.right_attribute, right_table_name)) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
             if condition.operator in [Operator.LESS, Operator.LESS_EQ]:
                 self.n *= (float(condition.right_operand) - QOData().get_min(condition.left_attribute, left_table_name)) / (QOData().get_max(condition.left_attribute, left_table_name) - QOData().get_min(condition.left_attribute, left_table_name))
             if condition.operator in [Operator.GREATER,Operator.GREATER_EQ]:
