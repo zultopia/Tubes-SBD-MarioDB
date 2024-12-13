@@ -66,7 +66,7 @@ class TestQueryPlanGeneration():
         join_conditions = [Condition("s.id", "l.id", Operator.EQ)]
         join_node = ConditionalJoinNode(JoinAlgorithm.HASH, join_conditions)
         join_node.set_children(Pair(table_s, table_l))
-        project_node = ProjectNode(student_attributes + lecturer_attributes)
+        project_node = ProjectNode(['*'])
         project_node.set_child(join_node)
         expected_plan = QueryPlan(project_node)
 

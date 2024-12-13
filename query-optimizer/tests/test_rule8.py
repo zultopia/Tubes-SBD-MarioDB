@@ -36,9 +36,11 @@ class TestOptimizerRule8:
         ])
         join2.set_children(Pair(course, join1))
         
-        project = ProjectNode(["title", "building", "room_no"])
+        project = ProjectNode(["title", "classroom.building", "classroom.room_no"])
         project.set_child(join2)
         original_plan = QueryPlan(project)
+
+        print(original_plan)
 
         # Expected: Push projections down keeping join attributes
         course2 = TableNode("course")
@@ -48,7 +50,7 @@ class TestOptimizerRule8:
         project_course = ProjectNode(["title", "course_id"])
         project_course.set_child(course2)
         
-        project_section = ProjectNode(["course_id", "building", "room_no"])
+        project_section = ProjectNode(["course_id", "building"])
         project_section.set_child(section2)
         
         project_classroom = ProjectNode(["building", "room_no"])
@@ -69,6 +71,8 @@ class TestOptimizerRule8:
         plans = generate_possible_plans(original_plan, [
             EquivalenceRules.push_projections_into_join
         ])
+        print(expected_plan)
+        print(plans)
 
         
         assert any(p == expected_plan for p in plans), "Course-Section-Classroom projection distribution should exist"

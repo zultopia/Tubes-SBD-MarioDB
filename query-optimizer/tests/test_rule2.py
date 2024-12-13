@@ -58,7 +58,8 @@ class TestOptimizerRule2:
 
         # Original plan: σtot_cred>20(σdept_name='CS'(student))
         table_node = TableNode("student")
-        select_dept = SelectionNode([Condition("dept_name", "CS", Operator.EQ)])
+        select_dept = SelectionNode([Condition("dept_name", "'CS'", Operator.EQ)])
+        print("select_dept", select_dept)
         select_dept.set_child(table_node)
         select_credits = SelectionNode([Condition("tot_cred", "20", Operator.GREATER)])
         select_credits.set_child(select_dept)
@@ -73,7 +74,7 @@ class TestOptimizerRule2:
         table_node2 = TableNode("student")
         select_credits2 = SelectionNode([Condition("tot_cred", "20", Operator.GREATER)])
         select_credits2.set_child(table_node2)
-        select_dept2 = SelectionNode([Condition("dept_name", "CS", Operator.EQ)])
+        select_dept2 = SelectionNode([Condition("dept_name", "'CS'", Operator.EQ)])
         select_dept2.set_child(select_credits2)
         project2 = ProjectNode(["name"])
         project2.set_child(select_dept2)

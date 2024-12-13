@@ -1,49 +1,54 @@
 from .enums import Operator
 
+
+
+
 class Condition:
-    left_table_alias: str
-    left_attribute: str
-
-    right_table_alias: str
-    right_attribute: str
-
     def __init__(self, left_operand: str, right_operand: str, operator: Operator):
-        self.left_operand = left_operand
-        self.right_operand = right_operand
+        # Use internal variables with different names to avoid recursion
+        self._left_operand = left_operand
+        self._right_operand = right_operand
         self.operator = operator
+        
+        self._left_table_alias = None
+        self._left_attribute = None
+        self._right_table_alias = None
+        self._right_attribute = None
 
-        left = left_operand.split('.')
-        right = right_operand.split('.')
+        # Initial parsing of operands
+        self._parse_left_operand(left_operand)
+        self._parse_right_operand(right_operand)
+
+    def _parse_left_operand(self, value: str):
+        """Helper method to parse left operand"""
+        left = value.split('.')
         if len(left) == 2:
-            self.left_table_alias = left[0]
-            self.left_attribute = left[1]
+            self._left_table_alias = left[0]
+            self._left_attribute = left[1]
         else:
-            self.left_table_alias = None
-            self.left_attribute = left_operand
+            self._left_table_alias = None
+            self._left_attribute = value
 
-        #  handle 3.14
-        if right_operand[0] == "'" and right_operand[-1] == "'":
-            self.right_table_alias = None
-            self.right_attribute = None
-        else:
-            #  handle 3.14 but also handles table.attribute
-            try:
-                float(right_operand)
-                self.right_table_alias = None
-                self.right_attribute = None
-            except ValueError:
-                right = right_operand.split('.')
-                if len(right) == 2:
-                    self.right_table_alias = right[0]
-                    self.right_attribute = right[1]
-                else:
-                    self.right_table_alias = None
-                    self.right_attribute = right_operand
-
-
-        # TODO: attribute & table_alias harus diset (kiri dan kanan)
-
-
+    def _parse_right_operand(self, value: str):
+        """Helper method to parse right operand"""
+        if value[0] == "'" and value[-1] == "'":
+            self._right_table_alias = None
+            self._right_attribute = None
+            return
+            
+        try:
+            float(value)
+            self._right_table_alias = None
+            self._right_attribute = None
+        except ValueError:
+            right = value.split('.')
+            if len(right) == 2:
+                self._right_table_alias = right[0]
+                self._right_attribute = right[1]
+            else:
+                self._right_table_alias = None
+                self._right_attribute = value
+    
     def __str__(self) -> str:
         left = self.left_table_alias + '.' + self.left_attribute if self.left_table_alias else self.left_attribute
         right = self.right_table_alias + '.' + self.right_attribute if self.right_table_alias else self.right_attribute
@@ -66,4 +71,58 @@ class Condition:
     def __repr__(self) -> str:
         return self.__str__()
 
-    
+    @property
+    def left_operand(self):
+        return self._left_operand
+
+    @left_operand.setter
+    def left_operand(self, value):
+        self._left_operand = value
+        self._parse_left_operand(value)
+
+    @property
+    def left_table_alias(self):
+        return self._left_table_alias
+
+    @left_table_alias.setter
+    def left_table_alias(self, value):
+        self._left_table_alias = value
+        self._left_operand = f"{value}.{self._left_attribute}" if value else self._left_attribute
+
+    @property
+    def left_attribute(self):
+        return self._left_attribute
+
+    @left_attribute.setter
+    def left_attribute(self, value):
+        self._left_attribute = value
+        self._left_operand = f"{self._left_table_alias}.{value}" if self._left_table_alias else value
+
+    @property
+    def right_operand(self):
+        return self._right_operand
+
+    @right_operand.setter
+    def right_operand(self, value):
+        self._right_operand = value
+        self._parse_right_operand(value)
+
+    @property
+    def right_table_alias(self):
+        return self._right_table_alias
+
+    @right_table_alias.setter
+    def right_table_alias(self, value):
+        self._right_table_alias = value
+        if not self.is_constant_comparison():
+            self._right_operand = f"{value}.{self._right_attribute}" if value else self._right_attribute
+
+    @property
+    def right_attribute(self):
+        return self._right_attribute
+
+    @right_attribute.setter
+    def right_attribute(self, value):
+        self._right_attribute = value
+        if not self.is_constant_comparison():
+            self._right_operand = f"{self._right_table_alias}.{value}" if self._right_table_alias else value

@@ -395,17 +395,14 @@ class EquivalenceRules:
             print(new_join)
             return new_join
 
-        print("here")
         # Scenario A: Project -> Join
         if isinstance(node.child, JoinNode):
-            print("here1")
 
             transformed_join = push_projections_on_join(node, node.child)
             return [transformed_join]
 
         # Scenario B: Project -> Selection -> Join
         if isinstance(node.child, SelectionNode) and isinstance(node.child.child, JoinNode):
-            print("here2")
 
             selection_node = node.child
             join_node = selection_node.child

@@ -19,6 +19,7 @@ class SelectionNode(QueryNode):
         self.child = child
 
     def clone(self) -> 'SelectionNode':
+
         cloned_conditions = [Condition(c.left_operand, c.right_operand, c.operator) for c in self.conditions]
         cloned_node = SelectionNode(cloned_conditions)
         cloned_node.id = self.id
@@ -93,6 +94,8 @@ class SelectionNode(QueryNode):
         
         # For each condition with constant comparison, match its attribute with child attributes
         for condition in self.conditions:
+            print("IN SELECTION NODE")
+            print(condition)
             if condition.is_constant_comparison():
                 # Find matching attribute from child
                 unqualified_attr = condition.left_attribute
@@ -102,8 +105,6 @@ class SelectionNode(QueryNode):
                     # Single match - use its table alias
                     table_alias = matching_attrs[0].split('.')[0]
                     condition.left_table_alias = table_alias
-                    print(condition)
-                    print(self.conditions)
                     
                 elif len(matching_attrs) == 2:
                     # Two matches - in case of natural join, use the left table's version
@@ -121,6 +122,7 @@ class SelectionNode(QueryNode):
                 #  make both left and right
                 left_unqualified_attr = condition.left_attribute
                 right_unqualified_attr = condition.right_attribute
+                print( "condition is not constant", condition)
 
                 left_matching_attrs = [attr for attr in child_attrs if attr.split('.')[-1] == left_unqualified_attr]
                 right_matching_attrs = [attr for attr in child_attrs if attr.split('.')[-1] == right_unqualified_attr]
@@ -137,7 +139,9 @@ class SelectionNode(QueryNode):
                     table_alias = right_matching_attrs[0].split('.')[0]
                     condition.right_table_alias = table_alias
                 else:
-                    raise ValueError(f"Attribute '{right_unqualified_attr}' not found in child node attributes")
+                    if condition.is_constant_comparison():
+                        condition.right_table_alias = condition.left_table_alias
+        
                 
         
         return child_attrs
