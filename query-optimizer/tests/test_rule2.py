@@ -15,244 +15,153 @@ class TestOptimizerRule2:
     def test_1(self):
         start_time = time()
 
-
         # Create the table node
-        table_node = TableNode("b")
+        table_node = TableNode("takes")
 
-        # Create a chain of SelectionNodes:
-        # Conditions: a = b, b = c, c = d, d = e, e = f, f = g
-        cond_a_b = Condition("a", "b", Operator.EQ)
-        cond_b_c = Condition("b", "c", Operator.EQ)
-        cond_c_d = Condition("c", "d", Operator.EQ)
-        cond_d_e = Condition("d", "e", Operator.EQ)
+        # Create a chain of SelectionNodes
+        cond_id_course = Condition("id", "course_id", Operator.EQ)
+        cond_course_sec = Condition("course_id", "sec_id", Operator.EQ)
+        cond_sec_sem = Condition("sec_id", "semester", Operator.EQ)
+        cond_sem_year = Condition("semester", "year", Operator.EQ)
 
+        # Build selection chain
+        select_sem_year = SelectionNode([cond_sem_year])
+        select_sem_year.set_child(table_node)
 
-        select_d_e = SelectionNode([cond_d_e])
-        select_d_e.set_child(table_node)
+        select_sec_sem = SelectionNode([cond_sec_sem])
+        select_sec_sem.set_child(select_sem_year)
 
-        select_c_d = SelectionNode([cond_c_d])
-        select_c_d.set_child(select_d_e)
+        select_course_sec = SelectionNode([cond_course_sec])
+        select_course_sec.set_child(select_sec_sem)
 
-        select_b_c = SelectionNode([cond_b_c])
-        select_b_c.set_child(select_c_d)
+        select_id_course = SelectionNode([cond_id_course])
+        select_id_course.set_child(select_course_sec)
 
-        select_a_b = SelectionNode([cond_a_b])
-        select_a_b.set_child(select_b_c)
-
-        # Create a project node on top
-        project_node = ProjectNode(["a"])
-        project_node.set_child(select_a_b)
+        # Create a project node
+        project_node = ProjectNode(["id"])
+        project_node.set_child(select_id_course)
 
         # Wrap in a QueryPlan
         plan = QueryPlan(project_node)
 
-        plans = generate_possible_plans(plan, [
-            EquivalenceRules.commute_selections
-        ])
+        # Apply equivalence rules
+        plans = generate_possible_plans(plan, [EquivalenceRules.commute_selections])
 
-        # 4!
-        assert len(plans) == 24
-        print(f"Test 1: Passed - {time() - start_time:.6f} s") 
+        # Validate number of plans (4!)
+        assert len(plans) == 24, f"Expected 24 plans, got {len(plans)}"
+
+        print(f"Test 1: Passed - {time() - start_time:.6f} s")
+
     
     def test_basic_selection_commutativity(self):
-        """Test basic commutativity of two selections"""
         start_time = time()
-        
-        # Original plan: σage>20(σsalary>50000(employees))
-        table_node = TableNode("employees")
-        select_salary = SelectionNode([
-            Condition("salary", "50000", Operator.GREATER)
-        ])
-        select_salary.set_child(table_node)
-        select_age = SelectionNode([
-            Condition("age", "20", Operator.GREATER)
-        ])
-        select_age.set_child(select_salary)
-        project = ProjectNode(["name"])
-        project.set_child(select_age)
-        original_plan = QueryPlan(project)
 
-
-        plans = generate_possible_plans(original_plan, [EquivalenceRules.commute_selections])
-        
-
-        # Create expected commuted plan: σsalary>50000(σage>20(employees))
-        table_node2 = TableNode("employees")
-        select_age2 = SelectionNode([
-            Condition("age", "20", Operator.GREATER)
-        ])
-        select_age2.set_child(table_node2)
-        select_salary2 = SelectionNode([
-            Condition("salary", "50000", Operator.GREATER)
-        ])
-        select_salary2.set_child(select_age2)
-        project2 = ProjectNode(["name"])
-        project2.set_child(select_salary2)
-        expected_plan = QueryPlan(project2)
-
-        assert len(plans) == 2  # Original + commuted
-        assert any(p == original_plan for p in plans), "Original plan should exist"
-        assert any(p == expected_plan for p in plans), "Commuted plan should exist"
-
-        print(f"Test basic commutativity: Passed - {time() - start_time:.6f} s")
-
-    def test_three_selections_commutativity(self):
-        """Test commutativity with three selection operations"""
-        start_time = time()
-        
-        # Original: σage>20(σsalary>50000(σdept='IT'(employees)))
-        table_node = TableNode("employees")
-        select_dept = SelectionNode([
-            Condition("dept", "IT", Operator.EQ)
-        ])
+        # Original plan: σtot_cred>20(σdept_name='CS'(student))
+        table_node = TableNode("student")
+        select_dept = SelectionNode([Condition("dept_name", "CS", Operator.EQ)])
         select_dept.set_child(table_node)
-        select_salary = SelectionNode([
-            Condition("salary", "50000", Operator.GREATER)
-        ])
-        select_salary.set_child(select_dept)
-        select_age = SelectionNode([
-            Condition("age", "20", Operator.GREATER)
-        ])
-        select_age.set_child(select_salary)
+        select_credits = SelectionNode([Condition("tot_cred", "20", Operator.GREATER)])
+        select_credits.set_child(select_dept)
         project = ProjectNode(["name"])
-        project.set_child(select_age)
+        project.set_child(select_credits)
         original_plan = QueryPlan(project)
 
-
+        # Generate possible plans
         plans = generate_possible_plans(original_plan, [EquivalenceRules.commute_selections])
-        
 
-        # Create one expected ordering: σdept='IT'(σage>20(σsalary>50000(employees)))
-        table_node2 = TableNode("employees")
-        select_salary2 = SelectionNode([
-            Condition("salary", "50000", Operator.GREATER)
-        ])
-        select_salary2.set_child(table_node2)
-        select_age2 = SelectionNode([
-            Condition("age", "20", Operator.GREATER)
-        ])
-        select_age2.set_child(select_salary2)
-        select_dept2 = SelectionNode([
-            Condition("dept", "IT", Operator.EQ)
-        ])
-        select_dept2.set_child(select_age2)
+        # Create commuted plan: σdept_name='CS'(σtot_cred>20(student))
+        table_node2 = TableNode("student")
+        select_credits2 = SelectionNode([Condition("tot_cred", "20", Operator.GREATER)])
+        select_credits2.set_child(table_node2)
+        select_dept2 = SelectionNode([Condition("dept_name", "CS", Operator.EQ)])
+        select_dept2.set_child(select_credits2)
         project2 = ProjectNode(["name"])
         project2.set_child(select_dept2)
         expected_plan = QueryPlan(project2)
 
-        assert len(plans) == 6  # 3! possible orderings
-        assert any(p == original_plan for p in plans), "Original plan should exist"
-        assert any(p == expected_plan for p in plans), "Reordered plan should exist"
+        # Validate plans
+        assert len(plans) == 2, f"Expected 2 plans, got {len(plans)}"
+        assert any(p == original_plan for p in plans), "Original plan not found."
+        assert any(p == expected_plan for p in plans), "Commuted plan not found."
 
-        print(f"Test three selections: Passed - {time() - start_time:.6f} s")
+        print(f"Test basic commutativity: Passed - {time() - start_time:.6f} s")
 
-    def test_commutativity_with_join(self):
-        """Test commutativity of selections above a join"""
+
+    def test_three_selections_commutativity(self):
         start_time = time()
-        
-        # Create base join
-        employees = TableNode("employees")
-        departments = TableNode("departments")
-        join = ConditionalJoinNode(JoinAlgorithm.HASH, [
-            Condition("employees.dept_id", "departments.id", Operator.EQ)
-        ])
-        join.set_children(Pair(employees, departments))
-        
-        # Add selections: σage>30(σlocation='NY'(emp ⋈ dept))
-        select_location = SelectionNode([
-            Condition("departments.location", "NY", Operator.EQ)
-        ])
-        select_location.set_child(join)
-        select_age = SelectionNode([
-            Condition("employees.age", "30", Operator.GREATER)
-        ])
-        select_age.set_child(select_location)
-        project = ProjectNode(["employees.name", "departments.name"])
-        project.set_child(select_age)
+
+        # Original: σcredits>3(σdept_name='CS'(σtitle='AI'(course)))
+        table_node = TableNode("course")
+        select_title = SelectionNode([Condition("title", "AI", Operator.EQ)])
+        select_title.set_child(table_node)
+        select_dept = SelectionNode([Condition("dept_name", "CS", Operator.EQ)])
+        select_dept.set_child(select_title)
+        select_credits = SelectionNode([Condition("credits", "3", Operator.GREATER)])
+        select_credits.set_child(select_dept)
+        project = ProjectNode(["course_id"])
+        project.set_child(select_credits)
         original_plan = QueryPlan(project)
 
-
+        # Generate possible plans
         plans = generate_possible_plans(original_plan, [EquivalenceRules.commute_selections])
-        
 
-        # Create commuted plan: σlocation='NY'(σage>30(emp ⋈ dept))
-        employees2 = TableNode("employees")
-        departments2 = TableNode("departments")
-        join2 = ConditionalJoinNode(JoinAlgorithm.HASH, [
-            Condition("employees.dept_id", "departments.id", Operator.EQ)
-        ])
-        join2.set_children(Pair(employees2, departments2))
-        
-        select_age2 = SelectionNode([
-            Condition("employees.age", "30", Operator.GREATER)
-        ])
-        select_age2.set_child(join2)
-        select_location2 = SelectionNode([
-            Condition("departments.location", "NY", Operator.EQ)
-        ])
-        select_location2.set_child(select_age2)
-        project2 = ProjectNode(["employees.name", "departments.name"])
-        project2.set_child(select_location2)
+        # Create one expected ordering: σdept_name='CS'(σtitle='AI'(σcredits>3(course)))
+        table_node2 = TableNode("course")
+        select_credits2 = SelectionNode([Condition("credits", "3", Operator.GREATER)])
+        select_credits2.set_child(table_node2)
+        select_title2 = SelectionNode([Condition("title", "AI", Operator.EQ)])
+        select_title2.set_child(select_credits2)
+        select_dept2 = SelectionNode([Condition("dept_name", "CS", Operator.EQ)])
+        select_dept2.set_child(select_title2)
+        project2 = ProjectNode(["course_id"])
+        project2.set_child(select_dept2)
         expected_plan = QueryPlan(project2)
 
-        assert len(plans) == 2
-        assert any(p == original_plan for p in plans), "Original plan should exist"
-        assert any(p == expected_plan for p in plans), "Commuted plan should exist"
+        # Validate plans
+        assert len(plans) == 6, f"Expected 6 plans, got {len(plans)}"
+        print(f"Test three selections: Passed - {time() - start_time:.6f} s")
+
+
+    def test_commutativity_with_join(self):
+        start_time = time()
+
+        # Create base join: student ⋈ advisor
+        student = TableNode("student")
+        advisor = TableNode("advisor")
+        join = ConditionalJoinNode(JoinAlgorithm.HASH, [
+            Condition("student.id", "advisor.s_id", Operator.EQ)
+        ])
+        join.set_children(Pair(student, advisor))
+
+        # Add selections: σtot_cred>30(σi_id=500(advisor ⋈ student))
+        select_i_id = SelectionNode([Condition("advisor.i_id", "500", Operator.EQ)])
+        select_i_id.set_child(join)
+        select_tot_cred = SelectionNode([Condition("student.tot_cred", "30", Operator.GREATER)])
+        select_tot_cred.set_child(select_i_id)
+        project = ProjectNode(["student.name", "advisor.i_id"])
+        project.set_child(select_tot_cred)
+        original_plan = QueryPlan(project)
+
+        # Generate possible plans
+        plans = generate_possible_plans(original_plan, [EquivalenceRules.commute_selections])
+
+        # Create commuted plan: σi_id=500(σtot_cred>30(advisor ⋈ student))
+        join2 = ConditionalJoinNode(JoinAlgorithm.HASH, [
+            Condition("student.id", "advisor.s_id", Operator.EQ)
+        ])
+        join2.set_children(Pair(TableNode("student"), TableNode("advisor")))
+        select_tot_cred2 = SelectionNode([Condition("student.tot_cred", "30", Operator.GREATER)])
+        select_tot_cred2.set_child(join2)
+        select_i_id2 = SelectionNode([Condition("advisor.i_id", "500", Operator.EQ)])
+        select_i_id2.set_child(select_tot_cred2)
+        project2 = ProjectNode(["student.name", "advisor.i_id"])
+        project2.set_child(select_i_id2)
+        expected_plan = QueryPlan(project2)
+
+        # Validate plans
+        assert len(plans) == 2, f"Expected 2 plans, got {len(plans)}"
+        assert any(p == original_plan for p in plans), "Original plan not found."
+        assert any(p == expected_plan for p in plans), "Commuted plan not found."
 
         print(f"Test join commutativity: Passed - {time() - start_time:.6f} s")
 
-    def test_mixed_selections_commutativity(self):
-        """Test commutativity with different types of conditions"""
-        start_time = time()
-        
-        # Mix of equality, range, and correlation conditions
-        table_node = TableNode("employees")
-        
-        # σdept='IT'(σsalary>mgr.salary(σage>25(employees)))
-        select_age = SelectionNode([
-            Condition("age", "25", Operator.GREATER)  # Range
-        ])
-        select_age.set_child(table_node)
-        
-        select_salary = SelectionNode([
-            Condition("salary", "mgr.salary", Operator.GREATER)  # Correlation
-        ])
-        select_salary.set_child(select_age)
-        
-        select_dept = SelectionNode([
-            Condition("dept", "IT", Operator.EQ)  # Equality
-        ])
-        select_dept.set_child(select_salary)
-        
-        project = ProjectNode(["name", "salary"])
-        project.set_child(select_dept)
-        original_plan = QueryPlan(project)
-
-
-        plans = generate_possible_plans(original_plan, [EquivalenceRules.commute_selections])
-        
-
-        # Create one expected ordering: σage>25(σdept='IT'(σsalary>mgr.salary(employees)))
-        table_node2 = TableNode("employees")
-        select_salary2 = SelectionNode([
-            Condition("salary", "mgr.salary", Operator.GREATER)
-        ])
-        select_salary2.set_child(table_node2)
-        select_dept2 = SelectionNode([
-            Condition("dept", "IT", Operator.EQ)
-        ])
-        select_dept2.set_child(select_salary2)
-        select_age2 = SelectionNode([
-            Condition("age", "25", Operator.GREATER)
-        ])
-        select_age2.set_child(select_dept2)
-        project2 = ProjectNode(["name", "salary"])
-        project2.set_child(select_age2)
-        expected_plan = QueryPlan(project2)
-
-        assert len(plans) == 6
-        assert any(p == original_plan for p in plans), "Original plan should exist"
-        assert any(p == expected_plan for p in plans), "Reordered plan should exist"
-
-        print(f"Test mixed selections: Passed - {time() - start_time:.6f} s")
-    

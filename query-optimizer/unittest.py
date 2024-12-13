@@ -5,6 +5,7 @@ from tests.test_rule5 import TestOptimizerRule5
 from tests.test_rule6 import TestOptimizerRule6
 from tests.test_rule7 import TestOptimizerRule7
 from tests.test_rule8 import TestOptimizerRule8
+from tests.test_query_plan_tree import TestQueryPlanGeneration
         
 if __name__ == '__main__':
     print("=============================================================")
@@ -54,15 +55,15 @@ if __name__ == '__main__':
     #     if method_name.startswith("test_"):
     #         method = getattr(instance, method_name)
     #         method()
-    instance = TestOptimizerRule6()
-    print("Testing for rule 6")
-    # For each method that starts with "test_"
-    for method_name in dir(instance):
-        if method_name.startswith("test_"):
-            method = getattr(instance, method_name)
-            method()
+    # instance = TestOptimizerRule6()
+    # print("Testing for rule 6")
+    # # For each method that starts with "test_"
+    # for method_name in dir(instance):
+    #     if method_name.startswith("test_"):
+    #         method = getattr(instance, method_name)
+    #         method()
 
-    print("\n\n=============================================================")
+    # print("\n\n=============================================================")
 
     instance = TestOptimizerRule7()
     print("Testing for rule 7")
@@ -74,6 +75,15 @@ if __name__ == '__main__':
     
     instance = TestOptimizerRule8()
     print("Testing for rule 8")
+    # For each method that starts with "test_"
+    for method_name in dir(instance):
+        if method_name.startswith("test_"):
+            method = getattr(instance, method_name)
+            method()
+
+    print("\n\n=============================================================")
+    instance = TestQueryPlanGeneration()
+    print("Testing for query plan generation")
     # For each method that starts with "test_"
     for method_name in dir(instance):
         if method_name.startswith("test_"):

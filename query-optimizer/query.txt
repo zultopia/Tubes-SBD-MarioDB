@@ -1,1 +1,1 @@
-select budi from table1 join table2 on table1.id = table2.id join table3 on table2.id = table3.id natural join a natural join b natural join c where x = a and x = b or x =c and x = d;
+SELECT * FROM student AS s JOIN instructor AS l ON s.id = l.id;

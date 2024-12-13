@@ -7,6 +7,7 @@ from .nodes.table_node import TableNode
 from .nodes.join_nodes import JoinNode, ConditionalJoinNode, NaturalJoinNode
 from .nodes.sorting_node import SortingNode
 from .nodes.update_node import UpdateNode
+from .nodes.limit_node import LimitNode
 from utils import Pair, Prototype
 
 
@@ -49,12 +50,18 @@ class QueryPlan(Prototype):
                     result.append(repr_node(node.children.second, level + 1))
             
             elif isinstance(node, SortingNode):
-                node_str += f" BY {', '.join(node.attributes)}"
+                node_str += f" BY {', '.join(node.sort_attributes)}"
+                if hasattr(node, 'child') and node.child:
+                    result.append(repr_node(node.child, level + 1))
+
+            elif isinstance(node, LimitNode):
                 if hasattr(node, 'child') and node.child:
                     result.append(repr_node(node.child, level + 1))
             
             elif isinstance(node, TableNode):
                 pass  # TableNode has no children
+
+
                 
             return '\n'.join(result)
 
@@ -72,7 +79,7 @@ class QueryPlan(Prototype):
             def serialize_node(node: QueryNode) -> str:
                 if isinstance(node, ProjectNode):
                     child_str = serialize_node(node.child) if node.child else ''
-                    return f"PROJECT[{','.join(node.attributes)}]->{child_str}"
+                    return f"PROJECT[{','.join(node.projected_attributes)}]->{child_str}"
                 elif isinstance(node, UnionSelectionNode):
                     children_str = ','.join([serialize_node(child) for child in node.children])
                     return f"UNION[{children_str}]"
@@ -86,9 +93,12 @@ class QueryPlan(Prototype):
                 elif isinstance(node, SortingNode):
                     order = "ASC" if node.ascending else "DESC"
                     child_str = serialize_node(node.child) if node.child else ''
-                    return f"SORT[{','.join(node.attributes)} {order}]->{child_str}"
+                    return f"SORT[{','.join(node.sort_attributes)} {order}]->{child_str}"
                 elif isinstance(node, TableNode):
                     return f"TABLE[{node.table_name} AS {node.alias}]"
+                elif isinstance(node, LimitNode):
+                    child_str = serialize_node(node.child) if node.child else ''
+                    return f"LIMIT[{node.limit}]->{child_str}"
                 else:
                     return "UNKNOWN"
 

@@ -69,6 +69,7 @@ class TestOptimizerRule8:
         plans = generate_possible_plans(original_plan, [
             EquivalenceRules.push_projections_into_join
         ])
+
         
         assert any(p == expected_plan for p in plans), "Course-Section-Classroom projection distribution should exist"
         print(f"Course-Section-Classroom projection: Passed - {time() - start_time:.6f} s")

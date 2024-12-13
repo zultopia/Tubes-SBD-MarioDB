@@ -55,3 +55,7 @@ class QueryNode(ABC, Prototype):
         # For children, you might do something like:
         # hash_value = hash((self.node_type, tuple_of_children_hashes, tuple_of_node_specific_attributes))
         return hash(self.node_type)  # Extend this in subclasses
+
+    @abstractmethod
+    def attributes(self) -> List[str]:
+        raise NotImplementedError

@@ -10,10 +10,12 @@ from query_plan.nodes.project_node import ProjectNode
 from query_plan.nodes.table_node import TableNode
 from query_plan.nodes.selection_node import SelectionNode, UnionSelectionNode
 from query_plan.nodes.update_node import UpdateNode
+from query_plan.nodes.limit_node import LimitNode
 from query_plan.enums import JoinAlgorithm, Operator
 from parse_tree import ParseTree, Node
 from lexer import Token 
 from query_plan.shared import Condition
+
 
 def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
     if not isinstance(parse_tree.root, str) or parse_tree.root != "Query":
@@ -43,27 +45,37 @@ def from_parse_tree(parse_tree: ParseTree) -> QueryPlan:
             if where_index is not None:
                 condition_node = process_where_clause(parse_tree.childs[where_index + 1])
 
-                # **Handle SelectionNode and UnionSelectionNode separately**
+                # Handle SelectionNode and UnionSelectionNode separately
                 if isinstance(condition_node, SelectionNode):
-                    # For SelectionNode, set a single child
                     condition_node.set_child(table_node)
+                    table_node = condition_node
                 elif isinstance(condition_node, UnionSelectionNode):
-                    # For UnionSelectionNode, set children for each SelectionNode
-                    # Assuming all selection nodes share the same child (table_node)
                     condition_node.set_child_to_all(table_node)
+                    table_node = condition_node
                 else:
                     raise TypeError("condition_node must be either SelectionNode or UnionSelectionNode")
-
-                # Update table_node to be the condition_node
-                table_node = condition_node
 
             # Attach the table_node to the project_node
             project_node.set_child(table_node)
 
-            # Additional processing for ORDER BY, LIMIT, etc., if needed
-            # (Not required for the current example)
+            # Check for ORDER BY clause (if needed)
+            # (Not shown here as it wasn't implemented in the original snippet)
 
-            return QueryPlan(project_node)
+            # Check for LIMIT clause
+            limit_index = None
+            for i, child in enumerate(parse_tree.childs):
+                if isinstance(child.root, Node) and child.root.token_type == Token.LIMIT:
+                    limit_index = i
+                    break
+
+            if limit_index is not None:
+                # The next token should be a NUMBER
+                limit_value = float(parse_tree.childs[limit_index + 1].root.value)
+                limit_node = LimitNode(limit_value)
+                limit_node.set_child(project_node)
+                return QueryPlan(limit_node)
+            else:
+                return QueryPlan(project_node)
 
         elif first_token.token_type == Token.UPDATE:
             # Process UPDATE query

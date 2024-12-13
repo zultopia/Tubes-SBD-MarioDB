@@ -138,6 +138,9 @@ class TestOptimizerRule6:
         plans = generate_possible_plans(original_plan, [
             EquivalenceRules.associativeJoins
         ])
+        print(original_plan)
+        print(expected_plan)
+        print(plans)
         
         assert any(p == expected_plan for p in plans), "Complex condition association should exist"
         print(f"Complex conditions: Passed - {time() - start_time:.6f} s")
