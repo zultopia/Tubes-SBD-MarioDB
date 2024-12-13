@@ -72,6 +72,30 @@ class Buffer:
             cache_key = (table_name, block_id)
             return self._buffer.put(cache_key, block_data)
 
+    def put_buffer_hash(
+        self,
+        hashNumber: int,
+        table_name: str,
+        block_id: int,
+        column: str,
+        block_data: any,
+    ):
+        """
+        Put a block to the buffer cache
+
+        Args:
+            table_name (str): The name of the table
+            block_id (int): The block ID
+            block_data (any): The block data
+
+        Returns:
+            None: if the buffer still has space or old block is overwritten
+            Any: the block data that is overwritten
+        """
+        with self._buffer_lock:
+            cache_key = (hashNumber, table_name, block_id, column)
+            return self._buffer.put(cache_key, block_data)
+
     def delete_buffer(self, table_name: str, block_id: int) -> bool:
         """
         Delete a block from the buffer cache

@@ -8,7 +8,7 @@ import textwrap
 from typing import Any, List, Literal, Union, Dict, Tuple
 
 from StorageManager.HashIndex import Hash
-from ConcurrencyControlManager.classes import PrimaryKey
+from ConcurrencyControlManager.utils import PrimaryKey
 from FailureRecoveryManager.Buffer import Buffer
 
 class Student:
