@@ -158,16 +158,6 @@ class StorageManager:
         self.indexes = {}
         self.logs = self._load_logs()
         self.action_logs = []
-
-    # def _load_data(self):
-    #     if os.path.exists(self.DATA_FILE):
-    #         with open(self.DATA_FILE, "rb") as file:
-    #             return pickle.load(file)
-    #     return {}
-
-    # def _save_data(self):
-    #     with open(self.DATA_FILE, "wb") as file:
-    #         pickle.dump(self.data, file)
     
     def _load_logs(self):
         if os.path.exists(self.LOG_FILE):
@@ -258,11 +248,11 @@ class StorageManager:
                 if not block:
                     block = self._load_block(table, block_id)
                 for row in block:
-                    if self._evaluate_conditions(row, conditions):
+                    if data_retrieval.conditions is not None and self._evaluate_conditions(row, conditions):
                         results.append({col: row[col] for col in columns})
         return results
         
-    def write_block_to_disk(self, table: str, block_id: int, block_data: Dict) -> int:
+    def write_block_to_disk(self, table: str, block_id: int, block_data: List[Dict]) -> int:
         """Writes blocks straight to disk. Automatically syncs index
 
         Args:
@@ -271,6 +261,10 @@ class StorageManager:
         Returns:
             int: Number of rows affected
         """
+        for column_exist in self.get_all_attributes(table):
+            for row in block_data:
+                if column_exist not in row.keys():
+                    row[column_exist] = None
         self._save_block(table, block_id, block_data)
 
     def write_block(self, data_write: DataWrite) -> int:

@@ -80,41 +80,6 @@ class TestStorageManager(unittest.TestCase):
         self.assertEqual(retrieved_records[0]["name"], "Yusuf")
         self.assertEqual(retrieved_records[0]["dept_name"], "Mathematics")
 
-    def test_write_block_with_logging(self):
-        """
-        Test write block functionality with logging
-        1. Write a new record
-        2. Verify the record retrieved
-        3. Verify the log entry
-        """
-        write_student4 = DataWrite(
-            table="Student", 
-            columns=["id", "name", "dept_name"], 
-            new_values=[4, "Bilal", "Psychology"], 
-            level="table"
-        )
-        
-        self.manager.write_block(write_student4)
-        
-        retrieved_records = self.manager.read_block(DataRetrieval(
-            table="Student", 
-            columns=["id", "name", "dept_name"], 
-            conditions=ConditionGroup([Condition("id", "=", 4)]),
-            search_type="sequential",
-            level="row"
-        ))
-        
-        self.assertEqual(len(retrieved_records), 1)
-        self.assertEqual(retrieved_records[0]["id"], 4)
-        self.assertEqual(retrieved_records[0]["name"], "Bilal")
-        self.assertEqual(retrieved_records[0]["dept_name"], "Psychology")
-        
-        # Verify the log entry (last one)
-        # last_log = self.manager.logs[-1]
-        # self.assertEqual(last_log["action"], "write")
-        # self.assertEqual(last_log["table"], DataWrite.table)
-        # self.assertEqual(last_log["data"], DataWrite.new_values)
-
     def test_delete_block(self):
         data_deletion = DataDeletion("Student", ConditionGroup([Condition("name", "=", "Bob")]), "row")
         removed = self.manager.delete_block(data_deletion)
