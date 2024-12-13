@@ -84,7 +84,7 @@ class Hash(object):
     @staticmethod
     def _save_hash_block_to_disk(table: str, column: str, hash_value: int, block_id: int, block_data: List[Dict]):
         block_file = Hash._get_hash_block_file(table, column, hash_value, block_id)
-        if not block_data:
+        if block_data is None:
             if os.path.exists(Hash._get_hash_block_file(table, column, hash_value, block_id)):
                os.remove(Hash._get_hash_block_file(table, column, hash_value, block_id))
             return

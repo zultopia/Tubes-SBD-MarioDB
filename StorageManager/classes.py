@@ -502,10 +502,13 @@ class StorageManager:
     
     def get_index(self, relation: str, attribute: str) -> Union[Literal["hash", "btree"], None]:
         """Get the type of index on the given attribute in the relation."""
+        stuff = 0
         for file in os.listdir(os.path.join(self.DATA_DIR, self.HASH_DIR)):
+            print(file)
+            stuff += 1
             if file.startswith(f"{relation}__{attribute}__hash"):
                 return "hash"
-            print(file)
+        print(stuff)
         return None
     
     def has_index(self, attribute: str, relation: str) -> bool:

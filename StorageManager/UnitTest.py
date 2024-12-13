@@ -12,7 +12,7 @@ class TestStorageManager(unittest.TestCase):
     def setUp(self):
         self.test_data_dir = "data_blocks/"
         self.test_hash_dir = "hash/"
-        self.manager = StorageManager(Buffer(100))
+        self.manager = StorageManager(Buffer(1000))
         write_student = DataWrite(
             table="Student", 
             columns=["id", "name", "dept_name"], 
@@ -25,8 +25,8 @@ class TestStorageManager(unittest.TestCase):
             new_values=[2, "Bob", "Mathematics"], 
             level="table"
         )
-        self.manager.write_block_to_disk(write_student)
-        self.manager.write_block_to_disk(write_student2)
+        self.manager.write_block(write_student)
+        self.manager.write_block(write_student2)
         
     def tearDown(self):
         shutil.rmtree(self.test_data_dir)
@@ -116,8 +116,8 @@ class TestHashIndex(unittest.TestCase):
         
         self.manager.set_index("Student", "id", "hash")
         
-        self.manager.write_block_to_disk(write_student)
-        self.manager.write_block_to_disk(write_student2)
+        self.manager.write_block(write_student)
+        self.manager.write_block(write_student2)
 
     def tearDown(self):
         shutil.rmtree(self.test_data_dir)
@@ -148,7 +148,7 @@ class TestHashIndex(unittest.TestCase):
             level="table"
         )
         
-        self.manager.write_block_to_disk(write_student3)
+        self.manager.write_block(write_student3)
         
         retrieved_records = self.manager.read_block_with_hash("Student", "id", 3)
         
@@ -169,7 +169,7 @@ class TestHashIndex(unittest.TestCase):
             level="table"
         )
         print("TEST TRY DELETE")
-        deleted_count = self.manager.delete_block_to_disk(delete_student)
+        deleted_count = self.manager.delete_block(delete_student)
         self.assertEqual(deleted_count, 1)
         
         retrieved_records = self.manager.read_block_with_hash("Student", "id", 2)
