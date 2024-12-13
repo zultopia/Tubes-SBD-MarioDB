@@ -166,7 +166,10 @@ class LRUCache:
         -------
         dict[any, any]: The cache dictionary
         """
-        return self.cache
+        newval = {}
+        for key, node in self.cache.items():
+            newval[key] = node.val
+        return newval
 
     def clear(self) -> None:
         """

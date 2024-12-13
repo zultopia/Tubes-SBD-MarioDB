@@ -1,12 +1,8 @@
 import json
+from datetime import datetime
 from threading import Lock, Timer
 
-from ConcurrencyControlManager.utils import (
-    PrimaryKey,
-    Row,
-    Table,
-    TransactionAction,
-)
+from ConcurrencyControlManager.utils import PrimaryKey, Row, Table, TransactionAction
 from FailureRecoveryManager.ExecutionResult import ExecutionResult
 from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
 from FailureRecoveryManager.Rows import Rows
@@ -157,9 +153,9 @@ class FailureRecoveryManager:
                     self.storage.write_hash_block_to_disk(
                         table=table_name,
                         block_id=block_id,
-                        block_data=value,
-                        column_name=column_name,
+                        column=column_name,
                         hash_value=hash_number,
+                        block_data=value,
                     )
                 elif len(key) == 2:
                     # normal block => {tablename}:{blockid}
@@ -173,7 +169,7 @@ class FailureRecoveryManager:
                 else:
                     print("Error writing block to disk: Invalid key format.")
 
-            # print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
+        # print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
 
         # MANAGE WA LOG
         with self._wa_log_lock:
@@ -345,7 +341,6 @@ class FailureRecoveryManager:
                 exit()
             # send before and after data to storage manager to process
 
-
             # insert case
             if before_states == None and after_states != None:
                 for state in after_states:
@@ -409,8 +404,10 @@ class FailureRecoveryManager:
 
             before_states = Row(table, PrimaryKey(None), before_states)
             after_states = Row(table, PrimaryKey(None), after_states)
-           
-            transaction_action = TransactionAction(transaction_id,"WRITE", "row", before_states, after_states)
+
+            transaction_action = TransactionAction(
+                transaction_id, "WRITE", "row", before_states, after_states
+            )
             self.write_log(transaction_action)
         # Close rollback process
         # abort_result = ExecutionResult(
@@ -420,7 +417,9 @@ class FailureRecoveryManager:
         #     "ABORT",
         #     "",
         # )
-        transaction_abort = TransactionAction(criteria.transaction_id,"ABORT", None, None, None)
+        transaction_abort = TransactionAction(
+            criteria.transaction_id, "ABORT", None, None, None
+        )
         # print("write log: ", exec_result.__dict__)
         self.write_log(transaction_abort)
 
@@ -636,7 +635,9 @@ class FailureRecoveryManager:
                 before_states = Row(table, PrimaryKey(None), before_states)
                 after_states = Row(table, PrimaryKey(None), after_states)
 
-                transaction_action = TransactionAction(transaction_id,"WRITE", "row", before_states, after_states)
+                transaction_action = TransactionAction(
+                    transaction_id, "WRITE", "row", before_states, after_states
+                )
                 # print("write log: ", exec_result.__dict__)
                 self.write_log(transaction_action)
             if len(active_transactions) == 0:

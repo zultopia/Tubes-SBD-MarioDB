@@ -65,21 +65,25 @@ class TestFailureRecoveryManager(unittest.TestCase):
 
     @patch.object(FailureRecoveryManager, "_start_checkpoint_cron_job")
     def test_write_log(self, _):
-        with open("./FailureRecoveryManager/test/log_write.log", 'w') as file:
+        with open("./FailureRecoveryManager/test/log_write.log", "w") as file:
             pass
 
-        frm = FailureRecoveryManager(buffer=Buffer(5), log_file="./FailureRecoveryManager/test/log_write.log")
+        frm = FailureRecoveryManager(
+            buffer=Buffer(5), log_file="./FailureRecoveryManager/test/log_write.log"
+        )
         frm._wa_logs = [
             '102|WRITE|employees|None|[{"id": 2, "name": "Bob", "salary": 4000}]',
             '102|WRITE|employees|[{"id": 2, "name": "Bob", "salary": 4000}]|None',
             "102|ABORT",
             '103|WRITE|employees|[{"id": 1, "name": "Alice", "salary": 5000}]|[{"id": 1, "name": "Alice", "salary": 6000}]',
         ]
-      
+
         table = Table("employees")
 
         before_states = Row(table, PrimaryKey(None), None)
-        after_states = Row(table, PrimaryKey(None), [{"id": 2, "name": "Bob", "salary": 4000}])
+        after_states = Row(
+            table, PrimaryKey(None), [{"id": 2, "name": "Bob", "salary": 4000}]
+        )
 
         transaction_action = TransactionAction(
             102, "WRITE", "row", after_states, before_states
@@ -153,7 +157,7 @@ class TestFailureRecoveryManager(unittest.TestCase):
             table="table3",
             block_id=3,
             block_data=b"hash_block_data",
-            column_name="column1",
+            column="column1",
             hash_value=1,
         )
 
@@ -209,14 +213,13 @@ class TestFailureRecoveryManager(unittest.TestCase):
         with open("./FailureRecoveryManager/test/test_log.log", "w") as file:
             pass
 
-    # test_recover 
+    # test_recover
     @patch.object(FailureRecoveryManager, "_start_checkpoint_cron_job")
     @patch("StorageManager.classes.StorageManager")
     def test_recover(self, mock_storage_manager, mock_start_checkpoint_cron_job):
-        
-        with open("./FailureRecoveryManager/test/log_recover.log", 'w') as file:
+        with open("./FailureRecoveryManager/test/log_recover.log", "w") as file:
             pass
-        
+
         log_data = [
             'CHECKPOINT|[]',
             '101|START',
@@ -227,7 +230,7 @@ class TestFailureRecoveryManager(unittest.TestCase):
             '103|WRITE|Student|[{"StudentID": 2, "FullName": "John", "GPA": 3}]|[{"StudentID": 2, "FullName": "John B", "GPA": 4}]',
             'CHECKPOINT|[102,103]',
         ]
-        
+
         with open("./FailureRecoveryManager/test/log_recover.log", "w") as log_file:
             log_file.write("\n".join(log_data))
             log_file.write("\n")
@@ -295,12 +298,11 @@ class TestFailureRecoveryManager(unittest.TestCase):
 
         with open("./FailureRecoveryManager/test/log_recover.log", "r") as f:
             actual_content = f.read()
-            
+
         self.assertEqual(actual_content.strip(), "\n".join(log_data + expected_logs))
-        with open("./FailureRecoveryManager/test/log_recover.log", 'w') as file:
+        with open("./FailureRecoveryManager/test/log_recover.log", "w") as file:
             pass
 
-    
     # recover_system_crash
     @patch.object(FailureRecoveryManager, "_start_checkpoint_cron_job")
     @patch("StorageManager.classes.StorageManager")
@@ -322,7 +324,9 @@ class TestFailureRecoveryManager(unittest.TestCase):
             '103|WRITE|Student|[{"StudentID": 1, "FullName": "Alice", "GPA": 1}]|[{"StudentID": 1, "FullName": "Alice", "GPA": 2}]',
         ]
 
-        with open("./FailureRecoveryManager/test/log_recover_crash.log", "w") as log_file:
+        with open(
+            "./FailureRecoveryManager/test/log_recover_crash.log", "w"
+        ) as log_file:
             log_file.write("\n".join(log_data))
             log_file.write("\n")
         mock_start_checkpoint_cron_job.return_value = None

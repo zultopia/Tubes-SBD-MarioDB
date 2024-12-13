@@ -111,7 +111,7 @@ class Buffer:
             Any: the block data that is overwritten
         """
         with self._buffer_lock:
-            cache_key = (hashNumber, table_name, block_id, column)
+            cache_key = ("hash", hashNumber, table_name, block_id, column)
             return self._buffer.put(cache_key, block_data)
 
     def delete_buffer(self, table_name: str, block_id: int) -> bool:
