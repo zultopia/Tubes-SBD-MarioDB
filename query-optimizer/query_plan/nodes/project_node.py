@@ -64,7 +64,8 @@ class ProjectNode(QueryNode):
                 if len(matches) > 1:
                     raise ValueError(f"Ambiguous attribute reference '{attr}'. Please qualify with table alias.")
                 self.projected_attributes.extend(matches)
-
+        
+        self.project_list = self.projected_attributes
 
 
     def clone(self) -> 'ProjectNode':
