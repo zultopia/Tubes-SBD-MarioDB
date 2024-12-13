@@ -144,7 +144,7 @@ class Statistic:
         self.V_a_r = V_a_r
 
 class StorageManager:
-    DATA_FILE = "data.dat/"
+    # DATA_FILE = "data.dat/"
     LOG_FILE = "log.dat"
     DATA_DIR = "data_blocks/"
     HASH_DIR = "hash/" # DATA_DIR/HASH_DIR/{table}_{column}_{hash}_{block_id}
@@ -160,15 +160,15 @@ class StorageManager:
         self.logs = self._load_logs()
         self.action_logs = []
 
-    def _load_data(self):
-        if os.path.exists(self.DATA_FILE):
-            with open(self.DATA_FILE, "rb") as file:
-                return pickle.load(file)
-        return {}
+    # def _load_data(self):
+    #     if os.path.exists(self.DATA_FILE):
+    #         with open(self.DATA_FILE, "rb") as file:
+    #             return pickle.load(file)
+    #     return {}
 
-    def _save_data(self):
-        with open(self.DATA_FILE, "wb") as file:
-            pickle.dump(self.data, file)
+    # def _save_data(self):
+    #     with open(self.DATA_FILE, "wb") as file:
+    #         pickle.dump(self.data, file)
     
     def _load_logs(self):
         if os.path.exists(self.LOG_FILE):

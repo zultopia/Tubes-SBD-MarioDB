@@ -226,11 +226,22 @@ class TestConcurrencyControlManager(unittest.TestCase):
         self.assertEqual(res8.status, "wait")
         self.assertEqual(res9.status, "wait")
         self.assertEqual(res9.status, "wait")
+        self.assertEqual(len(ccm.waiting_list), 8)
         
-        print(len(ccm.waiting_list))
+        res10 = ccm.validate_object(TransactionAction(tid1, "commit", None, None, None))
+        self.assertEqual(len(ccm.waiting_list), 6)
+        
+        res11 = ccm.validate_object(TransactionAction(tid4, "commit", None, None, None))
+        self.assertEqual(len(ccm.waiting_list), 7)
+        
+        res11 = ccm.validate_object(TransactionAction(tid3, "commit", None, None, None))
+        self.assertEqual(len(ccm.waiting_list), 8)
+        
+        res11 = ccm.validate_object(TransactionAction(tid2, "commit", None, None, None))
+        self.assertEqual(len(ccm.waiting_list), 0)
         
         # for t_action in ccm.waiting_list:
-        #     print(t_action)
+        #     print(t_action.id, t_action.action)
         
     def test_deadlock(self):
         table1 = Table('table1')
