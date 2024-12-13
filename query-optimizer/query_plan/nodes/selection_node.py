@@ -35,20 +35,25 @@ class SelectionNode(QueryNode):
         self.attributes = self.child.attributes
         self.n = self.child.n
         for condition in self.conditions:
-            
 
-            if condition.operator == Operator.EQ:
-                left_table_name = alias_dict[condition.left_table_alias]
-                right_table_name = alias_dict[condition.right_table_alias]
-                self.n *= min(1 / QOData().get_V(condition.left_attribute, left_table_name), 1 / QOData().get_V(condition.right_attribute, right_table_name)) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
-            if condition.operator in [Operator.LESS, Operator.LESS_EQ]:
-                left_table_name = alias_dict[condition.left_table_alias]
-                self.n *= (float(condition.right_operand) - QOData().get_min(condition.left_attribute, left_table_name)) / (QOData().get_max(condition.left_attribute, left_table_name) - QOData().get_min(condition.left_attribute, left_table_name))
-            if condition.operator in [Operator.GREATER,Operator.GREATER_EQ]:
-                left_table_name = alias_dict[condition.left_table_alias]
-                self.n *= (QOData().get_max(condition.left_attribute, left_table_name) - float(condition.right_operand) ) / (QOData().get_max(condition.left_attribute, left_table_name) - QOData().get_min(condition.left_attribute, left_table_name))
-        
-        
+            # Case 1: Attr OPERATOR LITERAL
+            if condition.right_table_alias is None:
+                if condition.operator == Operator.EQ:
+                    left_table_name = alias_dict[condition.left_table_alias]
+                    self.n *= 1 / QOData().get_V(condition.left_attribute, left_table_name) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
+                if condition.operator in [Operator.LESS, Operator.LESS_EQ]:
+                    left_table_name = alias_dict[condition.left_table_alias]
+                    self.n *= (float(condition.right_operand) - QOData().get_min(condition.left_attribute, left_table_name)) / (QOData().get_max(condition.left_attribute, left_table_name) - QOData().get_min(condition.left_attribute, left_table_name))
+                if condition.operator in [Operator.GREATER,Operator.GREATER_EQ]:
+                    left_table_name = alias_dict[condition.left_table_alias]
+                    self.n *= (QOData().get_max(condition.left_attribute, left_table_name) - float(condition.right_operand) ) / (QOData().get_max(condition.left_attribute, left_table_name) - QOData().get_min(condition.left_attribute, left_table_name))
+            # Case 2: Attr OPERATOR Attr
+            else:
+                if condition.operator == Operator.EQ:
+                    left_table_name = alias_dict[condition.left_table_alias]
+                    right_table_name = alias_dict[condition.right_table_alias]
+                    self.n *= min(1 / QOData().get_V(condition.left_attribute, left_table_name), 1 / QOData().get_V(condition.right_attribute, right_table_name)) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
+
         self.n = int(self.n)
         if self.n < 0:
             self.n = 0
@@ -62,18 +67,19 @@ class SelectionNode(QueryNode):
 
         is_index = False
         for condition in self.conditions:
+
             left_table_name = alias_dict[condition.left_table_alias]
-            right_table_name = alias_dict[condition.right_table_alias]
-            if (QOData().get_index(condition.left_attribute, left_table_name) == 'btree' or QOData().get_index(condition.right_attribute, right_table_name) == 'btree') and condition.operator != Operator.NEQ:
-                is_index = True
-                break
-        
+            # Attr OPERATOR Literal
+            if condition.right_table_alias is None:
+                if QOData().get_index(condition.left_attribute, left_table_name) == 'btree':
+                    is_index = True
+                    break
         if not is_index:
             return previous_cost + t_S + self.child.b * t_T + self.b * t_T
         else:
             c = 3
             # TODO: find height of the tree
-            return previous_cost + (c + 1) * (t_T + t_S) + self.b * t_T
+            return previous_cost + (c + self.n) * (t_T + t_S) + self.b * t_T
 
 
 
@@ -182,7 +188,7 @@ class UnionSelectionNode(QueryNode):
         self.estimate_size(statistics, alias_dict)
         previous_cost = 0
         for seletion_node in self.children:
-            previous_cost += seletion_node.estimate_cost()
+            previous_cost += seletion_node.estimate_cost(statistics, alias_dict)
 
         return previous_cost + self.b * t_T
 

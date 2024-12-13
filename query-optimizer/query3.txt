@@ -1,0 +1,1 @@
+SELECT s.id, s.name, t.course_id, t.semester FROM student AS s NATURAL JOIN takes AS t WHERE s.id > 10 OR t.course_id = 10 OR s.id = 1 ORDER BY s.id LIMIT 5;

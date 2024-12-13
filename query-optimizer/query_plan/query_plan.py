@@ -23,6 +23,8 @@ class QueryPlan(Prototype):
             if node.child == None and node.children == None:
                 assert(isinstance(node, TableNode))
                 assert(node.alias != None and node.table_name != None)
+                if node.alias in self.alias_dict:
+                    raise Exception("Aliases or Tables conflicts")
                 self.alias_dict[node.alias] = node.table_name
             elif node.child != None:
                 assert(node.children == None)
