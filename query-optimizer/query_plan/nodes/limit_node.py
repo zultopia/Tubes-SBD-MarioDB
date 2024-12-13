@@ -20,8 +20,17 @@ class LimitNode(QueryNode):
     def _calculate_operation_cost(self, statistics: Dict) -> float:
         return 1
     
-    def estimate_cost(self, statistics: Dict) -> float:
-        return 1
+    def estimate_size(self, statistics: Dict, alias_dict) -> float:
+        self.child.estimate_size()
+
+        # n dan b tidak perlu dihitung karena itu step akhir
+
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        self.estimate_size()
+
+        previous_cost = self.child.estimate_cost()
+        
+        return previous_cost 
 
     def clone(self):
         cloned_node = LimitNode(self.limit)

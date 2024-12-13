@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 from query_plan.base import QueryNode
 from query_plan.enums import NodeType, Operator
 from data import QOData 
+from .constants import *
 from query_plan.shared import Condition 
 from utils import Pair
 
@@ -53,8 +54,25 @@ class SelectionNode(QueryNode):
 
 
     def estimate_cost(self, statistics: Dict, alias_dict) -> float:
-        # Karena pipeline, IO cost adalah 0
-        return self.child.estimate_cost()
+        self.estimate_size()
+
+        previous_cost = self.child.estimate_cost()
+
+        is_index = False
+        for condition in self.conditions:
+            left_table_name = alias_dict[condition.left_table_alias]
+            right_table_name = alias_dict[condition.right_table_alias]
+            if (QOData().get_index(condition.left_attribute, left_table_name) == 'btree' or QOData().get_index(condition.right_attribute, right_table_name) == 'btree') and condition.operator != Operator.NEQ:
+                is_index = True
+                break
+        
+        if not is_index:
+            return previous_cost + t_S + self.child.b * t_T + self.b * t_T
+        else:
+            c = 3
+            # TODO: find height of the tree
+            return previous_cost + (c + 1) * (t_T + t_S) + self.b * t_T
+
 
 
     def _calculate_operation_cost(self, statistics: Dict) -> float:

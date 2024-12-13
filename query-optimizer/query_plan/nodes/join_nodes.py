@@ -123,7 +123,7 @@ class ConditionalJoinNode(JoinNode):
             for condition in self.conditions:
                 left_table_name = alias_dict[condition.left_table_alias]
                 right_table_name = alias_dict[condition.right_table_alias]
-                if QOData().get_index(condition.left_attribute, left_table_name) == 'btree' or QOData().get_index(condition.right_attribute, right_table_name) == 'btree':
+                if (QOData().get_index(condition.left_attribute, left_table_name) == 'btree' or QOData().get_index(condition.right_attribute, right_table_name) == 'btree') and condition.operator != Operator.NEQ:
                     is_index = True
                     break
             
