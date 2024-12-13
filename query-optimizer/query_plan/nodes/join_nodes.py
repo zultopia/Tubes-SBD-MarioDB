@@ -180,7 +180,7 @@ class NaturalJoinNode(JoinNode):
         return cloned_node
 
     def estimate_size(self, statistics: Dict, alias_dict):
-        assert (isinstance(self.children, Pair[QueryNode, QueryNode]))
+        assert (isinstance(self.children, Pair))
         
         left: QueryNode = self.children.first
         right: QueryNode = self.children.second
