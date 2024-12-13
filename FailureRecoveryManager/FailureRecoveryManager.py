@@ -137,7 +137,7 @@ class FailureRecoveryManager:
         # TODO: Write all the buffer to the disk . Need to inject storage manager
 
         # Clear the buffer
-        self.clear_buffer()
+        self.buffer.clear_buffer()
         # print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
 
         self._wa_log_lock.acquire()
