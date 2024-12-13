@@ -1,0 +1,1 @@
+select * from Student natural join Takes natural join Advisor;

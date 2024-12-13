@@ -89,7 +89,7 @@ class ProjectNode(QueryNode):
         self.attributes = []
         for attr in self.project_list:
             for i in self.child.attributes:
-                child_attribute, child_alias = i.first, i.second
+                child_attribute, child_alias = i
                 if child_attribute == attr:
                     self.attributes.append((child_attribute, child_alias))
         

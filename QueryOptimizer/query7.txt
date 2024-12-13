@@ -1,0 +1,1 @@
+select * from student join takes on student.id = takes.id natural join advisor WHERE student.dept_name = 'azmi gans' ORDER BY student.dept_name ASCENDING;
