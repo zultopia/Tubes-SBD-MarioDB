@@ -62,14 +62,14 @@ if current == 'gana':
     print ("Query is: ")
     print(query_string)
     tree = get_parse_tree(query_string)
-    print(tree)
     query_plan = from_parse_tree(tree)
-    print(query_plan)
-
-    plans = generate_possible_plans(query_plan)
 
     print("Initial plan:")
     print(query_plan)
+    print(query_plan.clone())
+    
+    plans = generate_possible_plans(query_plan)
+
     # print("\n\n\nGenerated plans:" + str(len(plans)))
     
     # LIMIT_5 = min(len(plans), 20)
