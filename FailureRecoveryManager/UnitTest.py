@@ -9,7 +9,7 @@ from FailureRecoveryManager.FailureRecoveryManager import FailureRecoveryManager
 from FailureRecoveryManager.LRUCache import LRUCache
 from FailureRecoveryManager.Buffer import Buffer
 from StorageManager.classes import StorageManager, DataWrite, DataDeletion, Condition
-from ConcurrencyControlManager.classes import TransactionAction, Table, Row, Cell, PrimaryKey
+from ConcurrencyControlManager.utils import TransactionAction, Table, Row, Cell, PrimaryKey
 
 
 class TestFailureRecoveryManager(unittest.TestCase):

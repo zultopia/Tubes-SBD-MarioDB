@@ -97,7 +97,7 @@ class Cell(IDataItem):
         return False
 
     def __hash__(self):
-        return hash(self.table + self.pkey.__str__() + self.attribute)
+        return hash(self.table.table + self.pkey.__str__() + self.attribute)
     
     def get_row(self):
         return self.row

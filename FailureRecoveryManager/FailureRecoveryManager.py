@@ -5,7 +5,7 @@ from FailureRecoveryManager.ExecutionResult import ExecutionResult
 from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
 from FailureRecoveryManager.Rows import Rows
 from StorageManager.classes import Condition, DataDeletion, DataWrite, StorageManager
-from ConcurrencyControlManager.classes import TransactionAction, Table, Row, Cell, PrimaryKey
+from ConcurrencyControlManager.utils import TransactionAction, Table, Row, Cell, PrimaryKey
 
 from .Buffer import Buffer
 
