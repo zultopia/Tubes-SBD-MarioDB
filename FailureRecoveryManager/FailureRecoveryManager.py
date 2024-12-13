@@ -1,16 +1,13 @@
 import json
-from datetime import datetime
 from threading import Lock, Timer
-from typing import Union
 
 from FailureRecoveryManager.ExecutionResult import ExecutionResult
-from FailureRecoveryManager.LRUCache import LRUCache
 from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
 from FailureRecoveryManager.Rows import Rows
 from StorageManager.classes import Condition, DataDeletion, DataWrite, StorageManager
 from ConcurrencyControlManager.classes import TransactionAction, Table, Row, Cell, PrimaryKey
 
-from . import Buffer
+from .Buffer import Buffer
 
 
 class FailureRecoveryManager:
@@ -23,7 +20,7 @@ class FailureRecoveryManager:
         buffer: Buffer,
         log_file="./FailureRecoveryManager/log.log",
         checkpoint_interval=5,
-        storage_manager=StorageManager()
+        storage_manager=StorageManager(),
     ):
         """
         Dependency injection
@@ -139,42 +136,53 @@ class FailureRecoveryManager:
         # print(f"[FRM | {str(datetime.now())}]: Saving checkpoint...")
 
         # MANAGE BUFFER
-        # TODO: Write all the buffer to the disk . Need to inject storage manager
-
         # Clear the buffer
-        self.buffer.clear_buffer()
-        # print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
+        initial_cache = self.buffer.clear_buffer()
+        if initial_cache is not None:
+            for key, value in initial_cache.items():
+                # hash: hash:tablename:column
+                # normal block: tablename:blockid
+                splits = str(key).split(":")
+                if splits[0] == hash:
+                    # Hash in buffer
+                    # TODO: Wait for Kristo's implementation
+                    pass
+                else:
+                    # Normal block in buffer
+                    table_name = splits[0]
+                    # block_id = int(splits[1])
+                    data_write = DataWrite(table_name, value.keys(), value.values(), "")
+                    self.storage.write_block_to_disk(data_write)
+            # print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
 
-        self._wa_log_lock.acquire()
         # MANAGE WA LOG
-        # Check write ahead not empty
-        if len(self._wa_logs) == 0:
-            # print(f"[FRM | {str(datetime.now())}]: No logs to save.")
-            return
+        with self._wa_log_lock:
+            # Check write ahead not empty
+            if len(self._wa_logs) == 0:
+                # print(f"[FRM | {str(datetime.now())}]: No logs to save.")
+                return
 
-        # Save the wh_log to the log.log file (append to the end of the file)\
-        try:
-            # After transaction is commited or aborted, it cannot do more operation.
-            # So it is guarenteed that the remaining transaction id in the set is active.
-            active_transactions = set()
-            with open(self._log_file, "a") as file:
-                for log in self._wa_logs:
-                    status = log.split("|")[1]
-                    id = log.split("|")[0]
-                    if status != "COMMIT" and status != "ABORT":
-                        active_transactions.add(id)
-                    else:
-                        active_transactions.discard(id)
-                    file.write(log + "\n")
-                file.write(f"CHECKPOINT|{json.dumps(list(active_transactions))}\n")
-            # Clear the wh_log
-            self._wa_logs.clear()
-            # print(f"[FRM | {str(datetime.now())}]: write ahead log saved.")
-        except Exception as e:
-            # print(f"[FRM | {str(datetime.now())}]: Error saving checkpoint: {e}")
-            pass
-        finally:
-            self._wa_log_lock.release()
+            # Save the wh_log to the log.log file (append to the end of the file)\
+            try:
+                # After transaction is commited or aborted, it cannot do more operation.
+                # So it is guarenteed that the remaining transaction id in the set is active.
+                active_transactions = set()
+                with open(self._log_file, "a") as file:
+                    for log in self._wa_logs:
+                        status = log.split("|")[1]
+                        id = log.split("|")[0]
+                        if status != "COMMIT" and status != "ABORT":
+                            active_transactions.add(id)
+                        else:
+                            active_transactions.discard(id)
+                        file.write(log + "\n")
+                    file.write(f"CHECKPOINT|{json.dumps(list(active_transactions))}\n")
+                # Clear the wh_log
+                self._wa_logs.clear()
+                # print(f"[FRM | {str(datetime.now())}]: write ahead log saved.")
+            except Exception as e:
+                # print(f"[FRM | {str(datetime.now())}]: Error saving checkpoint: {e}")
+                pass
 
     def _start_checkpoint_cron_job(self) -> None:
         """
