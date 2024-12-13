@@ -16,20 +16,21 @@ from QueryOptimizer.query_optimizer import get_parse_tree
 # mengubah parse tree menjadi query plan
 from QueryOptimizer.from_parse_tree import from_parse_tree
 
+# import library lain yang diperlukan
+import datetime
+
 # Kita buat class interface untuk objek-objek yang digunakan
 class Rows:
-    def __init__(self, data: Dict[str, List[Dict[str, Union[int, str]]]], rows_count: int):
+    def __init__(self, data: List[Dict[str, Union[int, str]]]):
         self.data = data
-        self.rows_count = rows_count
+        self.rows_count = len(data)
 
 class ExecutionResult:
-    def __init__(self, transaction_id: int, timestamp: str, message: str, data_before: Optional[Union[Rows, int]], data_after: Optional[Union[Rows, int]], status: str, query: str):
+    def __init__(self, transaction_id: int, timestamp: str, message: str, data: Rows, query: str):
         self.transaction_id = transaction_id
         self.timestamp = timestamp
         self.message = message
-        self.data_before = data_before
-        self.data_after = data_after
-        self.status = status
+        self.data = data
         self.query = query
 
 # Sekarang query processornya
@@ -301,22 +302,21 @@ class QueryProcessor:
 
     def execute_query(self, query_string: str) -> ExecutionResult:
         query_tree: ParseTree = get_parse_tree(query_string)
-        # cek child pertama untuk menentukan jenis query (lengkapnya cek komentar dari fungsi di bawah ini)
-        self.check_first_child(query_tree)
-        print(query_tree)
+        transaction_id = 0
+        timestamp = datetime.datetime.now()
+        message = "Query is successful"
+        data = self.check_first_child(query_tree)
+        return ExecutionResult(transaction_id, timestamp, message, data, query_string)
         # query_plan belum jadi, sementara proses query tree dulu, lagipula nanti query plan juga bentuknya objek query tree, tapi teroptimasi
 
     # cek child pertama dari parse tree untuk menentukan jenis query SQL (SELECT, UPDATE, atau TRANSACTION)
-    def check_first_child(self, query_tree: ParseTree):
+    def check_first_child(self, query_tree: ParseTree) -> Rows:
         # child pertama adalah elemen pertama pada atribut childs dari ParseTree, berupa list of ParseTree
         first_child_node = query_tree.childs[0]
         # jika child pertama merupakan token SELECT
         if (isinstance(first_child_node.root, Node)) and (first_child_node.root.token_type in {Token.SELECT}):
             # panggil fungsi execute_SELECT
-            self.execute_SELECT(query_tree)
-        elif (isinstance(first_child_node.root, Node)) and (first_child_node.root.token_type) in (Token.UPDATE):
-            # panggil fungsi execute_UPDATE
-            self.execute_UPDATE(query_tree)
+            return (self.execute_SELECT(query_tree))
 
     # menambahkan atribut yang di-SELECT ke dalam schema dari node SelectListTail
     def add_schema_from_SelectListTail(self, SelectListTail_node: ParseTree, schema: Dict[str, List[str]]) -> Dict[str, List[str]]:
@@ -399,7 +399,7 @@ class QueryProcessor:
             self.add_table_from_FromListTail(schema, alias, TableResultTail_node.childs[3])
 
     # handle query SELECT, menerima input node query tree
-    def execute_SELECT(self, query_tree: ParseTree):
+    def execute_SELECT(self, query_tree: ParseTree) -> Rows:
         # child kedua dari query tree adalah node SelectList
         SelectList_node = query_tree.childs[1]
         # child pertama dari node SelectList adalah node Field
@@ -471,8 +471,7 @@ class QueryProcessor:
             rows = [item for sublist in rows for item in sublist]
             self.execute_ORDER_BY(rows, order_by_attr, descending)
         
-        print(rows)
-        print("\n")
+        return Rows(rows)
 
     def add_condition_from_AndConditionTail(self, schema: Dict[str, List[str]], alias: Dict[str, str], conditions: Dict[str, List[Condition]], AndConditionTail_node: ParseTree):
         ConditionTerm_node = AndConditionTail_node.childs[1]
