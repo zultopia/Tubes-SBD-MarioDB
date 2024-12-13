@@ -481,7 +481,9 @@ class StorageManager:
                 stats[table_name]["n_r"] += len(block)
                 stats[table_name]["b_r"] += 1
                 if block:
+                    print(block)
                     for row in block:
+                        print(row)
                         for col in row.keys():
                             if col not in stats[table_name]["V_a_r"]:
                                 stats[table_name]["V_a_r"][col] = set()
