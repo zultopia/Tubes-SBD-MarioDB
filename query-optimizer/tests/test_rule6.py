@@ -41,7 +41,6 @@ class TestOptimizerRule6:
         plans = generate_possible_plans(original_plan, [
             EquivalenceRules.associativeJoins
         ])
-        
         assert any(p == expected_plan for p in plans), "Natural join association should exist"
         print(f"Natural join associativity: Passed - {time() - start_time:.6f} s")
 
@@ -49,40 +48,40 @@ class TestOptimizerRule6:
         """Test Rule 6b: Theta Join Associativity"""
         start_time = time()
         
-        # Original: (Orders ⋈(o.cust_id=c.id) Customer) ⋈(c.region=s.region) Shipper
-        orders = TableNode("Orders")
-        customer = TableNode("Customer")
-        shipper = TableNode("Shipper")
+        # Original: (advisor ⋈(s_id=id) student) ⋈(dept_name=dept_name) course
+        advisor = TableNode("advisor")
+        student = TableNode("student")
+        course = TableNode("course")
 
-        # θ1: Orders ⋈(o.cust_id=c.id) Customer
+        # θ1: advisor ⋈(s_id=id) student
         inner_join = ConditionalJoinNode(JoinAlgorithm.HASH, [
-            Condition("o.cust_id", "c.id", Operator.EQ)
+            Condition("s_id", "id", Operator.EQ)
         ])
-        inner_join.set_children(Pair(orders, customer))
+        inner_join.set_children(Pair(advisor, student))
 
-        # θ12: (Orders ⋈ Customer) ⋈(c.region=s.region) Shipper 
+        # θ12: (advisor ⋈ student) ⋈(dept_name=dept_name) course
         outer_join = ConditionalJoinNode(JoinAlgorithm.HASH, [
-            Condition("c.region", "s.region", Operator.EQ)
+            Condition("dept_name", "dept_name", Operator.EQ)
         ])
-        outer_join.set_children(Pair(inner_join, shipper))
+        outer_join.set_children(Pair(inner_join, course))
         original_plan = QueryPlan(outer_join)
 
-        # Expected: Orders ⋈(o.cust_id=c.id) (Customer ⋈(c.region=s.region) Shipper)
-        orders2 = TableNode("Orders")
-        customer2 = TableNode("Customer")
-        shipper2 = TableNode("Shipper")
+        # Expected: advisor ⋈(s_id=id) (student ⋈(dept_name=dept_name) course)
+        advisor2 = TableNode("advisor")
+        student2 = TableNode("student")
+        course2 = TableNode("course")
 
-        # θ2: Customer ⋈(c.region=s.region) Shipper
+        # θ2: student ⋈(dept_name=dept_name) course
         inner_join2 = ConditionalJoinNode(JoinAlgorithm.HASH, [
-            Condition("c.region", "s.region", Operator.EQ)
+            Condition("dept_name", "dept_name", Operator.EQ)
         ])
-        inner_join2.set_children(Pair(customer2, shipper2))
+        inner_join2.set_children(Pair(student2, course2))
 
-        # θ1: Orders ⋈(o.cust_id=c.id) (Customer ⋈ Shipper)
+        # θ1: advisor ⋈(s_id=id) (student ⋈ course)
         outer_join2 = ConditionalJoinNode(JoinAlgorithm.HASH, [
-            Condition("o.cust_id", "c.id", Operator.EQ)
+            Condition("s_id", "id", Operator.EQ)
         ])
-        outer_join2.set_children(Pair(orders2, inner_join2))
+        outer_join2.set_children(Pair(advisor2, inner_join2))
         expected_plan = QueryPlan(outer_join2)
 
         plans = generate_possible_plans(original_plan, [
@@ -97,51 +96,50 @@ class TestOptimizerRule6:
         """Test associativity with complex join conditions"""
         start_time = time()
         
-        # Original: (Orders ⋈(o.amount>p.min_amount) Payment) ⋈(p.status='verified' AND p.type=s.type) Status
-        orders = TableNode("Orders")
-        payment = TableNode("Payment")
-        status = TableNode("Status")
+        # Original: (takes ⋈(grade>2) course) ⋈(dept_name=dept_name AND credits>3) instructor
+        takes = TableNode("takes")
+        course = TableNode("course")
+        instructor = TableNode("instructor")
 
         # First join
         inner_join = ConditionalJoinNode(JoinAlgorithm.HASH, [
-            Condition("o.amount", "p.min_amount", Operator.GREATER)
+            Condition("grade", "2", Operator.GREATER)
         ])
-        inner_join.set_children(Pair(orders, payment))
+        inner_join.set_children(Pair(takes, course))
 
         # Second join with multiple conditions
         outer_join = ConditionalJoinNode(JoinAlgorithm.HASH, [
-            Condition("p.status", "verified", Operator.EQ),
-            Condition("p.type", "s.type", Operator.EQ)
+            Condition("dept_name", "dept_name", Operator.EQ),
+            Condition("credits", "3", Operator.GREATER)
         ])
-        outer_join.set_children(Pair(inner_join, status))
+        outer_join.set_children(Pair(inner_join, instructor))
         original_plan = QueryPlan(outer_join)
 
-        # Expected: Orders ⋈(o.amount>p.min_amount) (Payment ⋈(p.status='verified' AND p.type=s.type) Status)
-        orders2 = TableNode("Orders")
-        payment2 = TableNode("Payment")
-        status2 = TableNode("Status")
+        # Expected: takes ⋈(grade>2) (course ⋈(dept_name=dept_name AND credits>3) instructor)
+        takes2 = TableNode("takes")
+        course2 = TableNode("course")
+        instructor2 = TableNode("instructor")
 
-        # Join between Payment and Status first
+        # Join between course and instructor first
         inner_join2 = ConditionalJoinNode(JoinAlgorithm.HASH, [
-            Condition("p.status", "verified", Operator.EQ),
-            Condition("p.type", "s.type", Operator.EQ)
+            Condition("dept_name", "dept_name", Operator.EQ),
+            Condition("credits", "3", Operator.GREATER)
         ])
-        inner_join2.set_children(Pair(payment2, status2))
+        inner_join2.set_children(Pair(course2, instructor2))
 
-        # Then join with Orders
+        # Then join with takes
         outer_join2 = ConditionalJoinNode(JoinAlgorithm.HASH, [
-            Condition("o.amount", "p.min_amount", Operator.GREATER)
+            Condition("grade", "2", Operator.GREATER)
         ])
-        outer_join2.set_children(Pair(orders2, inner_join2))
+        outer_join2.set_children(Pair(takes2, inner_join2))
         expected_plan = QueryPlan(outer_join2)
 
         plans = generate_possible_plans(original_plan, [
             EquivalenceRules.associativeJoins
         ])
-        print(original_plan)
-        print(expected_plan)
-        print(plans)
+        # print(original_plan)
+        # print(expected_plan)
+        # print(plans)
         
         assert any(p == expected_plan for p in plans), "Complex condition association should exist"
         print(f"Complex conditions: Passed - {time() - start_time:.6f} s")
-
