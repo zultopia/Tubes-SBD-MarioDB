@@ -147,13 +147,14 @@ class TestStorageManager(unittest.TestCase):
     def test_index(self):
         # Contoh set_index dan get_index
         self.manager.set_index("Student", "name", 'hash')
-        self.manager.set_index("Departement", "building", 'hash')
+        self.manager.set_index("Department", "building", 'hash')
         self.assertEqual(self.manager.get_index("Student", "name"), 'hash')
-        self.assertEqual(self.manager.get_index("Departement", "building"), 'hash')
+        self.assertEqual(self.manager.get_index("Department", "building"), 'hash')
 
     def test_stats(self):
         statistic = self.manager.get_stats()
-        print("STATS", statistic["Student"].n_r)
+        self.assertEqual(statistic["Student"].n_r, 2)
+        self.assertEqual(statistic["Student"].b_r, 1)
 
     def tearDown(self):
             shutil.rmtree(self.test_data_dir)
@@ -162,11 +163,6 @@ class TestHashIndex(unittest.TestCase):
     def setUp(self):
         self.test_data_dir = "data_blocks/"
         self.test_hash_dir = "hash/"
-        
-        # os.makedirs(self.test_data_dir, exist_ok=True)
-        # os.makedirs(os.path.join(self.test_data_dir, self.test_hash_dir), exist_ok=True)
-        
-        # Hash.change_config(DATA_DIR=self.test_data_dir, HASH_DIR=self.test_hash_dir)
         
         self.manager = StorageManager(Buffer(100))
         
@@ -237,7 +233,6 @@ class TestHashIndex(unittest.TestCase):
             conditions=ConditionGroup([Condition("id", "=", 2)]),
             level="table"
         )
-        print("TEST TRY DELETE")
         deleted_count = self.manager.delete_block(delete_student)
         self.assertEqual(deleted_count, 1)
         
