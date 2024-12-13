@@ -174,7 +174,7 @@ class LRUCache:
 
         Returns
         -------
-        the cache values before it is cleared
+        None
         """
         # Clear the current dictionary
         self.cache.clear()
