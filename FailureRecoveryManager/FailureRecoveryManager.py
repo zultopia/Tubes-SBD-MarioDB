@@ -1,11 +1,17 @@
 import json
 from threading import Lock, Timer
 
+from ConcurrencyControlManager.classes import (
+    Cell,
+    PrimaryKey,
+    Row,
+    Table,
+    TransactionAction,
+)
 from FailureRecoveryManager.ExecutionResult import ExecutionResult
 from FailureRecoveryManager.RecoverCriteria import RecoverCriteria
 from FailureRecoveryManager.Rows import Rows
 from StorageManager.classes import Condition, DataDeletion, DataWrite, StorageManager
-from ConcurrencyControlManager.utils import TransactionAction, Table, Row, Cell, PrimaryKey
 
 from .Buffer import Buffer
 
@@ -71,7 +77,6 @@ class FailureRecoveryManager:
 
         log_entry = None
 
-
         if transaction_action.action == "WRITE":
             table = transaction_action.data_item.get_table()
             old_value = transaction_action.old_data_item.map
@@ -86,9 +91,7 @@ class FailureRecoveryManager:
                 f"{process_rows(new_value) if new_value else None}"
             )
         else:
-            log_entry = (
-                f"{transaction_action.id}|" f"{transaction_action.action}"
-            )
+            log_entry = f"{transaction_action.id}|" f"{transaction_action.action}"
 
         # Must write wal to stable storage if the write-ahead log is full
         self._wa_log_lock.acquire()
@@ -104,7 +107,10 @@ class FailureRecoveryManager:
         self._wa_log_lock.release()
 
         # Must write wal to stable storage if transaction commited or aborted to ensure consistency
-        if transaction_action.action == "COMMIT" or transaction_action.action == "ABORT":
+        if (
+            transaction_action.action == "COMMIT"
+            or transaction_action.action == "ABORT"
+        ):
             # self._save_checkpoint()
             self._flush_wal()
 
@@ -141,20 +147,33 @@ class FailureRecoveryManager:
         # Clear the buffer
         initial_cache = self.buffer.clear_buffer()
         if initial_cache is not None:
-            for key, value in initial_cache.items():
-                # hash: hash:tablename:column
-                # normal block: tablename:blockid
-                splits = str(key).split(":")
-                if splits[0] == hash:
-                    # Hash in buffer
-                    # TODO: Wait for Kristo's implementation
-                    pass
+            for ky, value in initial_cache.items():
+                key = tuple(ky)
+                if len(key) == 5 and key[0] == "hash":
+                    # hash => (hash,hashNumber,table,block_id,column)
+                    hash_number = key[1]
+                    table_name = key[2]
+                    block_id = key[3]
+                    column_name = key[4]
+                    self.storage.write_hash_block_to_disk(
+                        table=table_name,
+                        block_id=block_id,
+                        block_data=value,
+                        column_name=column_name,
+                        hash_value=hash_number,
+                    )
+                elif len(key) == 2:
+                    # normal block => {tablename}:{blockid}
+                    table_name = key[0]
+                    block_id = int(key[1])
+                    self.storage.write_block_to_disk(
+                        table=table_name,
+                        block_id=block_id,
+                        block_data=value,
+                    )
                 else:
-                    # Normal block in buffer
-                    table_name = splits[0]
-                    # block_id = int(splits[1])
-                    data_write = DataWrite(table_name, value.keys(), value.values(), "")
-                    self.storage.write_block_to_disk(data_write)
+                    print("Error writing block to disk: Invalid key format.")
+
             # print(f"[FRM | {str(datetime.now())}]: Buffer cleared.")
 
         # MANAGE WA LOG
@@ -193,6 +212,7 @@ class FailureRecoveryManager:
         """
 
         self.timer = Timer(self._checkpoint_interval, self._run_checkpoint_cron_job)
+        self.timer.daemon = True
         self.timer.start()
 
     def _run_checkpoint_cron_job(self) -> None:
@@ -208,6 +228,7 @@ class FailureRecoveryManager:
             if self.timer:
                 self.timer.cancel()  # Cancel any existing timer
             self.timer = Timer(self._checkpoint_interval, self._run_checkpoint_cron_job)
+            self.timer.daemon = True
             self.timer.start()
 
         except Exception as e:
@@ -386,7 +407,7 @@ class FailureRecoveryManager:
             # )
 
             table = Table(table)
-            
+
             before_states = Row(table, PrimaryKey(None), before_states)
             after_states = Row(table, PrimaryKey(None), after_states)
            
@@ -524,7 +545,9 @@ class FailureRecoveryManager:
                     #     "ABORT",
                     #     "",
                     # )
-                    transaction_abort = TransactionAction(transaction_id,"ABORT", None, None, None)
+                    transaction_abort = TransactionAction(
+                        transaction_id, "ABORT", None, None, None
+                    )
                     # print("write log: ", exec_result.__dict__)
                     self.write_log(transaction_abort)
                     continue
@@ -610,7 +633,7 @@ class FailureRecoveryManager:
                 #     table,
                 # )
                 table = Table(table)
-            
+
                 before_states = Row(table, PrimaryKey(None), before_states)
                 after_states = Row(table, PrimaryKey(None), after_states)
 

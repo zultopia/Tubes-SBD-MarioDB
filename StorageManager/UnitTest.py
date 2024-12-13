@@ -32,16 +32,88 @@ class TestStorageManager(unittest.TestCase):
         shutil.rmtree(self.test_data_dir)
 
     def test_read_block(self):
-        conditions = ConditionGroup([Condition("GPA", ">", 3.6)])
-        data_retrieval = DataRetrieval("Student", ["name"], conditions, "sequential", "cell")
-        result = self.manager.read_block(data_retrieval)
-        self.assertEqual(result, [])
+        """
+        Test read block functionality
+        1. Read a block
+        2. Verify the record 
+        """
+        read_student1 = DataRetrieval(
+            table="Student", 
+            columns=["id", "name", "dept_name"], 
+            conditions= ConditionGroup([Condition("id", "=", 1)]),
+            search_type="sequential",
+            level="row"
+        )
+        retrieved_records = self.manager.read_block(read_student1)        
+        
+        self.assertEqual(len(retrieved_records), 1)
+        self.assertEqual(retrieved_records[0]["id"], 1)
+        self.assertEqual(retrieved_records[0]["name"], "Alice")
+        self.assertEqual(retrieved_records[0]["dept_name"], "Computer Science")
 
-    # def test_write_block(self):
-    #     data_write = DataWrite("Student", ["GPA"], [4.0], [Condition("StudentID", "=", 1)])
-    #     affected = self.manager.write_block(data_write)
-    #     self.assertEqual(affected, 1)
-    #     self.assertEqual(self.manager.data["Student"][0]["GPA"], 4.0)
+
+    def test_write_block(self):
+        """
+        Test write block functionality
+        1. Write a new record
+        2. Verify the record retrieved
+        """
+        write_student3 = DataWrite(
+            table="Student", 
+            columns=["id", "name", "dept_name"], 
+            new_values=[3, "Yusuf", "Mathematics"], 
+            level="table"
+        )
+        self.manager.write_block(write_student3)
+        
+        read_student3 = DataRetrieval(
+            table="Student", 
+            columns=["id", "name", "dept_name"], 
+            conditions=ConditionGroup([Condition("id", "=", 3)]),
+            search_type="sequential",
+            level="row"
+        )
+        retrieved_records = self.manager.read_block(read_student3)
+        
+        self.assertEqual(len(retrieved_records), 1)
+        self.assertEqual(retrieved_records[0]["id"], 3)
+        self.assertEqual(retrieved_records[0]["name"], "Yusuf")
+        self.assertEqual(retrieved_records[0]["dept_name"], "Mathematics")
+
+    def test_write_block_with_logging(self):
+        """
+        Test write block functionality with logging
+        1. Write a new record
+        2. Verify the record retrieved
+        3. Verify the log entry
+        """
+        write_student4 = DataWrite(
+            table="Student", 
+            columns=["id", "name", "dept_name"], 
+            new_values=[4, "Bilal", "Psychology"], 
+            level="table"
+        )
+        
+        self.manager.write_block(write_student4)
+        
+        retrieved_records = self.manager.read_block(DataRetrieval(
+            table="Student", 
+            columns=["id", "name", "dept_name"], 
+            conditions=ConditionGroup([Condition("id", "=", 4)]),
+            search_type="sequential",
+            level="row"
+        ))
+        
+        self.assertEqual(len(retrieved_records), 1)
+        self.assertEqual(retrieved_records[0]["id"], 4)
+        self.assertEqual(retrieved_records[0]["name"], "Bilal")
+        self.assertEqual(retrieved_records[0]["dept_name"], "Psychology")
+        
+        # Verify the log entry (last one)
+        # last_log = self.manager.logs[-1]
+        # self.assertEqual(last_log["action"], "write")
+        # self.assertEqual(last_log["table"], DataWrite.table)
+        # self.assertEqual(last_log["data"], DataWrite.new_values)
 
     def test_delete_block(self):
         data_deletion = DataDeletion("Student", ConditionGroup([Condition("name", "=", "Bob")]), "row")
@@ -50,14 +122,7 @@ class TestStorageManager(unittest.TestCase):
         # self.assertEqual(len(self.manager.read_block(DataRetrieval("Student","id", ConditionGroup(Condition("id", ">", 0)), "", "row" ))), 1)
         retrieved = self.manager.read_block(DataRetrieval("Student", ["id"], ConditionGroup([Condition("name", "=", "Bobiii")], "AND"), "sequential", "row"))
         self.assertEqual(len(retrieved), 0)
-    # def test_write_block_with_logging(self):
-    #     data_write = DataWrite("Student", ["GPA"], [4.0], [Condition("StudentID", "=", 1)])
-    #     self.manager.write_block(data_write)
-    #     last_log = self.manager.logs[-1]
-    #     self.assertEqual(last_log["action"], "write")
-    #     self.assertIn("old_new_values", last_log["details"])
-    #     self.assertEqual(last_log["details"]["old_new_values"][0]["old"]["GPA"], 3.5)
-    #     self.assertEqual(last_log["details"]["old_new_values"][0]["new"]["GPA"], 4.0)
+    
 
     def test_schema(self):
         all_relation = self.manager.get_all_relations()

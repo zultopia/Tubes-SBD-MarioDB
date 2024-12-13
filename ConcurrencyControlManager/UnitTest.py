@@ -173,16 +173,16 @@ class TestConcurrencyControlManager(unittest.TestCase):
         
         row1_table1 = Row(table1, PrimaryKey(1), {'col1': 1, 'col2': 'A'})
         row2_table1 = Row(table1, PrimaryKey(2), {'col1': 2, 'col2': 'A'})
-        row3_table1 = Row(table1, PrimaryKey(3), {'col1': 1, 'col2': 'B'})
+        # row3_table1 = Row(table1, PrimaryKey(3), {'col1': 1, 'col2': 'B'})
         
-        row1_table2 = Row(table2, PrimaryKey(1), {'col1': 1, 'col2': 'A'})
+        # row1_table2 = Row(table2, PrimaryKey(1), {'col1': 1, 'col2': 'A'})
         row2_table2 = Row(table2, PrimaryKey(2), {'col1': 1, 'col2': 'B'})
-        row3_table2 = Row(table2, PrimaryKey(3), {'col1': 1, 'col2': 'A'})
+        # row3_table2 = Row(table2, PrimaryKey(3), {'col1': 1, 'col2': 'A'})
         
-        cell1_row1_table1 = Cell(table1, row1_table1, row1_table1.pkey, 'col1', 1)
-        cell2_row1_table1 = Cell(table1, row1_table1, row1_table1.pkey, 'col2', 'A')
-        cell1_row2_table1 = Cell(table1, row2_table1, row2_table1.pkey, 'col1', 2)
-        cell2_row2_table1 = Cell(table1, row2_table1, row2_table1.pkey, 'col2', 'A')
+        # cell1_row1_table1 = Cell(table1, row1_table1, row1_table1.pkey, 'col1', 1)
+        # cell2_row1_table1 = Cell(table1, row1_table1, row1_table1.pkey, 'col2', 'A')
+        # cell1_row2_table1 = Cell(table1, row2_table1, row2_table1.pkey, 'col1', 2)
+        # cell2_row2_table1 = Cell(table1, row2_table1, row2_table1.pkey, 'col2', 'A')
         
         ccm = ConcurrencyControlManager(algorithm='tes')
         
@@ -226,23 +226,42 @@ class TestConcurrencyControlManager(unittest.TestCase):
         self.assertEqual(res8.status, "wait")
         self.assertEqual(res9.status, "wait")
         self.assertEqual(res9.status, "wait")
+        self.assertEqual(len(ccm.waiting_list), 8)
         
-        print(len(ccm.waiting_list))
+        res10 = ccm.validate_object(TransactionAction(tid1, "commit", None, None, None))
+        self.assertTrue(res10.allowed)
+        self.assertEqual(res10.status, "commit")
+        self.assertEqual(len(ccm.waiting_list), 6)
+        
+        res11 = ccm.validate_object(TransactionAction(tid4, "commit", None, None, None))
+        self.assertFalse(res11.allowed)
+        self.assertEqual(res11.status, "wait")
+        self.assertEqual(len(ccm.waiting_list), 7)
+        
+        res12 = ccm.validate_object(TransactionAction(tid3, "commit", None, None, None))
+        self.assertFalse(res12.allowed)
+        self.assertEqual(res12.status, "wait")
+        self.assertEqual(len(ccm.waiting_list), 8)
+        
+        res13 = ccm.validate_object(TransactionAction(tid2, "commit", None, None, None))
+        self.assertTrue(res13.allowed)
+        self.assertEqual(res13.status, "commit")
+        self.assertEqual(len(ccm.waiting_list), 0)
         
         # for t_action in ccm.waiting_list:
-        #     print(t_action)
+        #     print(t_action.id, t_action.action)
         
     def test_deadlock(self):
         table1 = Table('table1')
-        table2 = Table('table2')
+        # table2 = Table('table2')
         
         row1_table1 = Row(table1, PrimaryKey(1), {'col1': 1, 'col2': 'A'})
         row2_table1 = Row(table1, PrimaryKey(2), {'col1': 2, 'col2': 'A'})
-        row3_table1 = Row(table1, PrimaryKey(3), {'col1': 1, 'col2': 'B'})
+        # row3_table1 = Row(table1, PrimaryKey(3), {'col1': 1, 'col2': 'B'})
         
-        row1_table2 = Row(table2, PrimaryKey(1), {'col1': 1, 'col2': 'A'})
-        row2_table2 = Row(table2, PrimaryKey(2), {'col1': 1, 'col2': 'B'})
-        row3_table2 = Row(table2, PrimaryKey(3), {'col1': 1, 'col2': 'A'})
+        # row1_table2 = Row(table2, PrimaryKey(1), {'col1': 1, 'col2': 'A'})
+        # row2_table2 = Row(table2, PrimaryKey(2), {'col1': 1, 'col2': 'B'})
+        # row3_table2 = Row(table2, PrimaryKey(3), {'col1': 1, 'col2': 'A'})
         
         cell1_row1_table1 = Cell(table1, row1_table1, row1_table1.pkey, 'col1', 1)
         cell2_row1_table1 = Cell(table1, row1_table1, row1_table1.pkey, 'col2', 'A')
