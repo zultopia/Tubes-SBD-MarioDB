@@ -52,5 +52,5 @@ class UpdateNode(QueryNode):
         if not self.child:
             raise ValueError("UpdateNode has no child.")
         if self._cached_attributes is None:
-            self._cached_attributes = self.child.attributes().copy()
+            self._cached_attributes = self.child.get_node_attributes().copy()
         return self._cached_attributes

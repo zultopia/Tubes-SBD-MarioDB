@@ -391,8 +391,8 @@ class EquivalenceRules:
             elif isinstance(join_node, NaturalJoinNode):
                 new_join = NaturalJoinNode(
                     algorithm=join_node.algorithm,
-                    children=Pair(new_left, new_right)
                 )
+                new_join.set_children(Pair(new_left, new_right))
             else:
                 # Unsupported join node type
                 raise TypeError("Unsupported join node type.")

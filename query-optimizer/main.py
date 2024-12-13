@@ -58,30 +58,33 @@ if current == 'gana':
     
     query_string = query_string.strip()  # Final clean-up of leading/trailing spaces
 
-    try:
-        tree = get_parse_tree(query_string)
-        print(tree)
-        query_plan = from_parse_tree(tree)
-        print(query_plan)
+    # try:
+    print ("Query is: ")
+    print(query_string)
+    tree = get_parse_tree(query_string)
+    print(tree)
+    query_plan = from_parse_tree(tree)
+    print(query_plan)
 
-        plans = generate_possible_plans(query_plan)
+    plans = generate_possible_plans(query_plan)
 
-        print("Initial plan:")
-        print(query_plan)
-        print("\n\n\nGenerated plans:" + str(len(plans)))
-        
-        LIMIT_5 = min(len(plans), 20)
-        for plan in plans[:LIMIT_5]:
-            print(plan)
+    print("Initial plan:")
+    print(query_plan)
+    print("\n\n\nGenerated plans:" + str(len(plans)))
+    
+    LIMIT_5 = min(len(plans), 20)
+    for plan in plans[:LIMIT_5]:
+        print(plan)
 
         # Uncomment the below lines if you want to use the optimizer
         # bf = BFOptimizer()
         # bestPlan = bf.optimize(query_plan)
         # bestPlan.print()
         
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        print("Please try again with a valid query.")
+    # except Exception as e:
+        
+    #     print(f"An error occurred: {e}")
+    #     print("Please try again with a valid query.")
 elif (current == 'azmi'):
     pass
     # from query_plan.query_plan import QueryPlan

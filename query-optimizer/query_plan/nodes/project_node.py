@@ -29,35 +29,39 @@ class ProjectNode(QueryNode):
     def process_attributes(self):
         """
         Processes the original attributes to fully qualify them based on the child node's attributes.
-        Expands '*' to include all child attributes.
+        Handles '*' expansion and ambiguity resolution.
         """
         if not self.child:
             raise ValueError("ProjectNode must have a child node before processing attributes.")
 
         child_attrs = self.child.get_node_attributes()
+        
+        # Reset projected attributes
+        self.projected_attributes = []
+
         if '*' in self.original_attributes:
             # Expand '*' to all child attributes
-            self.projected_attributes = sorted(child_attrs)
+            self.projected_attributes = child_attrs
             return
 
-        # Qualify attributes
-        qualified_attrs = []
+        # Process each attribute in the original list
         for attr in self.original_attributes:
-            if attr in child_attrs:
-                # Attribute is already fully qualified
-                qualified_attrs.append(attr)
-            else:
-                # Attempt to match unqualified attribute
-                matches = [child_attr for child_attr in child_attrs if child_attr.split('.')[-1] == attr]
-                if matches:
-                    # Allow ambiguity by including all matches
-                    qualified_attrs.extend(matches)
+            if '.' in attr:  # Fully qualified attribute (e.g., "s.name")
+                # Add directly if it's in child attributes
+                if attr in child_attrs:
+                    self.projected_attributes.append(attr)
                 else:
+                    raise ValueError(f"Qualified attribute '{attr}' is not a valid attribute.")
+            else:  # Unqualified attribute (e.g., "name")
+                # Find matching attributes in child attributes
+                matches = [child_attr for child_attr in child_attrs 
+                         if child_attr.split('.')[-1] == attr]
+                
+                if not matches:
                     raise ValueError(f"Attribute '{attr}' not found in child node's attributes.")
-        
-        # Ensure the attributes are unique and sorted
-
-        self.projected_attributes = sorted(set(qualified_attrs))
+                if len(matches) > 1:
+                    raise ValueError(f"Ambiguous attribute reference '{attr}'. Please qualify with table alias.")
+                self.projected_attributes.extend(matches)
 
 
 

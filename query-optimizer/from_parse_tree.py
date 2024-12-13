@@ -96,8 +96,10 @@ def process_select_list(select_list_tree: ParseTree) -> ProjectNode:
         else:  
             return f"{field_tree.childs[0].root.value}.{field_tree.childs[2].root.value}"
     
+    print("select_list_tree is", select_list_tree)
     if select_list_tree.root == "SelectList":
         attributes.append(extract_field(select_list_tree.childs[0]))
+        print("attributes is", attributes)
         
         if len(select_list_tree.childs) > 1 and select_list_tree.childs[1]:
             current = select_list_tree.childs[1]

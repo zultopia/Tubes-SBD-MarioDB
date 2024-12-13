@@ -111,5 +111,5 @@ class UnionSelectionNode(QueryNode):
         if not self.children:
             raise ValueError("UnionSelectionNode has no children.")
         if self._cached_attributes is None:
-            self._cached_attributes = self.children[0].attributes().copy()
+            self._cached_attributes = self.children[0].get_node_attributes().copy()
         return self._cached_attributes

@@ -1,1 +1,1 @@
-SELECT l.dept_name, l.id, l.salary, s.dept_name, s.id, s.name, s.tot_cred FROM student AS s JOIN instructor AS l ON s.id = l.id;
+SELECT lt.name FROM student AS s JOIN instructor AS l ON s.id = l.id;

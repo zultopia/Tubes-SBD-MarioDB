@@ -40,7 +40,6 @@ class TestQueryPlanGeneration():
         project_node = ProjectNode(["student.id"])
         project_node.set_child(table_node)
         expected_plan = QueryPlan(project_node)
-        print(expected_plan)
 
         # Assert equality
         self.assertQueryPlansEqual(parsed_plan, expected_plan)
@@ -100,4 +99,4 @@ class TestQueryPlanGeneration():
         # Assert equality
         self.assertQueryPlansEqual(parsed_plan, expected_plan)
 
-        print(f"Test UPDATE with condition: Passed - {time() - start_time:.6f} s")
+        print(f"Test 3: Passed - {time() - start_time:.6f} s")
