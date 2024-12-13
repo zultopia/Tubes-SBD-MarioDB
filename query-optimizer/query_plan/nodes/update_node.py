@@ -19,11 +19,11 @@ class UpdateNode(QueryNode):
         updates_str = ', '.join([f"{col} = {val}" for col, val in self.updates])
         return f"UPDATE {updates_str}"
     
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
-        return 1
+    def estimate_size(self, statistics, alias_dict) -> float:
+        return 0
     
-    def estimate_cost(self, statistics: Dict) -> float:
-        return 1
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        return 0
 
     def clone(self):
         cloned_updates = self.updates.copy()

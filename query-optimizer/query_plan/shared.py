@@ -1,12 +1,10 @@
 from .enums import Operator
 
 class Condition:
-    left_id: str
-    left_table_name: str
+    left_table_alias: str
     left_attribute: str
 
-    right_id: str
-    right_table_name: str
+    right_table_alias: str
     right_attribute: str
 
     def __init__(self, left_operand: str, right_operand: str, operator: Operator, left_id: str = None, left_table_name: str = None, left_attribute: str = None):
@@ -14,7 +12,7 @@ class Condition:
         self.right_operand = right_operand
         self.operator = operator
 
-        # TODO: id, table_name, attribute harus diset kiri dan kanan
+        # TODO: attribute & table_alias harus diset (kiri dan kanan)
 
 
     def __str__(self) -> str:

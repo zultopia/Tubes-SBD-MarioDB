@@ -7,6 +7,7 @@ from ..enums import NodeType, JoinAlgorithm
 from utils import Pair
 from ..shared import Condition
 from ..enums import Operator
+from .constants import *
 
 class JoinNode(QueryNode):
     def __init__(self, algorithm: JoinAlgorithm = JoinAlgorithm.NESTED_LOOP):
@@ -30,12 +31,8 @@ class JoinNode(QueryNode):
     # def estimate_size(self, statistics: Dict):
     #     pass
 
-    def estimate_cost(self, statistics: Dict) -> float:
-        return self._calculate_operation_cost(statistics)
-
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
-        # Placeholder implementation
-        return 1
+    # def estimate_cost(self, statistics: Dict) -> float:
+    #     pass
 
     def __str__(self) -> str:
         return f"JOIN [{self.algorithm.value}]"
@@ -73,7 +70,7 @@ class ConditionalJoinNode(JoinNode):
 
         return cloned_node
 
-    def estimate_size(self, statistics: Dict):
+    def estimate_size(self, statistics: Dict, alias_dict):
         assert (isinstance(self.children, Pair[QueryNode, QueryNode]))
         
         left: QueryNode = self.children.first
@@ -85,37 +82,70 @@ class ConditionalJoinNode(JoinNode):
         left_attributes = left.attributes
         right_attributes = right.attributes
         
-        # Todo: Ganti ID Kl perlu (?)
-        self.attributes = left_attributes + right_attributes # kl conditional join, tidak ada intersectionnya
+        self.attributes = left_attributes + right_attributes
 
         self.n = left.n * right.n
         for condition in self.conditions:
-            # Belum handle kasus left & right operandnya ada dot
-            # Belum handle kasus atribut tidak ada di tabelnya
-            # Belum handle kasus attribute < attribute (kyknya ga perlu krn eksotik)
-            # Belum handle kasus NEQ (kyknya ga perlu) asumsi aja negligable karena dia tidak spesifik
+            left_table_name = alias_dict[condition.left_table_alias]
+            right_table_name = alias_dict[condition.right_table_alias]
 
             if condition.operator == Operator.EQ:
-                self.n *= min(1 / QOData().get_V(condition.left_attribute, condition.left_table_name), 1 / QOData().get_V(condition.right_attribute, condition.right_table_name)) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
+                self.n *= min(1 / QOData().get_V(condition.left_attribute, left_table_name), 1 / QOData().get_V(condition.right_attribute, right_table_name)) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
             if condition.operator in [Operator.LESS, Operator.LESS_EQ]:
-                self.n *= (float(condition.right_operand) - QOData().get_min(condition.left_attribute, condition.left_table_name)) / (QOData().get_max(condition.left_attribute, condition.left_table_name) - QOData().get_min(condition.left_attribute, condition.left_table_name))
+                self.n *= (float(condition.right_operand) - QOData().get_min(condition.left_attribute, left_table_name)) / (QOData().get_max(condition.left_attribute, left_table_name) - QOData().get_min(condition.left_attribute, left_table_name))
             if condition.operator in [Operator.GREATER,Operator.GREATER_EQ]:
-                self.n *= (QOData().get_max(condition.left_attribute, condition.left_table_name) - float(condition.right_operand) ) / (QOData().get_max(condition.left_attribute, condition.left_table_name) - QOData().get_min(condition.left_attribute, condition.left_table_name))
-        self.n = int(self.n)
+                self.n *= (QOData().get_max(condition.left_attribute, left_table_name) - float(condition.right_operand) ) / (QOData().get_max(condition.left_attribute, left_table_name) - QOData().get_min(condition.left_attribute, left_table_name))
+        
+        if self.n < 0:
+            self.n = 0
 
+        self.n = int(self.n)
+        
         self.b = int(1 / (1 / left.b + 1 / right.b))
 
 
-    def estimate_io(self, statistics: Dict):
-        pass     
 
-    def estimate_cost(self, statistics: Dict) -> float:
-        # Lagi integrasi fungsi calculate_join_cost biar menggunakan estimate_size
-        pass
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        self.estimate_size()
 
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
-        # Placeholder implementation for conditional joins
-        return 1
+        left: QueryNode = self.children.first
+        right: QueryNode = self.children.second
+
+        previous_cost = left.estimate_cost() + right.estimate_cost()
+
+        
+        if self.algorithm == JoinAlgorithm.NESTED_LOOP:
+            is_index = False
+            for condition in self.conditions:
+                left_table_name = alias_dict[condition.left_table_alias]
+                right_table_name = alias_dict[condition.right_table_alias]
+                if QOData().get_index(condition.left_attribute, left_table_name) == 'btree' or QOData().get_index(condition.right_attribute, right_table_name) == 'btree':
+                    is_index = True
+                    break
+            
+            if not is_index:
+                return previous_cost + (left.b + right.b) * t_T + 2 * t_S
+            else:
+                # TODO: Height dari tree perlu dicari
+                c = 3
+                return previous_cost + left.b * (t_T + t_S) + left.n * c
+        elif self.algorithm == JoinAlgorithm.HASH:
+            is_index = False
+            for condition in self.conditions:
+                left_table_name = alias_dict[condition.left_table_alias]
+                right_table_name = alias_dict[condition.right_table_alias]
+                if QOData().get_index(condition.left_attribute, left_table_name) == 'hash' or QOData().get_index(condition.right_attribute, right_table_name) == 'hash':
+                    is_index = True
+                    break
+            if not is_index:
+                return Exception("The index does not exist")
+            else:
+                return previous_cost + (left.b + right.b) * t_T + 2 * t_S
+        elif self.algorithm == JoinAlgorithm.MERGE:
+            # No seeks required because b_b -> infinity implies seeks -> 0 
+            return previous_cost + (left.b + right.b) * t_T
+        
+
 
     def __str__(self) -> str:
 
@@ -141,7 +171,7 @@ class NaturalJoinNode(JoinNode):
         cloned_node.set_children(cloned_children)
         return cloned_node
 
-    def estimate_size(self, statistics: Dict):
+    def estimate_size(self, statistics: Dict, alias_dict):
         assert (isinstance(self.children, Pair[QueryNode, QueryNode]))
         
         left: QueryNode = self.children.first
@@ -152,50 +182,102 @@ class NaturalJoinNode(JoinNode):
         left_attributes = left.attributes
         right_attributes = right.attributes
         
-        
-        # Belum handle kasus nama atribut sama tapi tipenya berbeda (seharusnya tidak perlu karena ribet)
-
+    
         self.attributes = []
         common = []
         for i in left_attributes:
-            for j in right_attributes:
-                if i.first.split('.')[1] == j.first.split('.')[1] : # if they have the same name
-                    common.append(i.first.split('.')[1])
-                    self.attributes.append((self.id + '.' + i.first.split('.')[1], i.second))
+            left_attribute, left_alias = i
+            for j in right_attributes: 
+                right_attribute, right_alias = j
+                if left_attribute == right_attribute and not any(left_attribute == attr for attr, _ in common):
+                    common.append((left_attribute, left_alias))
+                    self.attributes.append((left_attribute, left_alias))
     
 
         for i in left_attributes:
-            if i.first.split('.')[1] not in common:
-                self.attributes.append((self.id + '.' + i.first.split('.')[1], i.second))
+            left_attribute, left_alias = i
+            if not any(left_attribute == attr for attr, _ in common):
+                self.attributes.append((left_attribute, left_alias))
         
         for i in right_attributes:
-            if i.first.split('.')[1] not in common:
-                self.attributes.append((self.id + '.' + i.first.split('.')[1], i.second))
+            right_attribute, right_alias = i
+            if not any(right_attribute == attr for attr, _ in common):
+                self.attributes.append((right_attribute, right_alias))
 
         self.n = left.n * right.n
         for condition in self.conditions:
-            # Belum handle kasus left & right operandnya ada dot
-            # Belum handle kasus atribut tidak ada di tabelnya
-            # Belum handle kasus attribute < attribute (kyknya ga perlu krn eksotik)
-            # Belum handle kasus NEQ (kyknya ga perlu) asumsi aja negligible karena dia tidak spesifik
+            left_table_name = alias_dict[condition.left_table_alias]
+            right_table_name = alias_dict[condition.right_table_alias]
 
             if condition.operator == Operator.EQ:
-                self.n *= min(1 / QOData().get_V(condition.left_attribute, condition.left_table_name), 1 / QOData().get_V(condition.right_attribute, condition.right_table_name)) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
+                self.n *= min(1 / QOData().get_V(condition.left_attribute, left_table_name), 1 / QOData().get_V(condition.right_attribute, right_table_name)) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
             if condition.operator in [Operator.LESS, Operator.LESS_EQ]:
-                self.n *= (float(condition.right_operand) - QOData().get_min(condition.left_attribute, condition.left_table_name)) / (QOData().get_max(condition.left_attribute, condition.left_table_name) - QOData().get_min(condition.left_attribute, condition.left_table_name))
+                self.n *= (float(condition.right_operand) - QOData().get_min(condition.left_attribute, left_table_name)) / (QOData().get_max(condition.left_attribute, left_table_name) - QOData().get_min(condition.left_attribute, left_table_name))
             if condition.operator in [Operator.GREATER,Operator.GREATER_EQ]:
-                self.n *= (QOData().get_max(condition.left_attribute, condition.left_table_name) - float(condition.right_operand) ) / (QOData().get_max(condition.left_attribute, condition.left_table_name) - QOData().get_min(condition.left_attribute, condition.left_table_name))
+                self.n *= (QOData().get_max(condition.left_attribute, left_table_name) - float(condition.right_operand) ) / (QOData().get_max(condition.left_attribute, left_table_name) - QOData().get_min(condition.left_attribute, left_table_name))
+        
         self.n = int(self.n)
+
+        if self.n < 0:
+            self.n = 0
 
         self.b = int(1 / (1 / left.b + 1 / right.b))
 
-    def estimate_cost(self, statistics: Dict) -> float:
-        # Lagi integrasi fungsi calculate_join_cost biar menggunakan estimate_size
-        return self._calculate_operation_cost(statistics)
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        self.estimate_size()
 
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
-        # Placeholder implementation for natural joins
-        return 1
+        left: QueryNode = self.children.first
+        right: QueryNode = self.children.second
+
+        previous_cost = left.estimate_cost() + right.estimate_cost()
+
+        left_attributes = left.attributes
+        right_attributes = right.attributes
+
+        
+        if self.algorithm == JoinAlgorithm.NESTED_LOOP:
+            is_index = False
+            common = []
+            for i in left_attributes:
+                left_attribute, left_alias = i
+                for j in right_attributes: 
+                    right_attribute, right_alias = j
+                    if left_attribute == right_attribute and not any(left_attribute == attr for attr, _ in common):
+                        common.append((left_attribute, left_alias))
+            for attr, alias in common:
+                table = alias_dict[alias]
+                if QOData().get_index(attr, table) == 'btree':
+                    is_index = True
+                    break
+
+            if not is_index:
+                return previous_cost + (left.b + right.b) * t_T + 2 * t_S
+            else:
+                # Todo: Height dari tree perlu dicari
+                c = 3
+                return previous_cost + left.b * (t_T + t_S) + left.n * c
+        elif self.algorithm == JoinAlgorithm.HASH:
+            is_index = False
+            common = []
+            for i in left_attributes:
+                left_attribute, left_alias = i
+                for j in right_attributes: 
+                    right_attribute, right_alias = j
+                    if left_attribute == right_attribute and not any(left_attribute == attr for attr, _ in common):
+                        common.append((left_attribute, left_alias))
+            for attr, alias in common:
+                table = alias_dict[alias]
+                if QOData().get_index(attr, table) == 'hash':
+                    is_index = True
+                    break
+            if not is_index:
+                return Exception("The index does not exist")
+            else:
+                return previous_cost + (left.b + right.b) * t_T + 2 * t_S
+        elif self.algorithm == JoinAlgorithm.MERGE:
+            # No seeks required because b_b -> infinity implies seeks -> 0 
+            return previous_cost + (left.b + right.b) * t_T
+    
 
     def __str__(self) -> str:
         return f"NATURAL JOIN [{self.algorithm.value}]"

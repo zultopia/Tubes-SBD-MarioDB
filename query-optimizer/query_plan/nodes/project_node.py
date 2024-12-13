@@ -11,7 +11,7 @@ class ProjectNode(QueryNode):
         # Sort the attributes to ensure consistent ordering
         attributes.sort()
 
-        self.attributes = attributes
+        self.project_list = attributes
 
         self.child = None  # Single child node
 
@@ -28,29 +28,32 @@ class ProjectNode(QueryNode):
             cloned_node.set_child(cloned_child)
         return cloned_node
     
-    def estimate_size(self, statistics: Dict):
+    def estimate_size(self, statistics: Dict, alias_dict):
         if not self.child:
             return
         self.child.estimate_size()
 
-        # Todo: Ganti ID Kl perlu (?)
-        self.attributes = self.child.attributes
+
+        self.attributes = []
+        for attr in self.project_list:
+            for i in self.child.attributes:
+                child_attribute, child_alias = i
+                if child_attribute == attr:
+                    self.attributes.append((child_attribute, child_alias))
+        
         self.n = self.child.n
 
         record_size = 0
         for i in self.child.attributes:
-            attribute, table_name = i.first, i.second
-            attribute = attribute.split('.')[1]
-            record_size += QOData().get_size(attribute, table_name)
+            attribute, alias = i.first, i.second
+            table = alias_dict[alias]
+            record_size += QOData().get_size(attribute, table)
         self.b = int(BLOCK_SIZE / record_size)
 
 
-    def estimate_cost(self, statistics: Dict) -> float:
-        return self._calculate_operation_cost(statistics)
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        return self.child.estimate_cost()
 
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
-        # Placeholder implementation for project cost
-        return 1
 
     def __str__(self) -> str:
         return f"PROJECT {', '.join(self.attributes)}"

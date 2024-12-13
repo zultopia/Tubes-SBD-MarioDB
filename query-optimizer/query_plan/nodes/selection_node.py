@@ -33,36 +33,37 @@ class SelectionNode(QueryNode):
             cloned_node.set_child(self.child.clone())
         return cloned_node
 
-    def estimate_size(self, statistics: Dict):
+    def estimate_size(self, statistics: Dict, alias_dict):
         if not self.child:
             return
         self.child.estimate_size()
 
-        # Todo: Ganti ID Kl perlu (?)
         self.attributes = self.child.attributes
         self.n = self.child.n
         for condition in self.conditions:
-            # Belum handle kasus left & right operandnya ada dot
-            # Belum handle kasus atribut tidak ada di tabelnya
-            # Belum handle kasus attribute < attribute (kyknya ga perlu krn eksotik)
-            # Belum handle kasus NEQ (kyknya ga perlu) asumsi aja negligable karena dia tidak spesifik
+            
 
             if condition.operator == Operator.EQ:
-                self.n *= min(1 / QOData().get_V(condition.left_attribute, condition.left_table_name), 1 / QOData().get_V(condition.right_attribute, condition.right_table_name)) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
+                left_table_name = alias_dict[condition.left_table_alias]
+                right_table_name = alias_dict[condition.right_table_alias]
+                self.n *= min(1 / QOData().get_V(condition.left_attribute, left_table_name), 1 / QOData().get_V(condition.right_attribute, right_table_name)) # Menurut buku, aman diasumsikan bahwa distribusinya uniform
             if condition.operator in [Operator.LESS, Operator.LESS_EQ]:
-                self.n *= (float(condition.right_operand) - QOData().get_min(condition.left_attribute, condition.left_table_name)) / (QOData().get_max(condition.left_attribute, condition.left_table_name) - QOData().get_min(condition.left_attribute, condition.left_table_name))
+                left_table_name = alias_dict[condition.left_table_alias]
+                self.n *= (float(condition.right_operand) - QOData().get_min(condition.left_attribute, left_table_name)) / (QOData().get_max(condition.left_attribute, left_table_name) - QOData().get_min(condition.left_attribute, left_table_name))
             if condition.operator in [Operator.GREATER,Operator.GREATER_EQ]:
-                self.n *= (QOData().get_max(condition.left_attribute, condition.left_table_name) - float(condition.right_operand) ) / (QOData().get_max(condition.left_attribute, condition.left_table_name) - QOData().get_min(condition.left_attribute, condition.left_table_name))
+                left_table_name = alias_dict[condition.left_table_alias]
+                self.n *= (QOData().get_max(condition.left_attribute, left_table_name) - float(condition.right_operand) ) / (QOData().get_max(condition.left_attribute, left_table_name) - QOData().get_min(condition.left_attribute, left_table_name))
+        
+        
         self.n = int(self.n)
-
+        if self.n < 0:
+            self.n = 0
         self.b = self.child.b
 
 
-    def estimate_cost(self, statistics: Dict) -> float:
-        return self._calculate_operation_cost(statistics)
-
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
-        return 1
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        # Karena pipeline, IO cost adalah 0
+        return self.child.estimate_cost()
 
     def __str__(self) -> str:
         return f"SELECT {', '.join([str(c) for c in self.conditions])}"
@@ -104,12 +105,11 @@ class UnionSelectionNode(QueryNode):
 
         return cloned_node
 
-    def estimate_cost(self, statistics: Dict) -> float:
-        return self._calculate_operation_cost(statistics)
+    def estimate_size(self, statistics: Dict) -> float:
+        pass
 
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
-        # Placeholder implementation for union selection cost
-        return 1
+    def estimate_cost(self, statistics: Dict) -> float:
+        pass
 
     def __str__(self) -> str:
         return f"UNION"

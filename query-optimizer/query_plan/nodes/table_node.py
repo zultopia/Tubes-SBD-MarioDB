@@ -23,20 +23,17 @@ class TableNode(QueryNode):
     def set_child(self, child: QueryNode):
         self.child = child
 
-    def estimate_size(self, statistics: Dict):
+    def estimate_size(self, statistics: Dict, alias_dict):
         attributes = statistics[self.table_name]['attributes']
-        self.attributes =  [(self.id + '.' + attr_name, self.table_name) for attr_name, attr_info in attributes.items()]
+        self.attributes =  [(attr_name, self.alias) for attr_name, _ in attributes.items()]
         self.n = QOData().get_n(self.table_name)
         self.b = QOData().get_b(self.table_name)
 
 
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        self.estimate_size()
 
-    def estimate_cost(self, statistics: Dict) -> float:
-        return self._calculate_operation_cost(statistics)
-
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
-        # Placeholder implementation for table scan cost
-        return 1
+        return 0
 
     def __str__(self) -> str:
         return f"TABLE {self.table_name} AS {self.alias}" if self.alias != self.table_name else f"TABLE {self.table_name}"

@@ -25,7 +25,7 @@ class SortingNode(QueryNode):
             cloned_node.set_child(cloned_child)
         return cloned_node
 
-    def estimate_size(self, statistics: Dict):
+    def estimate_size(self, statistics: Dict, alias_dict):
         if not self.child:
             return
         self.child.estimate_size()
@@ -35,12 +35,9 @@ class SortingNode(QueryNode):
         self.n = self.child.n
         self.b = self.child.b
 
-    def estimate_cost(self, statistics: Dict) -> float:
-        return self._calculate_operation_cost(statistics)
-
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
-        # Placeholder implementation for sorting cost
-        return 1
+    def estimate_cost(self, statistics: Dict, alias_dict) -> float:
+        # Sorting tidak memakan IO
+        return self.child.estimate_cost()
 
     def __str__(self) -> str:
         order = "ASC" if self.ascending else "DESC"

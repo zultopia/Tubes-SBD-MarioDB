@@ -10,10 +10,11 @@ class QueryNode(ABC, Prototype):
     children: Union['QueryNode', Pair['QueryNode', 'QueryNode'], None, List['QueryNode']]
     id: str
 
-    table_name: str | None # str if it directly refers to a table, None if it is the result of the operations
-    attributes: List[Pair[str, str]] # The list of attributes and original table name. The format of each attribute name is id.attributename.
+    alias: str | None # str for table, None for non-table expressions
+    attributes: List[Pair[str, str]] # (attribute name, original table alias). 'attributes' can contain the same attribute names but must have different aliases. 
     n: int # The exact number of tuples for tables or the approximated number of tuples for the result of the operations.
     b: int # The blocking factor (the number of records that fit inside a block)
+    # f: int # The number of blocks or n / b
 
 
     def __init__(self, node_type: NodeType):
@@ -31,19 +32,11 @@ class QueryNode(ABC, Prototype):
         return self.children is not None and isinstance(self.children, QueryNode)
 
     @abstractmethod
-    def estimate_size(self, statistics: Dict):
+    def estimate_size(self, statistics: Dict, alias_dict: Dict[str, str]):
         pass
 
     @abstractmethod
-    def estimate_io(self, statistics: Dict):
-        pass
-
-    @abstractmethod
-    def estimate_cost(self, statistics: Dict) -> float:
-        pass
-
-    @abstractmethod
-    def _calculate_operation_cost(self, statistics: Dict) -> float:
+    def estimate_cost(self, statistics: Dict, alias_dict: Dict[str, str]) -> float:
         pass
 
     @abstractmethod
