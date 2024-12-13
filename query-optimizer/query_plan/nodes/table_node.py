@@ -27,8 +27,8 @@ class TableNode(QueryNode):
         self.child = child
 
     def estimate_size(self, statistics: Dict, alias_dict):
-        attributes = statistics[self.table_name]['attributes']
-        self.attributes =  [(attr_name, self.alias) for attr_name, _ in attributes.items()]
+        attributes = QOData().get_all_attributes(self.table_name)
+        self.attributes =  [(attr_name, self.alias) for attr_name in attributes]
         self.n = QOData().get_n(self.table_name)
         self.b = QOData().get_b(self.table_name)
 
